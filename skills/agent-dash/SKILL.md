@@ -1,14 +1,14 @@
 ---
 name: agent-dash
-description: Reach the human through Agent Dash — a personal push inbox. Send progress updates that land as phone notifications, and ask a question then WAIT for the answer before continuing. Use when you hit a milestone, finish a long task, hit an error the human should see, or reach a decision point where you need the human to choose (which option, approve/reject, fill in details) before proceeding.
+description: Connect a workspace to Agent Dash, send progress updates that land as phone notifications, and ask a question then WAIT for the human's answer. Use when pairing a project, reaching a milestone or error, or reaching a decision point where the human needs to choose, approve, or provide details.
 license: MIT
 ---
 
 # Agent Dash
 
 Agent Dash is the human's personal notification hub. You talk to it over plain
-HTTP with a bearer token. Two things you can do: **notify** (fire-and-forget)
-and **ask** (post a question, then poll until they answer).
+HTTP with a bearer token. You can **notify**, **ask and wait**, deliver an
+**artifact or static preview**, and poll for an ordinary human reply.
 
 ## Configuration
 
@@ -29,12 +29,82 @@ Every request sends `Authorization: Bearer <AGENT_KEY>`.
 Then use the key they paste. If they self-host, also ask for their hub URL.
 Store the key for the rest of the session; you don't need to ask again.
 
+For an MCP-capable agent, make sure the workspace has a project-local
+`.mcp.json` entry so the hub's tools can be discovered:
+
+```json
+{
+  "mcpServers": {
+    "agent-dash": {
+      "url": "https://agentdash.mycli.tools/mcp",
+      "headers": { "Authorization": "Bearer <AGENT_KEY>" }
+    }
+  }
+}
+```
+
+This file contains the key, so add `.mcp.json` to `.gitignore` and never commit
+it. If you create or change the entry during a session, tell the human that the
+agent may need to reload MCP servers or restart before `connect_project` and
+`deliver_artifact` appear.
+
+## Connect this workspace
+
+The portable command is `agentdash connect`. Claude Code also gets
+`/agentdash connect`; in Codex, invoke this skill with `connect`.
+
+Before the first question about a project, look for `.agentdm` at the workspace
+root. If it exists, read its `project.id` and reuse that id on every Agent Dash
+call. If it does not exist, pair the workspace before asking:
+
+1. Inspect enough of the repository to write a one-sentence summary.
+2. Collect only useful orientation: project name, HTTP(S) repository URL,
+   current branch, up to 8 important technologies, and the current focus.
+3. Call the MCP `connect_project` tool. With raw HTTP, use:
+
+```bash
+curl -X PUT "$AGENT_DASH_URL/api/v1/projects" \
+  -H "Authorization: Bearer $AGENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Agent Dash",
+    "summary": "A mobile inbox where AI coding agents send updates, work, and decisions.",
+    "repo_url": "https://github.com/example/agent-dash",
+    "branch": "main",
+    "stack": ["React", "TypeScript", "Cloudflare Workers"],
+    "current_focus": "Freemium onboarding and project context"
+  }'
+```
+
+`POST` is accepted as a compatibility alias if the agent's HTTP client cannot
+send `PUT`. An authenticated `GET /api/v1/projects` can be used to verify that
+the registration endpoint is available and inspect the current project list.
+
+4. Save the returned project identity locally:
+
+```json
+{
+  "version": 1,
+  "hub": "https://agentdash.mycli.tools",
+  "project": { "id": "prj_01...", "name": "Agent Dash" }
+}
+```
+
+Keep `.agentdm` git-ignored. It may contain the non-secret project profile, but
+never put `AGENT_KEY`, an encryption key, credentials, local absolute paths, or
+other secrets in it. If `.agentdm` already exists, do not create a second
+project. Reuse its id; refresh the profile only when the project context has
+materially changed. If an API call returns `unknown_project`, reconnect once.
+The connect response also includes `capabilities`; check
+`capabilities.artifact_delivery` before sending an image or file.
+
 ## Threading — the most important habit
 
 The human sees your work grouped as **Project → Task → conversation**. For that
 to work, on EVERY call include:
 
 - `project` — what you're building, e.g. `"Weather app"`.
+- `project_id` — the stable id from `.agentdm`, when paired.
 - `model` — which model you are, e.g. `"claude-opus-4.8"`, `"gpt-5"`.
 - `task` — the human-readable sub-task, e.g. `"Adding children mode"`.
 - **`task_id`** — a **stable id you generate once when you start a task and reuse
@@ -59,6 +129,10 @@ curl -X POST "$AGENT_DASH_URL/api/v1/events" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "claude-code",
+    "project_id": "prj_01...",
+    "project": "Agent Dash",
+    "task": "Landing page research",
+    "model": "claude-opus-4.8",
     "task_id": "landing-redesign",
     "title": "Finished the competitive research",
     "priority": 1,
@@ -89,6 +163,11 @@ curl -X POST "$AGENT_DASH_URL/api/v1/questions" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "claude-code",
+    "project_id": "prj_01...",
+    "project": "Agent Dash",
+    "task": "Deck framing",
+    "model": "claude-opus-4.8",
+    "task_id": "deck-framing",
     "title": "Which audience should the deck target?",
     "timeout_minutes": 120,
     "ack": "Got it — building for {answer}. Watch this thread for updates.",
@@ -140,10 +219,51 @@ automatically flips from "waiting for the agent…" to "agent received it" and
 shows your `ack` message. So keep polling promptly after they might answer — the
 poll is what confirms receipt to them.
 
+## 3. Wait for an ordinary reply
+
+The human can reply with free text in any task thread. Poll with the same stable
+`task_id` used on your messages:
+
+```bash
+curl "$AGENT_DASH_URL/api/v1/replies?thread_key=landing-redesign&after=0" \
+  -H "Authorization: Bearer $AGENT_KEY"
+# { "ok": true, "replies": [{ "id": "...", "body": { "text": "Make the CTA smaller" }, "created_at": 1699... }] }
+```
+
+Use the largest `created_at` value as the next `after` cursor. The CLI equivalent
+is `agentdash wait --task-id landing-redesign`.
+
+## 4. Bring the work into the thread
+
+Hosted artifacts and static previews are plan-gated. The CLI handles the upload
+lifecycle and posts the resulting typed block:
+
+```bash
+agentdash artifact ./proposal.pdf --project "Marketing" --task-id proposal
+agentdash preview ./dist --project "Website" --task-id landing-redesign
+```
+
+If the MCP tool list includes `deliver_artifact`, prefer it for images and files
+up to 8 MB: base64-encode the file bytes and call the tool with `name`,
+`mime_type`, `content_base64`, `title`, and the usual project/task metadata. It
+uploads the content and posts the artifact card in one call. When the human asks
+to see an image or file, deliver it this way instead of returning a local path.
+
+Use `artifact` for an image, PDF, document, archive, or other file up to the
+configured size limit. Use `preview` only for a built static directory containing
+`index.html`. Never send a local-only URL such as `localhost`; package the build
+as a preview so the human can open it from another device.
+
+If the hub returns `daily_agent_message_limit`, stop creating new events until
+the returned reset time. The human can still read, reply, and approve existing
+work. If it returns `monthly_artifact_limit`, send an ordinary link or text update
+instead of retrying the upload.
+
 ## Blocks reference
 
 Display (any event): `markdown`, `progress`, `keyvalue`, `table`, `link`,
-`image`, `code`, `callout`. Interactive (questions only): `buttons`, `form`.
+`image`, `code`, `callout`, `artifact`, `preview`. Interactive (questions only):
+`buttons`, `form`.
 
 Full machine-readable schema with examples: `GET $AGENT_DASH_URL/api/v1/schema.json`
 (no auth needed). Fetch it if you need exact field shapes.
