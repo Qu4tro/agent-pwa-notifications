@@ -1,6 +1,6 @@
 ---
 name: agent-dash
-description: Connect a workspace to Agent Dash, send progress updates that land as phone notifications, and ask a question then WAIT for the human's answer. Use when pairing a project, reaching a milestone or error, or reaching a decision point where the human needs to choose, approve, or provide details.
+description: Connect a workspace to Agent Dash, negotiate Free/Pro presentation capabilities, send rich progress or visual review updates, and ask a monitored question then wait for the human's answer. Use when pairing a project, delivering work, reaching a milestone or error, or needing the human to choose, approve, or provide details.
 license: MIT
 ---
 
@@ -46,7 +46,7 @@ For an MCP-capable agent, make sure the workspace has a project-local
 This file contains the key, so add `.mcp.json` to `.gitignore` and never commit
 it. If you create or change the entry during a session, tell the human that the
 agent may need to reload MCP servers or restart before `connect_project` and
-`deliver_artifact` appear.
+`get_capabilities`, `deliver_artifact`, and the other tools appear.
 
 ## Connect this workspace
 
@@ -95,8 +95,32 @@ never put `AGENT_KEY`, an encryption key, credentials, local absolute paths, or
 other secrets in it. If `.agentdm` already exists, do not create a second
 project. Reuse its id; refresh the profile only when the project context has
 materially changed. If an API call returns `unknown_project`, reconnect once.
-The connect response also includes `capabilities`; check
-`capabilities.artifact_delivery` before sending an image or file.
+The connect response includes an initial `capabilities` snapshot. It helps with
+setup, but plans can change; refresh capabilities again before every event.
+
+## Before every event: negotiate capabilities
+
+This is required before `notify`, `update`, `ask`, `upload_artifact`, or
+`deliver_artifact`:
+
+1. Call MCP `get_capabilities`. With raw HTTP, call:
+
+```bash
+curl "$AGENT_DASH_URL/api/v1/capabilities" \
+  -H "Authorization: Bearer $AGENT_KEY"
+```
+
+2. Read `capabilities.plan` and `presentation.available_blocks` before deciding
+   how to present the work. Do not compose a Pro-only block and hope it works.
+3. Pass the returned `capability_version` to the send call. If the hub returns
+   `capability_check_required`, check again. If it returns
+   `block_not_available`, use the returned fallback rather than dropping the
+   content.
+
+Free includes useful core blocks such as `table` and enhanced `code`. Pro (and
+self-hosted Community) adds `gallery`, `before_after`, `diff`, `metrics`, and
+`timeline`. Read [references/rich-blocks.md](references/rich-blocks.md) when
+choosing or constructing a rich visual block.
 
 ## Threading — the most important habit
 
@@ -129,6 +153,7 @@ curl -X POST "$AGENT_DASH_URL/api/v1/events" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "claude-code",
+    "capability_version": "blocks-v2:free:artifacts:no-previews",
     "project_id": "prj_01...",
     "project": "Agent Dash",
     "task": "Landing page research",
@@ -163,6 +188,7 @@ curl -X POST "$AGENT_DASH_URL/api/v1/questions" \
   -H "Content-Type: application/json" \
   -d '{
     "agent": "claude-code",
+    "capability_version": "blocks-v2:pro:artifacts:no-previews",
     "project_id": "prj_01...",
     "project": "Agent Dash",
     "task": "Deck framing",
@@ -200,15 +226,31 @@ curl "$AGENT_DASH_URL/api/v1/questions/01J..." \
 # pending:  { "ok": true, "status": "pending",  "answer": null }
 # answered: { "ok": true, "status": "answered", "answer": { "deck": { "audience": "VC", "tone": "Punchy", "notes": "Lead with traction" } } }
 # expired:  { "ok": true, "status": "expired" }
+# stale:    { "ok": true, "status": "stale" }
 ```
 
 **Polling loop — do exactly this:**
 
 1. Poll the id.
-2. If `status` is `pending`, wait ~10 seconds and poll again. After the first
-   5 minutes, back off to every ~30 seconds to be kind to the free tier.
+2. If `status` is `pending`, wait ~10 seconds and poll again. Each poll renews a
+   short monitoring lease that keeps the question answerable in the UI.
 3. If `status` is `answered`, read `answer` (keyed by each block `id`) and continue your work using those values.
 4. If `status` is `expired`, the human didn't respond in time — proceed with a sensible default and mention that you did.
+5. If `status` is `stale`, the question is closed and cannot be answered unless
+   active polling later revives an automatically stale lease.
+
+Do not leave a pending polling loop silently. If you finish another way, hit a
+terminal error, lose the ability to wait, or are about to end the session, call
+MCP `close_question`. Raw HTTP fallback:
+
+```bash
+curl -X POST "$AGENT_DASH_URL/api/v1/questions/01J.../close" \
+  -H "Authorization: Bearer $AGENT_KEY"
+```
+
+That immediately marks the question stale and removes its answer controls, so
+the human never answers a question nobody is listening for. If closing reports
+`answer_available`, poll once instead—the human already answered.
 
 The `answer` object is keyed by block id. A `buttons` block answers with the
 chosen string (`{ "confirm": "Deploy" }`); a `form` block answers with an object
@@ -245,9 +287,12 @@ agentdash preview ./dist --project "Website" --task-id landing-redesign
 
 If the MCP tool list includes `deliver_artifact`, prefer it for images and files
 up to 8 MB: base64-encode the file bytes and call the tool with `name`,
-`mime_type`, `content_base64`, `title`, and the usual project/task metadata. It
-uploads the content and posts the artifact card in one call. When the human asks
-to see an image or file, deliver it this way instead of returning a local path.
+`mime_type`, `content_base64`, `title`, `capability_version`, and the usual
+project/task metadata. It uploads the content and posts the artifact card in one
+call. When the human asks to see an image or file, deliver it this way instead
+of returning a local path. For a Pro gallery or before/after review, call
+`upload_artifact` for each image first, then reference those artifact ids in one
+rich block sent through `notify`.
 
 Use `artifact` for an image, PDF, document, archive, or other file up to the
 configured size limit. Use `preview` only for a built static directory containing
@@ -261,8 +306,9 @@ instead of retrying the upload.
 
 ## Blocks reference
 
-Display (any event): `markdown`, `progress`, `keyvalue`, `table`, `link`,
-`image`, `code`, `callout`, `artifact`, `preview`. Interactive (questions only):
+Core display: `markdown`, `progress`, `keyvalue`, `table`, `link`, `image`,
+`code`, `callout`, `artifact`, `preview`. Pro rich display: `gallery`,
+`before_after`, `diff`, `metrics`, `timeline`. Interactive (questions only):
 `buttons`, `form`.
 
 Full machine-readable schema with examples: `GET $AGENT_DASH_URL/api/v1/schema.json`
@@ -310,3 +356,4 @@ hub URL yet, ask for it once.
 - Set `priority: 2` only for things that should interrupt the human.
 - Reuse one `task_id` per run so the human sees a clean thread, not noise.
 - Don't block forever: always pass a `timeout_minutes` on questions and handle `expired`.
+- Never leave a pending question behind: keep polling or call `close_question`.
