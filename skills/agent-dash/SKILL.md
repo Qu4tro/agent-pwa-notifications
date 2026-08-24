@@ -10,6 +10,25 @@ Agent Dash is the human's personal notification hub. You talk to it over plain
 HTTP with a bearer token. You can **notify**, **ask and wait**, deliver an
 **artifact or static preview**, and poll for an ordinary human reply.
 
+## Command actions
+
+When the human invokes `/agent-dash update`, treat that invocation as permission
+to update only the Agent Dash skill. Run:
+
+```bash
+node "${CLAUDE_SKILL_DIR}/scripts/update-skill.mjs"
+```
+
+The updater detects the active skill's registered project or global scope,
+updates that copy from `Prajeevan/agent-dash`, and verifies the result. Report
+the updated scope, then stop; do not connect a project or send an Agent Dash event during
+the update action. If the running session retains the old instructions, tell the
+human to invoke `/agent-dash` again in a new conversation. Do not update every
+installed skill or alter MCP credentials.
+
+When invoked as `/agent-dash connect`, continue with **Connect this workspace**
+below. For other invocations, use the workflow that matches the human's request.
+
 ## Configuration
 
 You need two values:
@@ -50,8 +69,8 @@ agent may need to reload MCP servers or restart before `connect_project` and
 
 ## Connect this workspace
 
-The portable command is `agentdash connect`. Claude Code also gets
-`/agentdash connect`; in Codex, invoke this skill with `connect`.
+The portable command is `agentdash connect`. In Claude Code use
+`/agent-dash connect`; in Codex, invoke this skill with `connect`.
 
 Before the first question about a project, look for `.agentdm` at the workspace
 root. If it exists, read its `project.id` and reuse that id on every Agent Dash
