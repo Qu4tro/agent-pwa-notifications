@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-01
+
 The first release of the fork. No behaviour change beyond the new version field.
 
 ### Added
