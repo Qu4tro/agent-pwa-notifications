@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, Link, useParams } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet, useParams, useRouterState } from '@tanstack/react-router'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { api, AuthError, timeAgo, type TaskSummary } from '../lib/api'
 import { Header, Container, LockedScreen, Spinner } from '../lib/shell'
@@ -7,9 +7,16 @@ import { projectColor, projectLabel, fromParam, KIND_LABEL, KIND_COLOR } from '.
 import { useLive } from '../lib/live'
 
 export const Route = createFileRoute('/project/$name')({
-  component: ProjectView,
+  component: ProjectRoute,
   ssr: false,
 })
+
+function ProjectRoute() {
+  const hasTaskRoute = useRouterState({
+    select: (state) => state.matches.some((match) => match.routeId.endsWith('/task/$key')),
+  })
+  return hasTaskRoute ? <Outlet /> : <ProjectView />
+}
 
 function ProjectView() {
   const { name } = useParams({ from: '/project/$name' })

@@ -64,7 +64,35 @@ async function maybePush(env: Env, accountId: string, event: EventRow): Promise<
     eventId: event.id,
     kind: event.kind,
     priority: event.priority,
+    quickAnswers: quickAnswerActions(event),
   })
+}
+
+interface QuickAnswerAction {
+  action: string
+  title: string
+  answer: Record<string, string>
+}
+
+// Keep notification answers deliberately tiny. Longer or more complex
+// questions remain tap-to-open, which avoids truncated or incomplete choices.
+function quickAnswerActions(event: EventRow): QuickAnswerAction[] {
+  if (event.kind !== 'question' || event.enc === 1 || event.title.length > 80) return []
+  try {
+    const blocks = JSON.parse(event.blocks) as Block[]
+    const interactive = blocks.filter((block) => block.type === 'buttons' || block.type === 'form')
+    if (interactive.length !== 1 || interactive[0].type !== 'buttons') return []
+    const button = interactive[0]
+    if (button.options.length < 2 || button.options.length > 3) return []
+    if (button.options.some((option) => option !== option.trim() || option.length > 20)) return []
+    return button.options.map((option, index) => ({
+      action: `answer-${index}`,
+      title: option,
+      answer: { [button.id]: option },
+    }))
+  } catch {
+    return []
+  }
 }
 
 // A short plaintext preview for the notification body.

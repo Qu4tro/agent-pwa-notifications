@@ -4,7 +4,7 @@
   // or just run `pnpm setup` which walks you through it.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "agent-dash",
-  "account_id": "1a204f95e8c55231529cafa260756738",
+  "account_id": "f4d71022dd6ed8ada4e294c096d51fc5",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/worker.ts",
@@ -25,13 +25,13 @@
     {
       "binding": "DB",
       "database_name": "agent-dash",
-      "database_id": "ad92afb5-6abc-460d-aede-c3f6d5af9615"
+      "database_id": "40bec5c6-4077-4c43-a615-860181b6b766"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "SESSIONS",
-      "id": "db48529daf584e6cb422c1583bd85a46"
+      "id": "27cc01d4724a41a39be9e0201685a36c"
     }
   ]
 }

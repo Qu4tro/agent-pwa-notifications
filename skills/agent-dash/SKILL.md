@@ -199,6 +199,19 @@ curl -X POST "$AGENT_DASH_URL/api/v1/events" \
 Post a question with an **interactive block** (`buttons` for a choice, `form`
 to collect fields). You get back an `id`. Then poll that id until it's answered.
 
+### Notification micro-questions
+
+To let the human answer directly from a supported notification:
+
+- Write a one-clause title of at most 80 characters.
+- Use exactly one `buttons` block with 2 options preferred, 3 maximum.
+- Keep each option at most 20 characters.
+- Put supporting context in a `markdown` block. Tapping the notification or its
+  **More** action opens the complete thread.
+
+Longer questions, forms, encrypted questions, and unsupported browsers remain
+tap-to-open. Never shorten a choice until its meaning becomes ambiguous.
+
 ### Post the question
 
 ```bash
@@ -228,12 +241,13 @@ curl -X POST "$AGENT_DASH_URL/api/v1/questions" \
 # → { "ok": true, "id": "01J...", "poll_url": "/api/v1/questions/01J...", "timeout_at": 1699... }
 ```
 
-Or a simple choice:
+Or a notification micro-question:
 
 ```json
+"title": "Ready to deploy?",
 "blocks": [
-  { "type": "markdown", "text": "About to deploy to production. Go?" },
-  { "type": "buttons", "id": "confirm", "options": ["Deploy", "Cancel"] }
+  { "type": "markdown", "text": "All production checks passed." },
+  { "type": "buttons", "id": "confirm", "options": ["Deploy", "Hold"] }
 ]
 ```
 

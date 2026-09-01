@@ -51,11 +51,11 @@ const TOOLS = [
   {
     name: 'ask',
     description:
-      'Ask the human a question and get an id to poll. Provide at least one interactive block: a "buttons" block for a choice, or a "form" block to collect fields. ALWAYS pass project, model, task (the sub-task name), and — critically — the SAME task_id you use for this task\'s other calls, so a sequence of questions (Q1 → answer → Q2 → answer) stacks into one thread instead of separate cards. Returns { id }; then call wait_for_answer. Use ask for each DISTINCT step; use update (not ask) when a single status like a progress bar should change in place.',
+      'Ask the human a question and get an id to poll. For answers directly on supported notifications, make it a micro-question: title at most 80 characters, exactly one buttons block, 2 options preferred (3 max), and each option at most 20 characters. Put any context in a markdown block; the notification or More action opens the full thread. Longer choices and forms remain tap-to-open. ALWAYS pass project, model, task, and the SAME task_id used for this task\'s other calls. Returns { id }; then call wait_for_answer.',
     inputSchema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: 'The question, e.g. "Which color scheme?"' },
+        title: { type: 'string', description: 'Question headline. Keep at most 80 characters for notification answers.' },
         project: { type: 'string', description: 'Project name, e.g. "Weather app".' },
         task: { type: 'string', description: 'Current task, e.g. "Adding children mode".' },
         model: { type: 'string', description: 'Which model you are.' },
@@ -68,7 +68,7 @@ const TOOLS = [
         blocks: {
           type: 'array',
           description:
-            'Must include a buttons or form block. e.g. [{"type":"markdown","text":"Ready to send?"},{"type":"buttons","id":"go","options":["Send","Hold"]}]',
+            'Must include a buttons or form block. Notification answers require exactly one buttons block with 2–3 labels of at most 20 characters each. Put longer context in markdown; e.g. [{"type":"markdown","text":"The checks passed."},{"type":"buttons","id":"go","options":["Ship","Hold"]}]',
         },
         timeout_minutes: { type: 'number', description: 'How long to wait before the question expires. Default 1440 (24h).' },
         task_id: { type: 'string' },
