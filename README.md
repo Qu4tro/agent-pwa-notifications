@@ -1,5 +1,11 @@
 # Agent Dash
 
+> **Fork notice.** This is `Qu4tro/agent-pwa-notifications`, a fork of
+> [Prajeevan/agent-dash](https://github.com/Prajeevan/agent-dash), kept for one
+> self-hosted deployment. The app, the CLI and the Worker are being renamed, and
+> the release notes in [CHANGELOG.md](CHANGELOG.md) track the progress. Upstream
+> history is preserved and upstream's README follows.
+
 **Your agents report here.** A self-hosted push inbox for AI agents — deploy
 your own on Cloudflare's free plan, and any agent (Claude Code, Codex, Cursor,
 Antigravity, Kimi, or a raw ChatGPT/Claude chat) can send updates to your phone

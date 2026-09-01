@@ -201,6 +201,10 @@ function SettingsPage() {
             </button>
           </div>
         </Card>
+
+        <p style={{ color: 'var(--muted)', fontSize: '0.8rem', textAlign: 'center', margin: '1.5rem 0 0' }}>
+          Version {__APP_VERSION__}
+        </p>
       </Container>
     </>
   )
