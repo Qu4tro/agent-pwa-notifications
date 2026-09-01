@@ -4,6 +4,10 @@
   "description": "Self-hosted push + ask-and-wait inbox for AI agents. Deploy your own on Cloudflare's free plan.",
   "type": "module",
   "license": "MIT",
+  "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "vite dev --port 3000",
     "generate-routes": "tsr generate",
@@ -15,7 +19,9 @@
     "setup": "node scripts/setup.mjs",
     "login": "node scripts/login.mjs",
     "typecheck": "tsc --noEmit",
-    "publish:prod": "cd cli && npm publish --access public"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "release": "./scripts/release.sh"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.26.0",
@@ -31,6 +37,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@cloudflare/workers-types": "^5.20260722.1",
     "@tanstack/router-cli": "^1.132.0",
     "@types/node": "^22.10.2",
@@ -40,6 +47,7 @@
     "qrcode-terminal": "^0.12.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
+    "vitest": "^4.1.11",
     "wrangler": "^4.70.0"
   }
 }
