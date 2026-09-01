@@ -5,3 +5,7 @@ dist/
 .agent-dash.local.json
 *.log
 .DS_Store
+
+# Local scratch: the brief, the plan, the patch, screenshots. Anything meant
+# for publication lives in public_docs/ instead.
+docs/
