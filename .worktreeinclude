@@ -1,0 +1,4 @@
+# Gitignored paths that a new worktree still needs. A path must be both
+# gitignored and listed here to be copied.
+docs/
+.dev.vars
