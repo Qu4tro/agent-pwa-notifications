@@ -11,8 +11,8 @@ Workers. You talk to it over plain HTTP with a bearer token. You can send an
 update, change an update in place, and ask a question and wait for the answer.
 
 Everything in this document is an endpoint the hub really implements. There is
-no plan tier, no capability negotiation, no artifact upload and no free-text
-reply channel. If you need the machine-readable contract, fetch
+no paid tier, no negotiation step before you send, no file upload and no
+free-text reply channel. If you need the machine-readable contract, fetch
 `GET <hub>/api/v1/schema.json` (blocks) or `GET <hub>/api/v1/openapi.json`
 (endpoints). Neither needs auth.
 

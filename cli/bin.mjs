@@ -172,6 +172,12 @@ async function ask() {
   process.stderr.write('Waiting for an answer')
   for (let i = 0; i < 360; i++) {
     const r = await hub('GET', `/api/v1/questions/${json.id}`, conf)
+    // A cleared inbox deletes the question, so stop rather than poll a 404
+    // until the loop runs out.
+    if (r.status !== 200 || !r.json.ok) {
+      process.stderr.write('\n')
+      die(`Poll failed (${r.status}): ${r.json.error || 'unknown error'}`)
+    }
     if (r.json.status === 'answered') {
       let answer = r.json.answer
       if (conf.encKey && typeof answer === 'string') answer = await decrypt(conf.encKey, answer)
