@@ -1,6 +1,6 @@
-// Agent Dash service worker: receive Web Push, show the notification, and
-// deep-link into the relevant event when tapped. Deliberately tiny — no
-// offline caching in v1 (the app needs the network to be useful anyway).
+// Service worker: receive Web Push, show the notification, and deep-link into
+// the relevant event when tapped. Deliberately tiny: no offline caching (the
+// app needs the network to be useful anyway).
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
@@ -15,11 +15,11 @@ function actionsForNotification(data) {
     .filter((item) => item && typeof item.action === 'string' && typeof item.title === 'string')
     .map(({ action, title }) => ({ action, title }))
 
-  if (answers.length > max) {
-    return [...answers.slice(0, Math.max(0, max - 1)), { action: 'more', title: 'More' }]
-  }
-  if (answers.length < max) answers.push({ action: 'more', title: 'More' })
-  return answers
+  // Every answer fits: show only the answers. A spare slot buys nothing, since
+  // tapping the notification body already opens the thread.
+  if (answers.length <= max) return answers
+  // Too many: keep as many answers as fit beside a "More" that opens the thread.
+  return [...answers.slice(0, max - 1), { action: 'more', title: 'More' }]
 }
 
 self.addEventListener('push', (event) => {
@@ -27,15 +27,15 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {}
   } catch (e) {
-    data = { title: 'Agent Dash', body: event.data ? event.data.text() : '' }
+    data = { title: 'Agent Notifications', body: event.data ? event.data.text() : '' }
   }
 
-  const title = data.title || 'Agent Dash'
+  const title = data.title || 'Agent Notifications'
   const isQuestion = data.kind === 'question'
   const actions = isQuestion ? actionsForNotification(data) : []
   const options = {
     body: data.body || '',
-    tag: data.tag || data.eventId || 'agent-dash',
+    tag: data.tag || data.eventId || 'agent-notifications',
     data: {
       url: data.eventId ? `/event/${data.eventId}` : '/',
       eventId: data.eventId,
@@ -84,6 +84,14 @@ self.addEventListener('notificationclick', (event) => {
             body: JSON.stringify(selected.answer),
           })
           if (response.ok) return
+          // The session is gone (expired, or logged out on this device). Send
+          // the human to the login page and back to the question afterwards,
+          // instead of a silent redirect loop through the thread.
+          if (response.status === 401) {
+            return openNotificationTarget(
+              `/login?next=${encodeURIComponent(data.url || `/event/${data.eventId}`)}`,
+            )
+          }
         } catch {
           // Open the question so the answer is not lost silently.
         }
