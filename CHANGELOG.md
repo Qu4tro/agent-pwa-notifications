@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-02
+
 ### Added
 
 - Agent-key login links. `POST /api/v1/login-link` (bearer) mints a one-time

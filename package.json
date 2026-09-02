@@ -1,6 +1,6 @@
 {
   "name": "agent-dash",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Self-hosted push + ask-and-wait inbox for AI agents. Deploy your own on Cloudflare's free plan.",
   "type": "module",
   "license": "MIT",
