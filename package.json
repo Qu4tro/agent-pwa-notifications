@@ -17,7 +17,6 @@
     "db:migrate": "wrangler d1 migrations apply agent-dash --remote",
     "db:migrate:local": "wrangler d1 migrations apply agent-dash --local",
     "setup": "node scripts/setup.mjs",
-    "login": "node scripts/login.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

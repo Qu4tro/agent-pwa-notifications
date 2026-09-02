@@ -1,6 +1,6 @@
 {
   "//": "Drop these hooks into your Claude Code settings.json (~/.claude/settings.json or .claude/settings.json).",
-  "//1": "chmod +x notify.sh ask.sh, export AGENT_DASH_URL and AGENT_KEY, and fix the paths below.",
+  "//1": "chmod +x notify.sh ask.sh, export AGENT_NOTIFY_PWA_URL and AGENT_NOTIFY_PWA_KEY, and fix the paths below.",
   "//2": "ask.sh needs jq. Stop uses timeout 600 so it can poll for your phone answer.",
   "hooks": {
     "SessionStart": [
@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/agent-dash/examples/claude-code-hooks/notify.sh 'Session started' 0 update"
+            "command": "~/agent-pwa-notifications/examples/claude-code-hooks/notify.sh 'Session started' 0 update"
           }
         ]
       }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/agent-dash/examples/claude-code-hooks/notify.sh 'Claude needs your input' 2 update"
+            "command": "~/agent-pwa-notifications/examples/claude-code-hooks/notify.sh 'Claude needs your input' 2 update"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/agent-dash/examples/claude-code-hooks/ask.sh",
+            "command": "~/agent-pwa-notifications/examples/claude-code-hooks/ask.sh",
             "timeout": 600
           }
         ]
