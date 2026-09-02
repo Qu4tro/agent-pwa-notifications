@@ -3,19 +3,19 @@
 #
 # Wire this to the Stop event. On every turn end it does one of two things:
 #
-#   1. If Claude's final message contains a line starting with
+#   1. If the agent's final message contains a line starting with
 #        ::ASK_HUMAN:: <question>
 #      (optionally followed by a line  ::ASK_OPTIONS:: A | B | C )
 #      then it posts that question to the hub, polls until you answer on your
 #      phone, and feeds your answer BACK to the agent so it continues, no matter
 #      whether the model "remembered" to poll. That's the deterministic part.
 #
-#   2. Otherwise (a normal turn end) it pushes a tappable "Claude finished" card
+#   2. Otherwise (a normal turn end) it pushes a tappable "Agent finished" card
 #      carrying the summary of what it just said: a one-liner preview that
 #      opens to the full text on your phone.
 #
 # Requires: curl, jq. Reads AGENT_NOTIFY_PWA_URL / AGENT_NOTIFY_PWA_KEY from env. Fails safe: any
-# error just lets Claude stop normally (never wedges your session).
+# error just lets the agent stop normally (never wedges your session).
 
 set -uo pipefail
 

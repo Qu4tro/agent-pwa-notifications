@@ -28,7 +28,7 @@ Two things, both driven by Claude Code hooks (no MCP, just shell):
    `settings.json` (user-level `~/.claude/settings.json`, or project
    `.claude/settings.json`). Fix the paths to the two scripts.
 
-4. **Teach Claude the ask convention.** Add this to your `~/.claude/CLAUDE.md`
+4. **Teach the agent the ask convention.** Add this to your `~/.claude/CLAUDE.md`
    (or a project `CLAUDE.md`):
 
    > When you need a decision, approval, or missing detail from me, end your
@@ -45,10 +45,10 @@ That's it.
 | Event | Hook | Behavior |
 |-------|------|----------|
 | SessionStart | `notify.sh` | Quiet "Session started" one-liner. |
-| Notification | `notify.sh` | Priority-2 push when Claude needs permission / goes idle. |
-| Stop | `ask.sh` | If the message has `::ASK_HUMAN::` the hook posts the question, poll until you answer, feed your answer back so Claude continues. Otherwise a tappable "Claude finished" card carrying the summary. |
+| Notification | `notify.sh` | Priority-2 push when the agent needs permission / goes idle. |
+| Stop | `ask.sh` | If the message has `::ASK_HUMAN::` the hook posts the question, poll until you answer, feed your answer back so the agent continues. Otherwise a tappable "Agent finished" card carrying the summary. |
 
-The Stop hook receives Claude's final message (`last_assistant_message`) and can
+The Stop hook receives the agent's final message (`last_assistant_message`) and can
 return `{"decision":"block","reason":"<your answer>"}`, which Claude Code feeds
 back to the model as a system reminder , which is what makes the answer land
 deterministically instead of relying on the model to keep polling.
@@ -57,7 +57,7 @@ deterministically instead of relying on the model to keep polling.
   buttons; omit it and you get a text box on your phone.
 - **Timeout:** the Stop hook is configured with `timeout: 600` (10 minutes) and
   `ask.sh` polls for ~9 of those. If you don't answer in time, the question stays
-  open in the app and Claude is told to proceed with a sensible default.
+  open in the app and the agent is told to proceed with a sensible default.
 
 ## Notes & footguns
 
@@ -66,7 +66,7 @@ deterministically instead of relying on the model to keep polling.
   a turn just posts the finish card and never blocks. This is deliberate: you do
   **not** want every completion to hang waiting for a phone tap.
 - Fails safe: missing credentials, no network or no `jq` and the hook exits quietly, letting
-  Claude stop normally. It never wedges your session.
+  the agent stop normally. It never wedges your session.
 - While `ask.sh` is polling, that Claude Code turn is paused (as intended).
 - This is the deterministic, tool-specific path. Any other agent can use
   the portable [skill](../../skills/agent-notifications/SKILL.md) instead (it posts and

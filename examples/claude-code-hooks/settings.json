@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/agent-pwa-notifications/examples/claude-code-hooks/notify.sh 'Claude needs your input' 2 update"
+            "command": "~/agent-pwa-notifications/examples/claude-code-hooks/notify.sh 'The agent needs your input' 2 update"
           }
         ]
       }
