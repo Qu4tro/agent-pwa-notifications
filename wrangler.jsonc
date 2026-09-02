@@ -13,10 +13,17 @@
   "triggers": {
     "crons": ["0 * * * *"]
   },
-  // Instant mode is OFF by default — the app polls (free tier, no DO usage).
+  // Instant mode is OFF by default: the app polls (free tier, no DO usage).
   // Flip INSTANT to "1" (and keep the binding below) for sub-second live updates
-  // via a hibernating Durable Object. SQLite-backed class = free-plan eligible.
-  "vars": { "INSTANT": "0" },
+  // via a hibernating Durable Object. A SQLite-backed class is free-plan eligible.
+  // EVENT_RETENTION_DAYS: the hourly cron deletes events older than this.
+  // SESSION_TTL_DAYS: how long a signed-in browser stays signed in. Long, so a
+  // notification answer button still works weeks later.
+  "vars": {
+    "INSTANT": "0",
+    "EVENT_RETENTION_DAYS": "90",
+    "SESSION_TTL_DAYS": "365"
+  },
   "durable_objects": {
     "bindings": [{ "name": "HUB", "class_name": "Hub" }]
   },

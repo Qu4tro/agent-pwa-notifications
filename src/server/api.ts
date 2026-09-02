@@ -11,7 +11,7 @@ import { quickAnswerActions, previewText } from './quick-answers'
 
 // ── retention / settings helpers ─────────────────────────────────────────────
 function retentionMs(env: Env): number {
-  const days = Number(env.EVENT_RETENTION_DAYS ?? '30')
+  const days = Number(env.EVENT_RETENTION_DAYS ?? '90')
   return Math.max(1, days) * 86_400_000
 }
 
@@ -570,6 +570,8 @@ export async function markUnread(id: string, env: Env, accountId: string): Promi
 //   'read'    — only items already seen/answered (safe default; keeps unread + pending)
 //   'all'     — everything, including unanswered questions (a full restart)
 // Optionally scoped to a single project. Always scoped to the account.
+const CLEAR_CHUNK = 50
+
 export async function clearEvents(
   env: Env,
   accountId: string,
@@ -583,19 +585,36 @@ export async function clearEvents(
     clauses.push(`COALESCE(project, '') = ?2`)
     bind.push(project)
   }
-  if (scope !== 'all') clauses.push('read_at IS NOT NULL')
+  // Scope 'read' means "seen or settled". A question the human answered (or
+  // that expired) is done with, even when it was never marked read, or was
+  // flipped back to unread. Anything still waiting on the human survives.
+  if (scope !== 'all') {
+    clauses.push(
+      `(read_at IS NOT NULL OR EXISTS (
+         SELECT 1 FROM questions q
+         WHERE q.event_id = events.id AND q.status IN ('answered', 'expired')))`,
+    )
+  }
   const where = clauses.join(' AND ')
 
-  const countRow = await env.DB.prepare(`SELECT COUNT(*) AS n FROM events WHERE ${where}`)
+  // Snapshot the ids first. The 'read' clause reads the questions table, so
+  // deleting the question rows would change which events still match it.
+  const { results } = await env.DB.prepare(`SELECT id FROM events WHERE ${where}`)
     .bind(...bind)
-    .first<{ n: number }>()
+    .all<{ id: string }>()
+  const ids = results.map((row) => row.id)
 
-  await env.DB.batch([
-    env.DB.prepare(`DELETE FROM questions WHERE event_id IN (SELECT id FROM events WHERE ${where})`).bind(...bind),
-    env.DB.prepare(`DELETE FROM events WHERE ${where}`).bind(...bind),
-  ])
+  // D1 caps bound parameters per statement, so delete in chunks.
+  for (let i = 0; i < ids.length; i += CLEAR_CHUNK) {
+    const chunk = ids.slice(i, i + CLEAR_CHUNK)
+    const marks = chunk.map((_, n) => `?${n + 1}`).join(', ')
+    await env.DB.batch([
+      env.DB.prepare(`DELETE FROM questions WHERE event_id IN (${marks})`).bind(...chunk),
+      env.DB.prepare(`DELETE FROM events WHERE id IN (${marks})`).bind(...chunk),
+    ])
+  }
   await pokeHub(env, accountId)
-  return json({ ok: true, cleared: countRow?.n ?? 0 })
+  return json({ ok: true, cleared: ids.length })
 }
 
 // You answer a question in the UI. Validate the answer against the question's
@@ -625,16 +644,7 @@ export async function answerQuestion(id: string, request: Request, env: Env, acc
     if (submitted.enc !== true || typeof submitted.answer !== 'string' || !submitted.answer) {
       return json({ ok: false, error: 'Encrypted questions need an encrypted answer.' }, 400)
     }
-    await env.DB.prepare(
-      `UPDATE questions SET status = 'answered', answer = ?1, answered_at = ?2 WHERE event_id = ?3`,
-    )
-      .bind(submitted.answer, now(), id)
-      .run()
-    await env.DB.prepare('UPDATE events SET read_at = COALESCE(read_at, ?1) WHERE id = ?2')
-      .bind(now(), id)
-      .run()
-    await pokeHub(env, accountId)
-    return json({ ok: true })
+    return settleAnswer(env, accountId, id, submitted.answer)
   }
 
   const blocks = JSON.parse(event.blocks) as Block[]
@@ -659,11 +669,34 @@ export async function answerQuestion(id: string, request: Request, env: Env, acc
     return json({ ok: false, error: 'Answer did not match any of the question fields.' }, 400)
   }
 
-  await env.DB.prepare(
-    `UPDATE questions SET status = 'answered', answer = ?1, answered_at = ?2 WHERE event_id = ?3`,
+  return settleAnswer(env, accountId, id, JSON.stringify(answer))
+}
+
+// First answer wins. Two taps can land at once (the phone and a notification
+// action), so the write is conditional on the question still being pending and
+// the changed-row count decides the winner. The loser gets a 409 and the stored
+// answer is never a mix of the two bodies.
+async function settleAnswer(
+  env: Env,
+  accountId: string,
+  id: string,
+  answer: string,
+): Promise<Response> {
+  const result = await env.DB.prepare(
+    `UPDATE questions SET status = 'answered', answer = ?1, answered_at = ?2
+     WHERE event_id = ?3 AND status = 'pending'`,
   )
-    .bind(JSON.stringify(answer), now(), id)
+    .bind(answer, now(), id)
     .run()
+
+  if (result.meta.changes === 0) {
+    const current = await env.DB.prepare('SELECT status FROM questions WHERE event_id = ?1')
+      .bind(id)
+      .first<{ status: string }>()
+    if (!current) return json({ ok: false, error: 'Unknown question.' }, 404)
+    return json({ ok: false, error: `Question already ${current.status}.` }, 409)
+  }
+
   await env.DB.prepare('UPDATE events SET read_at = COALESCE(read_at, ?1) WHERE id = ?2')
     .bind(now(), id)
     .run()

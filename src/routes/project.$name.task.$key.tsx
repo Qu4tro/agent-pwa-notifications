@@ -20,7 +20,9 @@ function ThreadView() {
   const [state, setState] = useState<'loading' | 'ok' | 'locked' | 'notfound'>('loading')
   const [submitting, setSubmitting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const markedRead = useRef(false)
+  // Ids already sent to /read during this mount, so a poll that overlaps the
+  // round trip does not POST the same event twice.
+  const markedRead = useRef(new Set<string>())
 
   async function load() {
     try {
@@ -31,13 +33,16 @@ function ThreadView() {
       }
       setThread(res.thread)
       setState('ok')
-      // Mark non-pending unread events read once (pending questions stay unread
-      // until answered, so they keep surfacing in "Waiting on you").
-      if (!markedRead.current) {
-        markedRead.current = true
-        for (const e of res.thread.events) {
-          if (e.read_at == null && e.question?.status !== 'pending') api.markRead(e.id).catch(() => {})
-        }
+      // Mark non-pending unread events read on EVERY load, not only the first.
+      // Events that land while the thread is open (the agent's follow-up after
+      // an answer) would otherwise stay unread for ever, which keeps the thread
+      // card on the project page and survives "clear read". Pending questions
+      // stay unread until answered, so they keep surfacing in "Waiting on you".
+      for (const e of res.thread.events) {
+        if (e.read_at != null || e.question?.status === 'pending') continue
+        if (markedRead.current.has(e.id)) continue
+        markedRead.current.add(e.id)
+        api.markRead(e.id).catch(() => markedRead.current.delete(e.id))
       }
     } catch (e) {
       if (e instanceof AuthError) setState('locked')
