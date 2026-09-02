@@ -9,6 +9,9 @@ dist/
 # Worktrunk worktrees.
 .worktrees/
 
+# Local agent tooling: the design skills. Not published.
+.claude/
+
 # Local scratch: the brief, the plan, the patch, screenshots. Anything meant
 # for publication lives in public_docs/ instead.
 docs/
