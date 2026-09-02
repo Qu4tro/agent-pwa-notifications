@@ -11,7 +11,9 @@ import { projectColor, projectLabel, fromParam, KIND_LABEL, KIND_COLOR } from '.
 export const Route = createFileRoute('/_app/project/$name/')({
   ssr: false,
   loader: ({ context, params }) =>
-    ensure<TaskSummary[]>(context.queryClient, tasksQuery(fromParam(params.name))),
+    context.signedIn
+      ? ensure<TaskSummary[]>(context.queryClient, tasksQuery(fromParam(params.name)))
+      : undefined,
   pendingComponent: TasksSkeleton,
   component: ProjectView,
 })

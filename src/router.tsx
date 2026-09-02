@@ -2,6 +2,7 @@ import { Link, createRouter as createTanStackRouter } from '@tanstack/react-rout
 import { QueryClientProvider } from '@tanstack/react-query'
 import { routeTree } from './routeTree.gen'
 import { createQueryClient, persistCache, setUnauthorizedHandler } from './lib/query'
+import { afterAppMounted } from './lib/hydration'
 import { setLiveDefaults } from './lib/live'
 
 function NotFound() {
@@ -49,14 +50,16 @@ export function getRouter() {
   })
 
   // A persisted cache can hold an account whose session has since expired, so
-  // the 401 can arrive long after the route guard ran. Same landing as the
-  // guard: the login page, with the way back.
+  // the 401 can arrive long after the route guard ran - including from a page
+  // loader, which runs before anything has mounted. Same landing as the guard:
+  // the login page, with the way back, and never during hydration.
   if (typeof window !== 'undefined') {
-    setUnauthorizedHandler(() => {
+    const toLogin = () => {
       if (window.location.pathname === '/login') return
       const next = window.location.pathname + window.location.search
       router.navigate({ to: '/login', search: { next }, replace: true })
-    })
+    }
+    setUnauthorizedHandler(() => afterAppMounted(toLogin))
   }
 
   return router

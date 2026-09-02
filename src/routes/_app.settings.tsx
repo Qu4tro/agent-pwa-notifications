@@ -21,7 +21,9 @@ import { getEncKey, setEncKey, clearEncKey, generateEncKey } from '../lib/e2e'
 export const Route = createFileRoute('/_app/settings')({
   ssr: false,
   loader: ({ context }) =>
-    ensure<{ start: number; end: number } | null>(context.queryClient, settingsQuery()),
+    context.signedIn
+      ? ensure<{ start: number; end: number } | null>(context.queryClient, settingsQuery())
+      : undefined,
   pendingComponent: SettingsSkeleton,
   component: SettingsPage,
 })

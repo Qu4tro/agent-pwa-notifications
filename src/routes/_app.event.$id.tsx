@@ -13,6 +13,7 @@ export const Route = createFileRoute('/_app/event/$id')({
   // of a client-only route a loader redirect leaves the document empty, and a
   // notification tap is always an initial load.
   beforeLoad: async ({ context, params }) => {
+    if (!context.signedIn) return // the layout guard is already sending this one to /login
     const event = await ensure<EventItem | null>(context.queryClient, eventQuery(params.id))
     if (!event) return
     const key = event.task_id && event.task_id.trim() ? event.task_id : event.id

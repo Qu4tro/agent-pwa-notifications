@@ -13,7 +13,9 @@ import { getEncKey, encryptValue, decryptValue } from '../lib/e2e'
 export const Route = createFileRoute('/_app/project/$name/task/$key')({
   ssr: false,
   loader: ({ context, params }) =>
-    ensure<ThreadData | null>(context.queryClient, threadQuery(fromParam(params.name), params.key)),
+    context.signedIn
+      ? ensure<ThreadData | null>(context.queryClient, threadQuery(fromParam(params.name), params.key))
+      : undefined,
   pendingComponent: ThreadSkeleton,
   component: ThreadView,
 })

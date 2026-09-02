@@ -9,7 +9,9 @@ import { projectColor, projectLabel, toParam } from '../lib/project'
 
 export const Route = createFileRoute('/_app/')({
   ssr: false,
-  loader: ({ context }) => ensure<ProjectRow[]>(context.queryClient, projectsQuery()),
+  loader: ({ context }) =>
+    // A signed-out visitor is on the way to /login; there is nothing to fetch.
+    context.signedIn ? ensure<ProjectRow[]>(context.queryClient, projectsQuery()) : undefined,
   pendingComponent: ProjectsSkeleton,
   component: Projects,
 })
