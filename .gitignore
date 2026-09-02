@@ -6,6 +6,9 @@ dist/
 *.log
 .DS_Store
 
+# Worktrunk worktrees.
+.worktrees/
+
 # Local scratch: the brief, the plan, the patch, screenshots. Anything meant
 # for publication lives in public_docs/ instead.
 docs/

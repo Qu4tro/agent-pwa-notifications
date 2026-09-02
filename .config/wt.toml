@@ -1,0 +1,14 @@
+# Worktrunk project config. See https://worktrunk.dev/config/
+#
+# Worktrees live at .worktrees/<branch>, per the user config. Each phase of
+# the fork plan gets one worktree and one herdr tab.
+
+[post-start]
+# Git ignores all of docs/, so a fresh worktree has no planning material.
+# .worktreeinclude limits this copy to docs/ and the local dev vars.
+copy = "wt step copy-ignored"
+install = "pnpm install --frozen-lockfile"
+
+[pre-merge]
+# The same three checks that .github/workflows/ci.yml runs.
+gate = "pnpm typecheck && pnpm test && pnpm build"
