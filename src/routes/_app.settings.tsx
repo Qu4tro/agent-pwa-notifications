@@ -1,13 +1,31 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Bell, BellOff } from 'lucide-react'
-import { api, AuthError } from '../lib/api'
-import { Header, Container, LockedScreen, Spinner } from '../lib/shell'
+import { api } from '../lib/api'
+import { Container, InlineError, useHeaderActions } from '../lib/shell'
+import { SettingsSkeleton } from '../lib/skeleton'
+import {
+  accountQuery,
+  ensure,
+  queryKeys,
+  settingsQuery,
+  useClear,
+  usePutSettings,
+  useSubscribePush,
+  useUnsubscribePush,
+} from '../lib/queries'
+import { clearPersistedCache } from '../lib/query'
 import { getEncKey, setEncKey, clearEncKey, generateEncKey } from '../lib/e2e'
 
-export const Route = createFileRoute('/settings')({
-  component: SettingsPage,
+export const Route = createFileRoute('/_app/settings')({
   ssr: false,
+  loader: ({ context }) =>
+    context.signedIn
+      ? ensure<{ start: number; end: number } | null>(context.queryClient, settingsQuery())
+      : undefined,
+  pendingComponent: SettingsSkeleton,
+  component: SettingsPage,
 })
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
@@ -20,28 +38,29 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 }
 
 function SettingsPage() {
-  const navigate = useNavigate()
-  const [state, setState] = useState<'loading' | 'ok' | 'locked'>('loading')
+  const { data: quiet, isError, isFetched, refetch } = useQuery(settingsQuery())
+  const putSettings = usePutSettings()
+  const subscribe = useSubscribePush()
+  const unsubscribe = useUnsubscribePush()
   const [pushOn, setPushOn] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushMsg, setPushMsg] = useState<string | null>(null)
-  const [quiet, setQuiet] = useState<{ start: number; end: number } | null>(null)
 
+  useHeaderActions(
+    <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--muted)', textDecoration: 'none', fontSize: '0.9rem' }}>
+      <ArrowLeft size={16} /> Inbox
+    </Link>,
+    [],
+  )
+
+  // Whether this device has a push subscription is a browser fact, not a
+  // server one, so it stays out of the query cache.
   useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
     ;(async () => {
-      try {
-        const s = await api.settings()
-        const q = s.quiet_hours as { start: number; end: number } | null
-        setQuiet(q)
-        if ('serviceWorker' in navigator) {
-          const reg = await navigator.serviceWorker.ready.catch(() => null)
-          const sub = await reg?.pushManager.getSubscription()
-          setPushOn(!!sub)
-        }
-        setState('ok')
-      } catch (e) {
-        if (e instanceof AuthError) setState('locked')
-      }
+      const reg = await navigator.serviceWorker.ready.catch(() => null)
+      const sub = await reg?.pushManager.getSubscription()
+      setPushOn(!!sub)
     })()
   }, [])
 
@@ -71,7 +90,7 @@ function SettingsPage() {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(key),
       })
-      await api.subscribePush(sub.toJSON())
+      await subscribe.mutateAsync(sub.toJSON())
       setPushOn(true)
       setPushMsg('Notifications enabled on this device.')
     } catch (e) {
@@ -86,7 +105,7 @@ function SettingsPage() {
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.getSubscription()
       if (sub) {
-        await api.unsubscribePush(sub.endpoint)
+        await unsubscribe.mutateAsync(sub.endpoint)
         await sub.unsubscribe()
       }
       setPushOn(false)
@@ -97,116 +116,99 @@ function SettingsPage() {
     setPushBusy(false)
   }
 
-  async function saveQuiet(next: { start: number; end: number } | null) {
-    setQuiet(next)
-    const offsetMin = -new Date().getTimezoneOffset()
-    await api.putSettings({ quiet_hours: next ? { ...next, offsetMin } : null }).catch(() => {})
-  }
-
-  if (state === 'loading') return <Spinner />
-  if (state === 'locked') return <LockedScreen />
+  if (!isFetched && quiet === undefined) return <SettingsSkeleton />
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
   return (
-    <>
-      <Header
-        right={
-          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--muted)', textDecoration: 'none', fontSize: '0.9rem' }}>
-            <ArrowLeft size={16} /> Inbox
-          </Link>
-        }
-      />
-      <Container>
-        <h1 style={{ fontSize: '1.4rem', margin: '0 0 1.5rem' }}>Settings</h1>
+    <Container>
+      <h1 style={{ fontSize: '1.4rem', margin: '0 0 1.5rem' }}>Settings</h1>
 
-        <Card title="Notifications">
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
-            Get a push on this device when an agent needs you or flags something important.
-          </p>
-          {pushOn ? (
-            <button onClick={disablePush} disabled={pushBusy} style={btn(false)}>
-              <BellOff size={16} /> Disable on this device
-            </button>
-          ) : (
-            <button onClick={enablePush} disabled={pushBusy} style={btn(true)}>
-              <Bell size={16} /> Enable notifications
-            </button>
-          )}
-          {pushMsg ? <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.8rem' }}>{pushMsg}</p> : null}
-        </Card>
+      {isError && quiet === undefined ? (
+        <div style={{ marginBottom: '1rem' }}>
+          <InlineError message="Could not load your settings." onRetry={() => refetch()} />
+        </div>
+      ) : null}
 
-        <Card title="Quiet hours">
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
-            Silence non-urgent pings during these hours. Urgent (priority 2) always rings through.
-          </p>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.9rem' }}>
-            <input
-              type="checkbox"
-              checked={!!quiet}
-              onChange={(e) => saveQuiet(e.target.checked ? { start: 22 * 60, end: 7 * 60 } : null)}
-            />
-            <span style={{ fontSize: '0.9rem' }}>Enable quiet hours</span>
-          </label>
-          {quiet && (
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <TimeField label="From" minutes={quiet.start} onChange={(m) => saveQuiet({ ...quiet, start: m })} />
-              <TimeField label="To" minutes={quiet.end} onChange={(m) => saveQuiet({ ...quiet, end: m })} />
-            </div>
-          )}
-        </Card>
+      <Card title="Notifications">
+        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
+          Get a push on this device when an agent needs you or flags something important.
+        </p>
+        {pushOn ? (
+          <button onClick={disablePush} disabled={pushBusy} style={btn(false)}>
+            <BellOff size={16} /> Disable on this device
+          </button>
+        ) : (
+          <button onClick={enablePush} disabled={pushBusy} style={btn(true)}>
+            <Bell size={16} /> Enable notifications
+          </button>
+        )}
+        {pushMsg ? <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.8rem' }}>{pushMsg}</p> : null}
+      </Card>
 
-        <Card title="Your agent key">
-          <AgentKeyCard />
-        </Card>
+      <Card title="Quiet hours">
+        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
+          Silence non-urgent pings during these hours. Urgent (priority 2) always rings through.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.9rem' }}>
+          <input
+            type="checkbox"
+            checked={!!quiet}
+            onChange={(e) => putSettings.mutate(e.target.checked ? { start: 22 * 60, end: 7 * 60 } : null)}
+          />
+          <span style={{ fontSize: '0.9rem' }}>Enable quiet hours</span>
+        </label>
+        {quiet && (
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <TimeField label="From" minutes={quiet.start} onChange={(m) => putSettings.mutate({ ...quiet, start: m })} />
+            <TimeField label="To" minutes={quiet.end} onChange={(m) => putSettings.mutate({ ...quiet, end: m })} />
+          </div>
+        )}
+      </Card>
 
-        <Card title="Connect an agent">
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 0.5rem' }}>
-            Add the skill to your agent, then paste your key when it asks:
-          </p>
-          <Snippet text={`npx skills add Qu4tro/agent-pwa-notifications`} />
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '1rem 0 0.5rem' }}>
-            Prefer raw HTTP? Any agent can push an update with one curl:
-          </p>
-          <Snippet
-            text={`curl -X POST ${origin}/api/v1/events \\
+      <Card title="Your agent key">
+        <AgentKeyCard />
+      </Card>
+
+      <Card title="Connect an agent">
+        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 0.5rem' }}>
+          Add the skill to your agent, then paste your key when it asks:
+        </p>
+        <Snippet text={`npx skills add Qu4tro/agent-pwa-notifications`} />
+        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '1rem 0 0.5rem' }}>
+          Prefer raw HTTP? Any agent can push an update with one curl:
+        </p>
+        <Snippet
+          text={`curl -X POST ${origin}/api/v1/events \\
   -H "Authorization: Bearer YOUR_AGENT_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"agent":"claude","title":"Build finished","priority":1}'`}
-          />
-          <p style={{ fontSize: '0.85rem', marginTop: '0.8rem' }}>
-            Full contract: <a href="/api/v1/schema.json" target="_blank" rel="noreferrer">block schema</a> ·{' '}
-            <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">OpenAPI</a>
-          </p>
-        </Card>
-
-        <Card title="Encryption (E2E)">
-          <EncryptionCard />
-        </Card>
-
-        <Card title="Clear inbox">
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
-            Tidy up or start fresh. Agents can also clear things themselves when it gets cluttered.
-          </p>
-          <ClearButtons />
-        </Card>
-
-        <Card title="Session">
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <button onClick={() => api.logout().then(() => navigate({ to: '/' }))} style={btn(false)}>
-              Log out (this device)
-            </button>
-            <button onClick={() => api.logoutAll().then(() => navigate({ to: '/' }))} style={{ ...btn(false), color: 'var(--error)', borderColor: 'var(--error)' }}>
-              Log out everywhere
-            </button>
-          </div>
-        </Card>
-
-        <p style={{ color: 'var(--muted)', fontSize: '0.8rem', textAlign: 'center', margin: '1.5rem 0 0' }}>
-          Version {__APP_VERSION__}
+        />
+        <p style={{ fontSize: '0.85rem', marginTop: '0.8rem' }}>
+          Full contract: <a href="/api/v1/schema.json" target="_blank" rel="noreferrer">block schema</a> ·{' '}
+          <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">OpenAPI</a>
         </p>
-      </Container>
-    </>
+      </Card>
+
+      <Card title="Encryption (E2E)">
+        <EncryptionCard />
+      </Card>
+
+      <Card title="Clear inbox">
+        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
+          Tidy up or start fresh. Agents can also clear things themselves when it gets cluttered.
+        </p>
+        <ClearButtons />
+      </Card>
+
+      <Card title="Session">
+        <SessionButtons />
+      </Card>
+
+      <p style={{ color: 'var(--muted)', fontSize: '0.8rem', textAlign: 'center', margin: '1.5rem 0 0' }}>
+        Version {__APP_VERSION__}
+      </p>
+    </Container>
   )
 }
 
@@ -226,6 +228,30 @@ function TimeField({ label, minutes, onChange }: { label: string; minutes: numbe
         style={{ background: 'var(--bg-elev2)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.5rem', color: 'var(--text)' }}
       />
     </label>
+  )
+}
+
+// Logging out drops every cached list, including the persisted copy, so the
+// next visitor on this device starts from nothing.
+function SessionButtons() {
+  const client = useQueryClient()
+
+  async function end(everywhere: boolean) {
+    await (everywhere ? api.logoutAll() : api.logout()).catch(() => {})
+    client.clear()
+    clearPersistedCache()
+    window.location.href = '/login'
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+      <button onClick={() => end(false)} style={btn(false)}>
+        Log out (this device)
+      </button>
+      <button onClick={() => end(true)} style={{ ...btn(false), color: 'var(--error)', borderColor: 'var(--error)' }}>
+        Log out everywhere
+      </button>
+    </div>
   )
 }
 
@@ -286,12 +312,13 @@ function EncryptionCard() {
 }
 
 function ClearButtons() {
+  const clear = useClear()
   const [confirming, setConfirming] = useState<null | 'read' | 'all'>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
   async function run(scope: 'read' | 'all') {
     setConfirming(null)
-    const res = await api.clear(scope).catch(() => null)
+    const res = await clear.mutateAsync({ scope }).catch(() => null)
     setMsg(res ? `Cleared ${res.cleared} item${res.cleared === 1 ? '' : 's'}.` : 'Could not clear.')
   }
 
@@ -330,15 +357,13 @@ function ClearButtons() {
 // Shows the account's key prefix (the raw key is never stored, so it can't be
 // re-shown) and lets the user rotate to a fresh key — revealed once.
 function AgentKeyCard() {
-  const [email, setEmail] = useState<string | null>(null)
-  const [prefix, setPrefix] = useState<string | null>(null)
+  const client = useQueryClient()
+  const { data: account } = useQuery(accountQuery())
   const [rotated, setRotated] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    api.account().then((a) => { setEmail(a.email); setPrefix(a.key_prefix) }).catch(() => {})
-  }, [])
+  const prefix = rotated ? rotated.slice(0, 16) : (account?.key_prefix ?? null)
 
   async function rotate() {
     setConfirming(false)
@@ -346,7 +371,7 @@ function AgentKeyCard() {
     try {
       const res = await api.rotateKey()
       setRotated(res.agent_key)
-      setPrefix(res.agent_key.slice(0, 16))
+      await client.invalidateQueries({ queryKey: queryKeys.account() })
     } catch {
       /* ignore */
     }
@@ -356,7 +381,7 @@ function AgentKeyCard() {
   return (
     <div>
       <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 0.8rem' }}>
-        {email ? <>Signed in as <strong style={{ color: 'var(--text)' }}>{email}</strong>. </> : null}
+        {account?.email ? <>Signed in as <strong style={{ color: 'var(--text)' }}>{account.email}</strong>. </> : null}
         Agents authenticate with this key. It's stored only as a hash — we can't show it again, so
         rotate if you lose it.
       </p>

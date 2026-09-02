@@ -1,80 +1,68 @@
-import { useEffect, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { Settings2, ChevronRight, Inbox as InboxIcon } from 'lucide-react'
-import { api, AuthError, timeAgo, type ProjectRow } from '../lib/api'
-import { Header, Container, Landing, Spinner } from '../lib/shell'
+import { timeAgo, type ProjectRow } from '../lib/api'
+import { Container, InlineError, useHeaderActions } from '../lib/shell'
+import { ensure, projectsQuery } from '../lib/queries'
+import { ProjectsSkeleton } from '../lib/skeleton'
 import { projectColor, projectLabel, toParam } from '../lib/project'
-import { captureKeyFromHash } from '../lib/e2e'
-import { useLive } from '../lib/live'
 
-export const Route = createFileRoute('/')({
-  component: Projects,
+export const Route = createFileRoute('/_app/')({
   ssr: false,
+  loader: ({ context }) =>
+    // A signed-out visitor is on the way to /login; there is nothing to fetch.
+    context.signedIn ? ensure<ProjectRow[]>(context.queryClient, projectsQuery()) : undefined,
+  pendingComponent: ProjectsSkeleton,
+  component: Projects,
 })
 
 function Projects() {
-  const [projects, setProjects] = useState<ProjectRow[]>([])
-  const [state, setState] = useState<'loading' | 'ok' | 'locked'>('loading')
+  const { data, isError, refetch } = useQuery(projectsQuery())
+  useHeaderActions(
+    <Link to="/settings" title="Settings" style={{ ...iconBtn, display: 'inline-flex' }}>
+      <Settings2 size={18} />
+    </Link>,
+    [],
+  )
 
-  async function load() {
-    try {
-      const res = await api.projects()
-      setProjects(res.projects)
-      setState('ok')
-    } catch (e) {
-      if (e instanceof AuthError) setState('locked')
-    }
+  if (!data) {
+    if (!isError) return <ProjectsSkeleton />
+    return (
+      <Container>
+        <InlineError message="Could not load your projects." onRetry={() => refetch()} />
+      </Container>
+    )
   }
 
-  useEffect(() => {
-    captureKeyFromHash() // login QR may carry the E2E key in the URL fragment
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  useLive(load) // WebSocket in instant mode, else 5s polling
-
-  if (state === 'loading') return <Spinner />
-  if (state === 'locked') return <Landing />
-
-  const waiting = projects.filter((p) => p.pending > 0)
-  const rest = projects.filter((p) => p.pending === 0)
+  const waiting = data.filter((p) => p.pending > 0)
+  const rest = data.filter((p) => p.pending === 0)
 
   return (
-    <>
-      <Header
-        live
-        right={
-          <Link to="/settings" title="Settings" style={{ ...iconBtn, display: 'inline-flex' }}>
-            <Settings2 size={18} />
-          </Link>
-        }
-      />
-      <Container>
-        {projects.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <>
-            {waiting.length > 0 && (
-              <Section title={`Needs you · ${waiting.reduce((n, p) => n + p.pending, 0)}`} accent>
-                {waiting.map((p) => (
-                  <ProjectCard key={p.project || '__none__'} p={p} highlight />
-                ))}
-              </Section>
-            )}
-            <Section title="Projects">
-              {rest.map((p) => (
-                <ProjectCard key={p.project || '__none__'} p={p} />
+    <Container>
+      {data.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <>
+          {waiting.length > 0 && (
+            <Section title={`Needs you · ${waiting.reduce((n, p) => n + p.pending, 0)}`} accent>
+              {waiting.map((p) => (
+                <ProjectCard key={p.project || '__none__'} p={p} highlight />
               ))}
-              {rest.length === 0 && waiting.length > 0 ? (
-                <p style={{ color: 'var(--faint)', fontSize: '0.85rem', padding: '0.5rem 0' }}>
-                  Everything else is up to date.
-                </p>
-              ) : null}
             </Section>
-          </>
-        )}
-      </Container>
-    </>
+          )}
+          <Section title="Projects">
+            {rest.map((p) => (
+              <ProjectCard key={p.project || '__none__'} p={p} />
+            ))}
+            {rest.length === 0 && waiting.length > 0 ? (
+              <p style={{ color: 'var(--faint)', fontSize: '0.85rem', padding: '0.5rem 0' }}>
+                Everything else is up to date.
+              </p>
+            ) : null}
+          </Section>
+        </>
+      )}
+    </Container>
   )
 }
 

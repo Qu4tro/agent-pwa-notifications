@@ -10,6 +10,42 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Added
+
+- A front-end data layer built on TanStack Query. One `QueryClient`
+  (`src/lib/query.ts`), one place for keys, fetchers and mutations
+  (`src/lib/queries.ts`), and a route loader per page that reads from the cache
+  first. A navigation that has data shows it at once and refreshes behind the
+  content.
+- The query cache is persisted in `localStorage` under one key, so after a cold
+  start the app paints the last known lists before the network answers.
+- A pathless `_app` layout route. The header is mounted once and never
+  unmounts between pages; a page contributes its header actions through a
+  context. `/login` stays outside it.
+- Page skeletons in the content area (`src/lib/skeleton.tsx`) and a 2px refresh
+  line on the bottom edge of the header while any query is in flight.
+- An inline error line with a retry button, for a page whose query failed with
+  nothing cached to fall back on.
+
+### Changed
+
+- Polling and the instant-mode WebSocket moved into one `useLiveRefresh` hook,
+  mounted once by the layout. Pages no longer fetch on their own, and
+  `/api/v1/config` is fetched once instead of once per page mount.
+- The session check is a route guard on the layout: a logged-out visitor lands
+  on `/login` with `next` set, from any app route, and comes back to `next`
+  after signing in. A 401 that arrives later, on a query, redirects the same
+  way.
+- Answering a question settles it in the cache before the round trip, so the
+  buttons go away on tap. A failed answer rolls back and shows the reason.
+- A push deep link (`/event/<id>`) resolves and redirects before anything
+  renders, so it lands in the thread inside the app layout.
+
+### Removed
+
+- The Pro page, the Pro badge, the marketing landing page and the full-page
+  spinner and lock screens they came with.
+
 ## [0.3.0] - 2026-09-02
 
 ### Added

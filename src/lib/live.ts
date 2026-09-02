@@ -1,45 +1,65 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { configQuery, LIVE_KEYS } from './queries'
 
-// Live-refresh transport. In instant mode (INSTANT=1) it holds a WebSocket to
-// the Hub Durable Object and refreshes the moment anything changes. Otherwise
-// it polls every 5s while the tab is visible. Either way the caller just passes
-// its `load` function and forgets about the plumbing.
-export function useLive(onRefresh: () => void) {
-  const cb = useRef(onRefresh)
-  cb.current = onRefresh
+const POLL_MS = 5000
+const PING_MS = 30_000
+const RECONNECT_MS = 4000
+
+// The poll interval lives on the query defaults, not on a component, so it is
+// in place before the first observer subscribes. `refetchIntervalInBackground`
+// stays off, so a hidden tab or a backgrounded PWA costs nothing.
+export function setLiveDefaults(client: QueryClient) {
+  for (const queryKey of LIVE_KEYS) client.setQueryDefaults(queryKey, { refetchInterval: POLL_MS })
+}
+
+// Mounted once, in the app layout. It keeps the lists current: a poll while the
+// tab is visible, a full refresh when the tab comes back, and - in instant mode
+// (INSTANT=1) - a WebSocket to the Hub that refreshes the moment anything
+// changes. Pages never fetch on their own.
+export function useLiveRefresh() {
+  const client = useQueryClient()
+  const { data: config } = useQuery(configQuery())
+  const instant = config?.instant === true
 
   useEffect(() => {
+    setLiveDefaults(client)
+  }, [client])
+
+  // Coming back to the app is the moment the lists are most likely stale, and
+  // a poll that fired while hidden was skipped. `config` never changes for the
+  // life of a deploy, so it is left alone.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'config' })
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [client])
+
+  useEffect(() => {
+    if (!instant) return
     let stopped = false
     let ws: WebSocket | null = null
-    let pollTimer: ReturnType<typeof setInterval> | null = null
-    let pingTimer: ReturnType<typeof setInterval> | null = null
+    let ping: ReturnType<typeof setInterval> | null = null
     let reconnect: ReturnType<typeof setTimeout> | null = null
 
-    const refreshIfVisible = () => {
-      if (document.visibilityState === 'visible') cb.current()
-    }
-
-    const startPolling = (ms: number) => {
-      if (pollTimer) clearInterval(pollTimer)
-      pollTimer = setInterval(refreshIfVisible, ms)
-    }
-
-    const openSocket = () => {
+    const open = () => {
       if (stopped) return
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
       try {
         ws = new WebSocket(`${proto}://${location.host}/ws`)
       } catch {
-        startPolling(5000)
-        return
+        return // the 5s poll is still running underneath
       }
       ws.onmessage = (e) => {
-        if (typeof e.data === 'string' && e.data !== 'pong') refreshIfVisible()
+        if (typeof e.data === 'string' && e.data !== 'pong' && document.visibilityState === 'visible') {
+          client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'config' })
+        }
       }
       ws.onclose = () => {
-        if (stopped) return
-        // Fall back to slow polling and try to reconnect.
-        reconnect = setTimeout(openSocket, 4000)
+        if (!stopped) reconnect = setTimeout(open, RECONNECT_MS)
       }
       ws.onerror = () => {
         try {
@@ -48,46 +68,27 @@ export function useLive(onRefresh: () => void) {
           /* ignore */
         }
       }
-      // Keep-alive ping so proxies don't drop an idle hibernated socket.
-      if (pingTimer) clearInterval(pingTimer)
-      pingTimer = setInterval(() => {
+      // Keep-alive so a proxy does not drop an idle hibernated socket.
+      if (ping) clearInterval(ping)
+      ping = setInterval(() => {
         try {
-          ws?.readyState === WebSocket.OPEN && ws.send('ping')
+          if (ws?.readyState === WebSocket.OPEN) ws.send('ping')
         } catch {
           /* ignore */
         }
-      }, 30_000)
+      }, PING_MS)
     }
 
-    ;(async () => {
-      let instant = false
-      try {
-        const r = await fetch('/api/v1/config', { credentials: 'same-origin' })
-        instant = r.ok && ((await r.json()) as { instant?: boolean }).instant === true
-      } catch {
-        /* default to polling */
-      }
-      if (stopped) return
-      if (instant) {
-        openSocket()
-        startPolling(30_000) // safety net behind the socket
-      } else {
-        startPolling(5000)
-      }
-    })()
-
-    document.addEventListener('visibilitychange', refreshIfVisible)
+    open()
     return () => {
       stopped = true
-      if (pollTimer) clearInterval(pollTimer)
-      if (pingTimer) clearInterval(pingTimer)
+      if (ping) clearInterval(ping)
       if (reconnect) clearTimeout(reconnect)
-      document.removeEventListener('visibilitychange', refreshIfVisible)
       try {
         ws?.close()
       } catch {
         /* ignore */
       }
     }
-  }, [])
+  }, [client, instant])
 }

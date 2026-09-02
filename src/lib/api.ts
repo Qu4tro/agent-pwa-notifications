@@ -76,6 +76,7 @@ export class AuthError extends Error {
 }
 
 export const api = {
+  config: () => req<{ ok: boolean; instant: boolean; version: string }>('/api/v1/config'),
   feed: (sinceTs?: number) =>
     req<{ ok: boolean; events: EventItem[] }>(
       `/api/v1/feed${sinceTs ? `?since_ts=${sinceTs}` : ''}`,

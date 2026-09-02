@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { api } from '../lib/api'
+import { clearPersistedCache } from '../lib/query'
 import { Logo } from '../lib/shell'
 
+// `next` is where the app sends a visitor whose session ran out, and `t` is a
+// one-time login-link token. Declaring them here is what lets a route guard
+// build the redirect.
 export const Route = createFileRoute('/login')({
   component: LoginPage,
   ssr: false,
+  validateSearch: (search: Record<string, unknown>): { next?: string; t?: string } => ({
+    next: typeof search.next === 'string' ? search.next : undefined,
+    t: typeof search.t === 'string' ? search.t : undefined,
+  }),
 })
 
 const inputStyle: React.CSSProperties = {
@@ -84,6 +92,13 @@ function LoginPage() {
     window.location.href = safeNext(next ?? null) ?? safeNext(searchParams().get('next')) ?? '/'
   }
 
+  // A fresh sign-in must not inherit the cached lists of whoever used this
+  // device last, so the persisted cache goes before the new session lands.
+  function landAsNewSession(next?: string | null) {
+    clearPersistedCache()
+    land(next)
+  }
+
   useEffect(() => {
     const token = searchParams().get('t')
     if (token) {
@@ -91,7 +106,7 @@ function LoginPage() {
         .consumeLink(token)
         .then((res) => {
           if (res.ok) {
-            land(res.next)
+            landAsNewSession(res.next)
             return
           }
           setError('This link expired. Ask for a new one.')
@@ -135,7 +150,7 @@ function LoginPage() {
         setAgentKey(res.agent_key)
         setStage('key')
       } else {
-        land() // returning user, session set, load the app
+        landAsNewSession() // returning user, session set, load the app
       }
     } catch {
       setError('Network error. Try again.')
@@ -246,7 +261,7 @@ function LoginPage() {
             </div>
             <button
               type="button"
-              onClick={() => { land() }}
+              onClick={() => { landAsNewSession() }}
               style={{ marginTop: '1.25rem', width: '100%', padding: '0.6rem', background: 'none', border: '1px solid var(--border)', borderRadius: '0.6rem', color: 'var(--text)', cursor: 'pointer', fontSize: '0.95rem' }}
             >
               Continue to dashboard →

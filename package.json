@@ -25,6 +25,9 @@
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.26.0",
     "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/query-sync-storage-persister": "^5.102.8",
+    "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-query-persist-client": "^5.102.8",
     "@tanstack/react-router": "^1.132.0",
     "@tanstack/react-router-ssr-query": "^1.132.0",
     "@tanstack/react-start": "^1.132.0",
