@@ -6,8 +6,8 @@ import { homedir } from 'node:os'
 import { dirname, join, parse, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const SOURCE = 'Prajeevan/agent-dash'
-const NAME = 'agent-dash'
+const SOURCE = 'Qu4tro/agent-pwa-notifications'
+const NAME = 'agent-notifications'
 const dryRun = process.argv.includes('--dry-run')
 const requestedScope = process.argv.includes('--scope')
   ? process.argv[process.argv.indexOf('--scope') + 1]
@@ -42,24 +42,24 @@ function findInstall() {
 const install = findInstall()
 if (!install) {
   console.error(
-    `This Agent Dash copy is not managed by the skills CLI. Install the managed skill with:\n  npx skills add ${SOURCE} --global --agent claude-code --skill ${NAME} --yes`,
+    `This copy is not managed by the skills CLI. Install the managed skill with:\n  npx skills add ${SOURCE} --global --skill ${NAME} --yes`,
   )
   process.exit(1)
 }
 
 const flag = install.scope === 'global' ? '--global' : '--project'
 const args = ['--yes', 'skills', 'update', NAME, flag, '--yes']
-console.log(`Updating Agent Dash (${install.scope})…`)
+console.log(`Updating the agent-notifications skill (${install.scope})...`)
 
 if (dryRun) {
   console.log(`Would run: npx ${args.slice(1).join(' ')}`)
-  console.log(`Agent Dash skill update dry run passed for ${install.scope} scope.`)
+  console.log(`Skill update dry run passed for ${install.scope} scope.`)
   process.exit(0)
 }
 
 const result = spawnSync(npx, args, { cwd: process.cwd(), stdio: 'inherit' })
 if (result.status !== 0) {
-  console.error(`Agent Dash ${install.scope} update failed. No other skills were changed.`)
+  console.error(`The ${install.scope} update failed. No other skills were changed.`)
   process.exit(result.status ?? 1)
 }
 
@@ -71,9 +71,9 @@ try {
   }
   const lock = JSON.parse(readFileSync(lockPath, 'utf8'))
   if (lock?.skills?.[NAME]?.source !== SOURCE) {
-    throw new Error('the installed source is not Prajeevan/agent-dash')
+    throw new Error(`the installed source is not ${SOURCE}`)
   }
-  if (!readFileSync(skillPath, 'utf8').includes('/agent-dash update')) {
+  if (!readFileSync(skillPath, 'utf8').includes('/agent-notifications update')) {
     throw new Error('the downloaded skill does not include the self-update action')
   }
 } catch (error) {
@@ -81,7 +81,7 @@ try {
   process.exit(1)
 }
 
-console.log(`Agent Dash skill updated and verified (${install.scope}).`)
+console.log(`The agent-notifications skill was updated and verified (${install.scope}).`)
 console.log(
-  'Invoke /agent-dash again in a new conversation if this session still has the previous instructions loaded.',
+  'Invoke the skill again in a new conversation if this session still has the previous instructions loaded.',
 )

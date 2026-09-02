@@ -1,8 +1,7 @@
-// Shared helpers for the setup + login scripts. Node-only (uses node:crypto).
-import { generateKeyPairSync, randomBytes, createHmac } from 'node:crypto'
+// Shared helpers for the setup script. Node-only (uses node:crypto).
+import { generateKeyPairSync, randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
-import qrcode from 'qrcode-terminal'
 
 export const SECRETS_FILE = '.agent-dash.local.json'
 
@@ -28,13 +27,6 @@ export function generateVapidKeys() {
     publicKey: b64url(uncompressed),
     privateKey: b64url(Buffer.from(privJwk.d, 'base64url')),
   }
-}
-
-// A 15-minute magic-login token, HMAC-signed with APP_SECRET (mirrors auth.ts).
-export function mintLoginToken(appSecret) {
-  const exp = String(Date.now() + 15 * 60 * 1000)
-  const sig = b64url(createHmac('sha256', appSecret).update(`login.${exp}`).digest())
-  return `${exp}.${sig}`
 }
 
 export function loadSecrets() {
@@ -65,14 +57,4 @@ export function readWorkerName() {
   const raw = readFileSync('wrangler.jsonc', 'utf8').replace(/\/\/.*$/gm, '')
   const m = raw.match(/"name"\s*:\s*"([^"]+)"/)
   return m ? m[1] : 'agent-dash'
-}
-
-// Print a scannable QR of a login URL to the terminal, then the URL as a
-// fallback. The URL holds a short-lived magic-link token — we render locally
-// and NEVER send it to a third-party QR service.
-export function printLoginQr(url) {
-  console.log('\nScan this with your phone to log in (or open the link below):\n')
-  qrcode.generate(url, { small: true }, (qr) => console.log(qr))
-  console.log(`  ${url}\n`)
-  console.log('  Valid 15 minutes. On the phone: Add to Home Screen, then enable notifications.\n')
 }

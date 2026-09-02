@@ -2,11 +2,11 @@ import type { Env } from './env'
 import { json } from './util'
 import { createEvent, updateEvent, createQuestion, getQuestion, clearEvents } from './api'
 
-// ── Stateless MCP over Streamable HTTP ───────────────────────────────────────
-// A plain JSON-RPC POST handler — NOT Cloudflare's McpAgent (which is a Durable
-// Object and would make a DO mandatory). Our tools are pure request/response
-// with no session state, so a stateless endpoint is all we need and it keeps
-// the whole app free-plan simple. Auth: the same bearer AGENT_KEY.
+// -- Stateless MCP over Streamable HTTP ---------------------------------------
+// A plain JSON-RPC POST handler, not Cloudflare's McpAgent (which is a Durable
+// Object and would make a DO mandatory). The tools are pure request/response
+// with no session state, so a stateless endpoint is all we need. Auth: the
+// account's bearer agent key.
 
 const PROTOCOL_VERSION = '2024-11-05'
 
@@ -14,19 +14,19 @@ const TOOLS = [
   {
     name: 'notify',
     description:
-      'Push an update to the human. Use for milestones, not every step. ALWAYS pass: project (what you are working on), model (which LLM you are), and task_id — generate ONE stable task_id when you start a task and reuse it on EVERY notify/ask for that task, so all its messages thread together in one conversation instead of scattering into separate cards. Set priority 2 for anything that should ring through quiet hours.',
+      'Push an update to the human. Use for milestones, not every step. ALWAYS pass: project (what you are working on), model (which LLM you are), and task_id - generate ONE stable task_id when you start a task and reuse it on EVERY notify/ask for that task, so all its messages thread together in one conversation instead of scattering into separate cards. Set priority 2 for anything that should ring through quiet hours.',
     inputSchema: {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'Short headline / the message itself.' },
         project: { type: 'string', description: 'Project name, e.g. "Weather app". Used to group and filter.' },
         task: { type: 'string', description: 'Current task, e.g. "Adding children mode".' },
-        model: { type: 'string', description: 'Which model you are, e.g. "claude-opus-4.8", "gpt-5".' },
+        model: { type: 'string', description: 'Which model you are, e.g. "opus-4.8", "gpt-5".' },
         tags: { type: 'array', description: 'Optional freeform tags, e.g. ["backend","urgent"].' },
         blocks: { type: 'array', description: 'Optional display blocks. See /api/v1/schema.json.' },
         priority: { type: 'number', description: '0 info, 1 notify, 2 urgent. Default 0.' },
         task_id: { type: 'string', description: 'Stable key to group updates into one thread / update in place.' },
-        agent: { type: 'string', description: 'The tool/client you run in (e.g. "claude-code", "cursor").' },
+        agent: { type: 'string', description: 'The tool/client you run in (e.g. "cursor", "zed").' },
       },
       required: ['title'],
     },
@@ -34,7 +34,7 @@ const TOOLS = [
   {
     name: 'update',
     description:
-      'Update an existing event in place — the way to send LIVE progress. First call notify to create the event and keep its returned id; then call update repeatedly with new blocks (e.g. a progress block going 0→50→100) to move the same card without spamming new rows. Set notify:true on the final call to push a "done" notification.',
+      'Update an existing event in place - the way to send LIVE progress. First call notify to create the event and keep its returned id; then call update repeatedly with new blocks (e.g. a progress block going 0->50->100) to move the same card without spamming new rows. Set notify:true on the final call to push a "done" notification.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -43,7 +43,7 @@ const TOOLS = [
         blocks: { type: 'array', description: 'New display blocks (replaces the old ones).' },
         kind: { type: 'string', description: 'update | done | error' },
         priority: { type: 'number' },
-        notify: { type: 'boolean', description: 'Send a push for this update. Default false — leave off for silent progress ticks.' },
+        notify: { type: 'boolean', description: 'Send a push for this update. Default false - leave off for silent progress ticks.' },
       },
       required: ['event_id'],
     },
@@ -63,12 +63,12 @@ const TOOLS = [
         ack: {
           type: 'string',
           description:
-            'Optional acknowledgment shown to the human the instant they answer, e.g. "Got it — proceeding with {answer}. Watch for updates." Use {answer} as a placeholder for their choice.',
+            'Optional acknowledgment shown to the human the instant they answer, e.g. "Got it - proceeding with {answer}. Watch for updates." Use {answer} as a placeholder for their choice.',
         },
         blocks: {
           type: 'array',
           description:
-            'Must include a buttons or form block. Notification answers require exactly one buttons block with 2–3 labels of at most 20 characters each. Put longer context in markdown; e.g. [{"type":"markdown","text":"The checks passed."},{"type":"buttons","id":"go","options":["Ship","Hold"]}]',
+            'Must include a buttons or form block. Notification answers require exactly one buttons block with 2-3 labels of at most 20 characters each. Put longer context in markdown; e.g. [{"type":"markdown","text":"The checks passed."},{"type":"buttons","id":"go","options":["Ship","Hold"]}]',
         },
         timeout_minutes: { type: 'number', description: 'How long to wait before the question expires. Default 1440 (24h).' },
         task_id: { type: 'string' },
@@ -80,7 +80,7 @@ const TOOLS = [
   {
     name: 'clear',
     description:
-      "Tidy the human's inbox when it's getting cluttered. scope 'read' (the safe default) removes only items they've already seen or answered, keeping anything unread or awaiting an answer. scope 'all' wipes everything — only use 'all' when the human explicitly asked to restart. Optionally limit to one project.",
+      "Tidy the human's inbox when it's getting cluttered. scope 'read' (the safe default) removes only items they've already seen or answered, keeping anything unread or awaiting an answer. scope 'all' wipes everything - only use 'all' when the human explicitly asked to restart. Optionally limit to one project.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -166,7 +166,7 @@ export async function handleMcp(request: Request, env: Env, accountId: string): 
         rpcResult(id, {
           protocolVersion: PROTOCOL_VERSION,
           capabilities: { tools: {} },
-          serverInfo: { name: 'agent-dash', version: '0.1.0' },
+          serverInfo: { name: 'agent-pwa-notifications', version: __APP_VERSION__ },
         }),
       )
     case 'notifications/initialized':

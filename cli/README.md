@@ -1,36 +1,116 @@
-# agentdash (CLI)
+# agent-pwa-notifications (CLI)
 
-Connect an agent to your Agent Dash hub, log in on your phone, and send
-updates/questions from scripts.
+Talk to your own Agent Notifications hub from a shell: connect an agent, mint a
+one-time sign-in link for your phone, send updates, and ask a question and wait
+for the answer.
+
+The binary is `agent-notify-pwa`.
 
 ```bash
-npx agentdash login            # save + verify your hub URL and agent key
-npx agentdash connect          # write ./.mcp.json so your agent can call the hub
-npx agentdash open             # QR to open the dashboard on your phone
-npx agentdash notify "Deploy finished" --priority 1 --project "API"
-npx agentdash ask "Ship it?" --button Ship --button Hold   # waits, prints the answer JSON
-npx agentdash status
+agent-notify-pwa login          # save and verify your hub URL and account key
+agent-notify-pwa connect        # write ./.mcp.json so an MCP client can call the hub
+agent-notify-pwa open           # one-time sign-in link, with a QR to scan
+agent-notify-pwa notify "Deploy finished" --priority 1 --project "API"
+agent-notify-pwa ask "Ship it?" --button Ship --button Hold
+agent-notify-pwa status --json
 ```
 
-Credentials resolve from flags → env (`AGENT_DASH_URL`, `AGENT_KEY`,
-`AGENT_DASH_ENC_KEY`) → saved config at `~/.config/agent-dash/config.json`.
+There is no default hub URL: every hub is somebody's own deployment. `login`
+asks for yours and saves it to `~/.config/agent-notify-pwa/config.json` (XDG
+respected). If you used the older CLI, its config is copied over on first run.
+
+Resolution order for every value: flags, then environment, then the saved
+config.
+
+| Value | Flag | Environment |
+|---|---|---|
+| Hub URL | `--url` | `AGENT_NOTIFY_PWA_URL` |
+| Account key | `--key` | `AGENT_NOTIFY_PWA_KEY` |
+| Encryption key | `--enc-key` | `AGENT_NOTIFY_PWA_ENC_KEY` |
+
+## Commands
+
+### login
+
+```bash
+agent-notify-pwa login --url https://notifications.example.workers.dev --key ad_live_...
+```
+
+Verifies the pair against the hub before saving it. Get the account key from
+Settings in the app.
+
+### connect
+
+Adds an `agent-notifications` entry to `./.mcp.json`, keeping any other servers
+already in the file. That file holds your key, so keep it out of git.
+
+### open
+
+```bash
+agent-notify-pwa open                      # URL plus a QR code
+agent-notify-pwa open --no-qr              # URL only
+agent-notify-pwa open --next /settings     # land somewhere other than the inbox
+agent-notify-pwa open --ttl 60             # 1 to 60 minutes, default 15
+```
+
+Mints a one-time link that signs a browser in. Scan it on the phone; do not
+open it on the machine that printed it, because the link works exactly once.
+Ten links an hour per account.
+
+### notify
+
+```bash
+agent-notify-pwa notify "Tests failing" --kind error --priority 2 \
+  --project "API" --task "CI" --task-id ci-run-4821 \
+  --markdown "3 of 412 specs failed. See the log."
+```
+
+`--priority`: `0` silent, `1` push, `2` urgent (rings through quiet hours).
+`--kind`: `update`, `done` or `error`. Reuse one `--task-id` across a run so the
+messages thread together.
+
+### ask
+
+```bash
+agent-notify-pwa ask "Ready to deploy?" --button Deploy --button Hold \
+  --project "API" --task-id deploy-check --ack "Going with {answer}."
+```
+
+Posts the question, then polls until it is answered or expires. The answer JSON
+goes to stdout and the progress dots to stderr, so this composes:
+
+```bash
+CHOICE=$(agent-notify-pwa ask "Ship it?" --button Ship --button Hold | jq -r .choice)
+```
+
+Two or three buttons of at most 20 characters, with a title of at most 80
+characters, make the question answerable straight from the notification.
+
+### status
+
+```bash
+agent-notify-pwa status
+agent-notify-pwa status --json   # { "url": "...", "key": "...", "encKey": false }
+```
 
 ## End-to-end encryption
 
-Pass an encryption key at login and the CLI encrypts block content before it
-leaves your machine — the hub stores ciphertext it can't read:
+With an encryption key set, block content is encrypted before it leaves this
+machine and the hub only stores ciphertext.
 
 ```bash
-npx agentdash login --url … --key … --enc-key <ENC_KEY>
-npx agentdash notify "Secret result" --markdown "sensitive…" --e2e
+agent-notify-pwa login --url ... --key ... --enc-key <ENC_KEY>
+agent-notify-pwa notify "Secret result" --markdown "sensitive" --e2e
 ```
 
-Set the same `ENC_KEY` in the phone app (Settings → Encryption) so it can
-decrypt. The key never touches the server. See the root README for the full
-E2E design.
+Set the same key in the app under Settings, Encryption. The server cannot read
+encrypted blocks, so encrypted questions never get notification answer buttons.
 
-## Publish
+## Install
 
 ```bash
-cd cli && npm publish        # name may need scoping if "agent-dash" is taken
+npm install -g agent-pwa-notifications
 ```
+
+Or run it from a checkout with `node cli/bin.mjs <command>`. The only dependency
+is `qrcode-terminal`. Needs Node 20 or newer.

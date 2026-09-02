@@ -11,7 +11,7 @@ export function now(): number {
   return Date.now()
 }
 
-// ── ULID: time-sortable, URL-safe id. Crockford base32, 48-bit time + 80-bit random.
+// -- ULID: time-sortable, URL-safe id. Crockford base32, 48-bit time + 80-bit random.
 const ENC = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 export function ulid(time = Date.now()): string {
   let out = ''
@@ -26,7 +26,7 @@ export function ulid(time = Date.now()): string {
   return out
 }
 
-// ── base64url (no padding) helpers, for VAPID keys and JWTs.
+// -- base64url (no padding) helpers, for VAPID keys and JWTs.
 export function b64urlEncode(bytes: ArrayBuffer | Uint8Array): string {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
   let bin = ''
@@ -45,7 +45,7 @@ export function b64urlDecode(s: string): Uint8Array<ArrayBuffer> {
   return out
 }
 
-// ── Constant-time string compare, for token checks.
+// -- Constant-time string compare, for token checks.
 export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let diff = 0
@@ -53,7 +53,7 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
-// ── HMAC-SHA256 sign/verify, used for magic-login tokens and session cookies.
+// -- HMAC-SHA256 sign/verify, used for magic-login tokens and session cookies.
 async function hmacKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
@@ -75,7 +75,7 @@ export async function hmacVerify(secret: string, data: string, sig: string): Pro
   return timingSafeEqual(expected, sig)
 }
 
-// ── SHA-256 → lowercase hex. Used to store agent keys as a hash (never the
+// -- SHA-256 -> lowercase hex. Used to store agent keys as a hash (never the
 // raw key) and to hash OTP codes before they touch KV.
 export async function sha256hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
@@ -85,14 +85,14 @@ export async function sha256hex(input: string): Promise<string> {
   return hex
 }
 
-// ── A high-entropy URL-safe random token (default 32 bytes → ~43 chars).
+// -- A high-entropy URL-safe random token (default 32 bytes -> ~43 chars).
 export function randomToken(bytes = 32): string {
   const buf = new Uint8Array(bytes)
   crypto.getRandomValues(buf)
   return b64urlEncode(buf)
 }
 
-// ── A numeric one-time code, cryptographically random, fixed length (default 6).
+// -- A numeric one-time code, cryptographically random, fixed length (default 6).
 export function numericCode(digits = 6): string {
   const buf = new Uint32Array(1)
   let out = ''

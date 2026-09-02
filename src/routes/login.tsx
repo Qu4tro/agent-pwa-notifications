@@ -46,9 +46,24 @@ const codeBox: React.CSSProperties = {
   wordBreak: 'break-all',
 }
 
-// Email → one-time code → (for a brand-new account) the agent key shown once,
-// with connect steps. On success we hard-navigate to '/' so the freshly-set
-// session cookie is picked up.
+// Only a same-origin path is ever used as a landing target, so neither a login
+// link nor a crafted `?next=` can bounce the browser to another site.
+function safeNext(raw: string | null): string | null {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return null
+  return raw
+}
+
+function searchParams(): URLSearchParams {
+  return new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search)
+}
+
+// Two ways in. A one-time login link (`/login?t=...`, minted by an agent with
+// `agent-notify-pwa open`) trades its token for a session straight away.
+// Otherwise: email, then a one-time code, then (for a brand-new account) the agent key
+// shown once, with connect steps. On success we hard-navigate so the
+// freshly-set session cookie is picked up. `?next=` decides where we land,
+// which is how a notification answered on an expired session comes back to its
+// own thread.
 function LoginPage() {
   const [stage, setStage] = useState<'email' | 'code' | 'key'>('email')
   const [email, setEmail] = useState('')
@@ -57,6 +72,7 @@ function LoginPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<'' | 'key' | 'cmd'>('')
+  const [linkPending, setLinkPending] = useState(() => searchParams().has('t'))
 
   function copy(what: 'key' | 'cmd', text: string) {
     navigator.clipboard?.writeText(text)
@@ -64,9 +80,32 @@ function LoginPage() {
     setTimeout(() => setCopied(''), 1500)
   }
 
-  // Already signed in? Skip straight to the dashboard.
+  function land(next?: string | null) {
+    window.location.href = safeNext(next ?? null) ?? safeNext(searchParams().get('next')) ?? '/'
+  }
+
   useEffect(() => {
-    api.account().then(() => { window.location.href = '/' }).catch(() => {})
+    const token = searchParams().get('t')
+    if (token) {
+      api
+        .consumeLink(token)
+        .then((res) => {
+          if (res.ok) {
+            land(res.next)
+            return
+          }
+          setError('This link expired. Ask for a new one.')
+          setLinkPending(false)
+        })
+        .catch(() => {
+          setError('This link expired. Ask for a new one.')
+          setLinkPending(false)
+        })
+      return
+    }
+    // Already signed in? Skip straight to the dashboard.
+    api.account().then(() => { land() }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function sendCode(e?: React.FormEvent) {
@@ -96,7 +135,7 @@ function LoginPage() {
         setAgentKey(res.agent_key)
         setStage('key')
       } else {
-        window.location.href = '/' // returning user — session set, load the app
+        land() // returning user, session set, load the app
       }
     } catch {
       setError('Network error. Try again.')
@@ -112,7 +151,11 @@ function LoginPage() {
           <a href="/" aria-label="Home"><Logo /></a>
         </div>
 
-        {stage === 'email' && (
+        {linkPending && (
+          <p style={{ color: 'var(--muted)', textAlign: 'center' }}>Signing you in...</p>
+        )}
+
+        {!linkPending && stage === 'email' && (
           <form onSubmit={sendCode} style={{ textAlign: 'center' }}>
             <h1 style={{ fontSize: '1.4rem', margin: '0 0 0.5rem' }}>Sign in to Agent Dash</h1>
             <p style={{ color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
@@ -203,7 +246,7 @@ function LoginPage() {
             </div>
             <button
               type="button"
-              onClick={() => { window.location.href = '/' }}
+              onClick={() => { land() }}
               style={{ marginTop: '1.25rem', width: '100%', padding: '0.6rem', background: 'none', border: '1px solid var(--border)', borderRadius: '0.6rem', color: 'var(--text)', cursor: 'pointer', fontSize: '0.95rem' }}
             >
               Continue to dashboard →

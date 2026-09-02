@@ -6,7 +6,7 @@ export function blockSchemaDoc(): Response {
   return json(
     {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
-      title: 'Agent Dash blocks',
+      title: 'Agent Notifications blocks',
       description:
         'A JSON array of typed UI blocks. Display blocks work in any event. Interactive blocks (buttons, form) are only valid on a question.',
       blocks: {
@@ -60,10 +60,10 @@ export function openApiDoc(origin: string): Response {
   const spec = {
     openapi: '3.1.0',
     info: {
-      title: 'Agent Dash',
-      version: '0.1.0',
+      title: 'Agent Notifications',
+      version: __APP_VERSION__,
       description:
-        'Push updates and ask-and-wait questions from AI agents to one human. Bearer auth with your AGENT_KEY.',
+        'Push updates and ask-and-wait questions from AI agents to one human. Bearer auth with the account agent key.',
     },
     servers: [{ url: origin }],
     components: {
@@ -138,6 +138,73 @@ export function openApiDoc(origin: string): Response {
             { name: 'limit', in: 'query', schema: { type: 'integer' } },
           ],
           responses: { '200': { description: 'Recent events' } },
+        },
+      },
+      '/api/v1/events/{id}': {
+        post: {
+          operationId: 'update',
+          summary: 'Replace an existing event in place (live progress).',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string' },
+                    blocks: { type: 'array', items: { type: 'object' } },
+                    kind: { type: 'string', enum: ['update', 'done', 'error'] },
+                    priority: { type: 'integer', enum: [0, 1, 2] },
+                    notify: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+          responses: { '200': { description: 'Updated' } },
+        },
+      },
+      '/api/v1/clear': {
+        post: {
+          operationId: 'clear',
+          summary: "Remove seen or settled events ('read'), or everything ('all').",
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    scope: { type: 'string', enum: ['read', 'all'] },
+                    project: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          responses: { '200': { description: 'Returns the number of events removed' } },
+        },
+      },
+      '/api/v1/login-link': {
+        post: {
+          operationId: 'login_link',
+          summary: 'Mint a one-time link that signs the human in on any device.',
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    next: { type: 'string', description: 'Same-origin path to land on. Default "/".' },
+                    ttl_minutes: { type: 'integer', minimum: 1, maximum: 60, default: 15 },
+                  },
+                },
+              },
+            },
+          },
+          responses: { '200': { description: 'Returns url and expires_at' } },
         },
       },
     },

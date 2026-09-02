@@ -1,12 +1,12 @@
 import { z } from 'zod'
 
-// ── The block system ───────────────────────────────────────────────────────
+// -- The block system -------------------------------------------------------
 // Agents never send HTML. They send a JSON array of typed blocks, validated
 // here, rendered by the dashboard. Slack Block Kit / Adaptive Cards pattern:
 // LLMs emit schema-conformant JSON reliably, and we never render agent markup.
 //
 // Display blocks are valid in any event. Interactive blocks (buttons, form)
-// are only meaningful inside a kind:"question" event — enforced in the API.
+// are only meaningful inside a kind:"question" event - enforced in the API.
 
 const Markdown = z.object({
   type: z.literal('markdown'),
@@ -41,7 +41,7 @@ const Link = z.object({
 
 const Img = z.object({
   type: z.literal('image'),
-  url: z.string().url().max(2000), // URL only in v1 — no data: URIs
+  url: z.string().url().max(2000), // URL only in v1 - no data: URIs
   alt: z.string().max(400).optional(),
 })
 
@@ -57,7 +57,7 @@ const Callout = z.object({
   text: z.string().max(4000),
 })
 
-// ── Interactive blocks (questions only) ──────────────────────────────────────
+// -- Interactive blocks (questions only) --------------------------------------
 
 const Buttons = z.object({
   type: z.literal('buttons'),

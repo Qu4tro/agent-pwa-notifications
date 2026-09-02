@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers'
+import type { Env } from '../src/server/env'
 import { handleApi } from '../src/server/router'
 import { createSession } from '../src/server/auth'
 import { sha256hex, ulid, now } from '../src/server/util'
@@ -30,9 +31,11 @@ export async function sessionFor(accountId: string): Promise<string> {
   return `ad_session=${await createSession(env, accountId)}`
 }
 
-// Call the router the way the Worker would.
-export async function api(request: Request): Promise<Response> {
-  const res = await handleApi(request, env)
+// Call the router the way the Worker would. `overrides` patches the bindings
+// for one call, which is how tests exercise optional settings such as
+// ALLOWED_EMAILS without a second miniflare instance.
+export async function api(request: Request, overrides?: Partial<Env>): Promise<Response> {
+  const res = await handleApi(request, overrides ? { ...env, ...overrides } : env)
   if (!res) throw new Error(`handleApi did not claim ${request.method} ${request.url}`)
   return res
 }
@@ -58,9 +61,9 @@ export function req(
 export async function call(
   method: string,
   path: string,
-  opts: { body?: unknown; auth?: Auth } = {},
+  opts: { body?: unknown; auth?: Auth; env?: Partial<Env> } = {},
 ): Promise<{ status: number; body: any }> {
-  const res = await api(req(method, path, opts))
+  const res = await api(req(method, path, opts), opts.env)
   const text = await res.text()
   let parsed: unknown = text
   try {

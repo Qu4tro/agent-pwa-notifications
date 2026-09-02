@@ -42,9 +42,8 @@ async function questionIds(accountId: string): Promise<string[]> {
 }
 
 describe('POST /api/v1/clear with scope read', () => {
-  // Section 4.1, case 1. The brief suspected a lone answered question survived
-  // "clear read". It does not: answerQuestion stamps read_at, so the row is
-  // already read by the time clear runs. Kept green as a regression guard.
+  // Section 4.1, case 1. answerQuestion stamps read_at, so this one was already
+  // green before phase 2. Kept as a regression guard.
   it('deletes an answered question that was never explicitly marked read', async () => {
     const account = await createAccount('case1@example.invalid')
     const cookie = await sessionFor(account.id)
@@ -115,6 +114,75 @@ describe('POST /api/v1/clear with scope read', () => {
     const cleared = await call('POST', '/api/v1/clear', { body: { scope: 'read' }, auth: { cookie } })
     expect(cleared.body).toMatchObject({ ok: true, cleared: 0 })
     expect(await eventIds(account.id)).toEqual([id])
+  })
+
+  // Phase 2: "read" now means "seen or settled". An answered question that the
+  // human flipped back to unread is still settled, so clear takes it.
+  it('deletes an answered question that is marked unread again', async () => {
+    const account = await createAccount('answered-unread@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account, 'Ship it?')
+
+    await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { choice: 'Yes' },
+      auth: { cookie },
+    })
+    await call('POST', `/api/v1/event/${id}/unread`, { auth: { cookie } })
+
+    const row = await env.DB.prepare('SELECT read_at FROM events WHERE id = ?1')
+      .bind(id)
+      .first<{ read_at: number | null }>()
+    expect(row?.read_at).toBeNull()
+
+    const cleared = await call('POST', '/api/v1/clear', { body: { scope: 'read' }, auth: { cookie } })
+    expect(cleared.body).toMatchObject({ ok: true, cleared: 1 })
+    expect(await eventIds(account.id)).toEqual([])
+    expect(await questionIds(account.id)).toEqual([])
+  })
+
+  // Phase 2: an expired question is settled too - nobody can answer it any
+  // more, so it should not sit in the inbox forever.
+  it('deletes an expired question that was never read', async () => {
+    const account = await createAccount('expired@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account, 'Still relevant?')
+    await env.DB.prepare(`UPDATE questions SET status = 'expired' WHERE event_id = ?1`).bind(id).run()
+
+    const cleared = await call('POST', '/api/v1/clear', { body: { scope: 'read' }, auth: { cookie } })
+    expect(cleared.body).toMatchObject({ ok: true, cleared: 1 })
+    expect(await eventIds(account.id)).toEqual([])
+    expect(await questionIds(account.id)).toEqual([])
+  })
+
+  // Phase 2: the counterpart. A pending question is not settled and was never
+  // read, so it survives.
+  it('keeps a pending question that was never read', async () => {
+    const account = await createAccount('pending-kept@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account, 'Waiting on you')
+
+    const cleared = await call('POST', '/api/v1/clear', { body: { scope: 'read' }, auth: { cookie } })
+    expect(cleared.body).toMatchObject({ ok: true, cleared: 0 })
+    expect(await eventIds(account.id)).toEqual([id])
+    expect(await questionIds(account.id)).toEqual([id])
+  })
+
+  // Phase 2: the project filter still bounds the settled-question rule.
+  it('leaves a settled question in another project alone', async () => {
+    const account = await createAccount('settled-project@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const alphaId = await ask(account, 'Alpha ready?', 'alpha')
+    const betaId = await ask(account, 'Beta ready?', 'beta')
+    for (const id of [alphaId, betaId]) {
+      await env.DB.prepare(`UPDATE questions SET status = 'expired' WHERE event_id = ?1`).bind(id).run()
+    }
+
+    const cleared = await call('POST', '/api/v1/clear', {
+      body: { scope: 'read', project: 'beta' },
+      auth: { cookie },
+    })
+    expect(cleared.body).toMatchObject({ ok: true, cleared: 1 })
+    expect(await eventIds(account.id)).toEqual([alphaId])
   })
 
   it('never reaches into another account', async () => {

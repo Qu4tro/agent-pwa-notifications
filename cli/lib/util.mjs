@@ -1,18 +1,30 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import qrcode from 'qrcode-terminal'
 
-// ── config ───────────────────────────────────────────────────────────────────
-// The hosted hub. Users on the hosted service don't need to pass --url; a
-// self-hoster overrides it via --url, AGENT_DASH_URL, or saved config.
-export const DEFAULT_URL = 'https://agentdash.mycli.tools'
+// -- config ------------------------------------------------------------------
+// Every hub is somebody's own deployment, so there is no default URL. `login`
+// asks for one and saves it.
 
-export const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'agent-dash')
+const XDG = process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
+export const CONFIG_DIR = join(XDG, 'agent-notify-pwa')
 export const CONFIG_PATH = join(CONFIG_DIR, 'config.json')
 
+// Where the pre-rename CLI kept the same file. Copied once, on first run.
+const LEGACY_CONFIG_PATH = join(XDG, 'agent-dash', 'config.json')
+
+function migrateLegacyConfig() {
+  if (existsSync(CONFIG_PATH) || !existsSync(LEGACY_CONFIG_PATH)) return
+  mkdirSync(CONFIG_DIR, { recursive: true })
+  copyFileSync(LEGACY_CONFIG_PATH, CONFIG_PATH)
+  // stderr, so `status --json` stays machine-readable on stdout.
+  console.error(`Copied your old config from ${LEGACY_CONFIG_PATH} to ${CONFIG_PATH}.`)
+}
+
 export function loadConfig() {
+  migrateLegacyConfig()
   if (!existsSync(CONFIG_PATH)) return {}
   try {
     return JSON.parse(readFileSync(CONFIG_PATH, 'utf8'))
@@ -26,17 +38,17 @@ export function saveConfig(cfg) {
   writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2))
 }
 
-// Resolve url + key from flags → env → saved config → hosted default.
+// Resolve url + key + encKey from flags, then env, then saved config.
 export function resolve(flags = {}) {
   const cfg = loadConfig()
   return {
-    url: (flags.url || process.env.AGENT_DASH_URL || cfg.url || DEFAULT_URL).replace(/\/$/, ''),
-    key: flags.key || process.env.AGENT_KEY || cfg.key || '',
-    encKey: flags['enc-key'] || process.env.AGENT_DASH_ENC_KEY || cfg.encKey || '',
+    url: (flags.url || process.env.AGENT_NOTIFY_PWA_URL || cfg.url || '').replace(/\/$/, ''),
+    key: flags.key || process.env.AGENT_NOTIFY_PWA_KEY || cfg.key || '',
+    encKey: flags['enc-key'] || process.env.AGENT_NOTIFY_PWA_ENC_KEY || cfg.encKey || '',
   }
 }
 
-// ── HTTP ─────────────────────────────────────────────────────────────────────
+// -- HTTP --------------------------------------------------------------------
 export async function hub(method, path, { url, key }, body) {
   const res = await fetch(`${url}${path}`, {
     method,
@@ -64,7 +76,7 @@ export async function verify({ url, key }) {
   }
 }
 
-// ── E2E crypto (AES-256-GCM with a shared key the hub never sees) ────────────
+// -- E2E crypto (AES-256-GCM with a shared key the hub never sees) ------------
 // Envelope: base64( iv(12) || ciphertext+tag ). Same scheme in the browser.
 export function newEncKey() {
   return b64url(randomBytes(32))
@@ -81,7 +93,7 @@ async function importKey(encKey) {
   return crypto.subtle.importKey('raw', b64urlDecode(encKey), 'AES-GCM', false, ['encrypt', 'decrypt'])
 }
 
-// Encrypt any JSON-serializable value → opaque string for the `blocks` field.
+// Encrypt any JSON-serializable value into an opaque string for `blocks`.
 export async function encrypt(encKey, value) {
   const key = await importKey(encKey)
   const iv = randomBytes(12)
@@ -102,13 +114,13 @@ export async function decrypt(encKey, envelope) {
   return JSON.parse(new TextDecoder().decode(pt))
 }
 
-// ── display ──────────────────────────────────────────────────────────────────
+// -- display -----------------------------------------------------------------
 export function qr(text) {
   qrcode.generate(text, { small: true }, (out) => console.log(out))
 }
 
 export function die(msg) {
-  console.error(`\n✖ ${msg}\n`)
+  console.error(`\nError: ${msg}\n`)
   process.exit(1)
 }
 

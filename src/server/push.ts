@@ -1,22 +1,22 @@
 import type { Env } from './env'
 import { b64urlDecode, b64urlEncode } from './util'
 
-// ── Web Push, hand-rolled on WebCrypto so it runs in workerd (no Node deps) ──
+// -- Web Push, hand-rolled on WebCrypto so it runs in workerd (no Node deps) --
 // Two pieces per push:
 //   1. VAPID: an ES256 JWT proving we own the app server key (identifies us to
 //      the push service, e.g. FCM/Mozilla/Apple).
-//   2. Payload encryption: RFC 8291 "aes128gcm" — ECDH(our ephemeral P-256,
-//      subscriber's p256dh) → HKDF → AES-128-GCM. The push service can't read it.
+//   2. Payload encryption: RFC 8291 "aes128gcm" - ECDH(our ephemeral P-256,
+//      subscriber's p256dh) -> HKDF -> AES-128-GCM. The push service can't read it.
 //
 // Subscription shape (from the browser's PushSubscription.toJSON()):
-//   { endpoint, keys: { p256dh, auth } }  — both keys base64url.
+//   { endpoint, keys: { p256dh, auth } } - both keys base64url.
 
 export interface PushSubscription {
   endpoint: string
   keys: { p256dh: string; auth: string }
 }
 
-// ── VAPID JWT (ES256) ────────────────────────────────────────────────────────
+// -- VAPID JWT (ES256) --------------------------------------------------------
 async function importVapidPrivate(env: Env): Promise<CryptoKey> {
   // Private key stored as base64url raw scalar `d` (32 bytes). Rebuild a JWK
   // using the public key's x/y so WebCrypto can import an ECDSA signing key.
@@ -39,7 +39,7 @@ async function vapidHeader(env: Env, endpoint: string): Promise<string> {
   const payload = {
     aud,
     exp: Math.floor(Date.now() / 1000) + 12 * 3600,
-    sub: env.VAPID_SUBJECT || 'mailto:admin@agent-dash.local',
+    sub: env.VAPID_SUBJECT || 'mailto:admin@agent-notifications.local',
   }
   const enc = (o: unknown) => b64urlEncode(new TextEncoder().encode(JSON.stringify(o)))
   const signingInput = `${enc(header)}.${enc(payload)}`
@@ -49,11 +49,11 @@ async function vapidHeader(env: Env, endpoint: string): Promise<string> {
     key,
     new TextEncoder().encode(signingInput),
   )
-  // WebCrypto returns raw r||s (64 bytes) — exactly JOSE ES256 format.
+  // WebCrypto returns raw r||s (64 bytes) - exactly JOSE ES256 format.
   return `${signingInput}.${b64urlEncode(sig)}`
 }
 
-// ── Payload encryption (RFC 8291, aes128gcm) ─────────────────────────────────
+// -- Payload encryption (RFC 8291, aes128gcm) ---------------------------------
 async function hkdf(
   salt: Uint8Array<ArrayBuffer>,
   ikm: Uint8Array<ArrayBuffer>,
@@ -167,7 +167,7 @@ export async function pushToAll(env: Env, accountId: string, notification: unkno
           await env.DB.prepare('DELETE FROM push_subscriptions WHERE id = ?1').bind(row.id).run()
         }
       } catch {
-        // Network hiccup — leave the subscription, try again next event.
+        // Network hiccup - leave the subscription, try again next event.
       }
     }),
   )

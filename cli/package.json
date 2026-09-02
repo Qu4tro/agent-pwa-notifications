@@ -1,19 +1,23 @@
 {
-  "name": "agentdash",
+  "name": "agent-pwa-notifications",
   "version": "0.2.0",
-  "description": "CLI for Agent Dash — connect an agent to your hub, log in on your phone, and send updates/questions from scripts.",
+  "description": "CLI for a self-hosted Agent Notifications hub: connect an agent, mint a sign-in link, and send updates and questions from scripts.",
   "type": "module",
   "bin": {
-    "agentdash": "bin.mjs"
+    "agent-notify-pwa": "bin.mjs"
   },
   "files": ["bin.mjs", "lib/"],
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=20" },
   "license": "MIT",
-  "scripts": {
-    "publish:prod": "npm publish --access public"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Qu4tro/agent-pwa-notifications.git",
+    "directory": "cli"
   },
+  "homepage": "https://github.com/Qu4tro/agent-pwa-notifications#readme",
+  "bugs": { "url": "https://github.com/Qu4tro/agent-pwa-notifications/issues" },
   "dependencies": {
     "qrcode-terminal": "^0.12.0"
   },
-  "keywords": ["agentdash", "agent-dash", "ai-agents", "mcp", "cli", "notifications"]
+  "keywords": ["ai-agents", "mcp", "cli", "notifications", "web-push", "pwa", "cloudflare-workers"]
 }

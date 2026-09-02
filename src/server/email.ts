@@ -1,11 +1,11 @@
 import type { Env } from './env'
 
-// ── Transactional email via Resend ───────────────────────────────────────────
+// -- Transactional email via Resend -------------------------------------------
 // One job for now: deliver a login one-time code. In dev (no RESEND_API_KEY) we
 // log the code to the console instead of sending, so the whole OTP flow works
 // locally without a Resend account or a verified sending domain.
 
-const DEFAULT_FROM = 'Agent Dash <onboarding@resend.dev>'
+const DEFAULT_FROM = 'Agent Notifications <onboarding@resend.dev>'
 
 // Thrown when Resend rejects the send because the account's daily/monthly email
 // quota is exhausted (free tier is 100/day). Distinct from other failures so the
@@ -19,8 +19,8 @@ export class EmailCapError extends Error {
 
 export async function sendOtpEmail(env: Env, to: string, code: string): Promise<void> {
   if (!env.RESEND_API_KEY) {
-    // Dev bypass — no external send. The verify endpoint still checks this code.
-    console.log(`\n[agent-dash] login code for ${to}: ${code}\n`)
+    // Dev bypass - no external send. The verify endpoint still checks this code.
+    console.log(`\n[agent-notifications] login code for ${to}: ${code}\n`)
     return
   }
 
@@ -34,8 +34,8 @@ export async function sendOtpEmail(env: Env, to: string, code: string): Promise<
     body: JSON.stringify({
       from,
       to: [to],
-      subject: `Your Agent Dash code: ${code}`,
-      text: `Your Agent Dash login code is ${code}\n\nIt expires in 10 minutes. If you didn't request this, you can ignore this email.`,
+      subject: `Your Agent Notifications code: ${code}`,
+      text: `Your Agent Notifications login code is ${code}\n\nIt expires in 10 minutes. If you didn't request this, you can ignore this email.`,
       html: otpHtml(code),
     }),
   })
