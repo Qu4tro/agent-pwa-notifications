@@ -1,13 +1,10 @@
-import { useEffect } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useIsFetching } from '@tanstack/react-query'
 
-export function Header({
-  live,
-  right,
-}: {
-  live?: boolean
-  right?: React.ReactNode
-}) {
+// Mounted once by the app layout, so it never unmounts between pages. Pages
+// contribute their own actions through `useHeaderActions`.
+export function Header({ right }: { right?: React.ReactNode }) {
   return (
     <header
       className="safe-top"
@@ -26,41 +23,51 @@ export function Header({
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', textDecoration: 'none', color: 'var(--text)' }}>
             <Logo />
             <span style={{ fontWeight: 700, fontSize: '1.05rem', letterSpacing: '-0.01em' }}>Agent Dash</span>
-            {live ? (
-              <span className="live-dot" title="Live" style={{ width: '0.5rem', height: '0.5rem', borderRadius: '999px', background: 'var(--success)', marginLeft: '0.1rem' }} />
-            ) : null}
           </Link>
-          <ProButton />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>{right}</div>
       </div>
+      <RefreshBar />
     </header>
   )
 }
 
-function ProButton() {
+// The only "something is loading" signal in the app: a 2px line on the bottom
+// edge of the header while any query is in flight. Content never disappears
+// behind a spinner.
+function RefreshBar() {
+  const fetching = useIsFetching()
   return (
-    <Link
-      to="/pro"
+    <div
+      aria-hidden
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        textDecoration: 'none',
-        fontSize: '0.72rem',
-        fontWeight: 700,
-        letterSpacing: '0.02em',
-        color: '#fff',
-        background: 'linear-gradient(135deg, var(--accent), #c78bff)',
-        padding: '0.22rem 0.6rem',
-        borderRadius: '999px',
-        boxShadow: '0 2px 10px -2px color-mix(in srgb, var(--accent) 60%, transparent)',
-        whiteSpace: 'nowrap',
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: '-1px',
+        height: '2px',
+        overflow: 'hidden',
+        opacity: fetching > 0 ? 1 : 0,
+        transition: 'opacity 150ms linear',
       }}
     >
-      ✦ Pro
-    </Link>
+      <div className="refresh-bar" style={{ height: '2px', background: 'var(--accent)' }} />
+    </div>
   )
+}
+
+// The header outlives the pages, so a page hands it its actions instead of
+// rendering its own header. The layout owns the state; a page calls
+// `useHeaderActions` and gets out of the way when it unmounts.
+export const HeaderActionsContext = createContext<(node: React.ReactNode) => void>(() => {})
+
+export function useHeaderActions(node: React.ReactNode, deps: React.DependencyList) {
+  const setActions = useContext(HeaderActionsContext)
+  useEffect(() => {
+    setActions(node)
+    return () => setActions(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
 }
 
 export function Logo() {
@@ -81,117 +88,41 @@ export function Container({ children }: { children: React.ReactNode }) {
   )
 }
 
-// App pages (settings, project, thread…) render this when they hit a 401 — it
-// bounces to the dedicated /login route. The public landing lives at '/'.
-export function LockedScreen() {
-  useEffect(() => {
-    window.location.href = '/login'
-  }, [])
-  return <Spinner />
-}
-
-// The public marketing page shown at '/' to logged-out visitors. A signed-in
-// visitor never sees this — index.tsx renders the dashboard instead.
-export function Landing() {
-  const cardStyle: React.CSSProperties = {
-    background: 'var(--bg-elev)',
-    border: '1px solid var(--border)',
-    borderRadius: '0.8rem',
-    padding: '1rem 1.1rem',
-    textAlign: 'left',
-  }
+// What a page shows when its query failed and there is nothing cached to show
+// instead. One line, one button, inside the content area.
+export function InlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      <div style={{ maxWidth: '34rem', width: '100%', textAlign: 'center' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
-          <Logo />
-          <span style={{ fontWeight: 700, fontSize: '1.15rem', letterSpacing: '-0.01em' }}>Agent Dash</span>
-        </div>
-
-        <h1 style={{ fontSize: '2rem', lineHeight: 1.15, margin: '0 0 0.75rem', letterSpacing: '-0.02em' }}>
-          Your agents report here.
-        </h1>
-        <p style={{ color: 'var(--muted)', fontSize: '1.05rem', lineHeight: 1.6, margin: '0 auto 1.75rem', maxWidth: '28rem' }}>
-          A push inbox for AI agents. They send you progress updates as phone
-          notifications — and can ask a question and wait for your answer before
-          continuing.
-        </p>
-
-        <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2rem' }}>
-          <a
-            href="/login"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-              textDecoration: 'none', fontWeight: 700, fontSize: '1rem',
-              color: '#fff', background: 'linear-gradient(135deg, var(--accent), #c78bff)',
-              padding: '0.7rem 1.4rem', borderRadius: '0.6rem',
-            }}
-          >
-            Get started — it's free →
-          </a>
-          <a
-            href="https://github.com/Prajeevan/agent-dash"
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: 'inline-flex', alignItems: 'center',
-              textDecoration: 'none', fontWeight: 600, fontSize: '1rem',
-              color: 'var(--text)', background: 'var(--bg-elev2)',
-              border: '1px solid var(--border)', padding: '0.7rem 1.2rem', borderRadius: '0.6rem',
-            }}
-          >
-            Learn more
-          </a>
-        </div>
-
-        <div style={{ display: 'grid', gap: '0.7rem', gridTemplateColumns: '1fr', textAlign: 'left' }}>
-          <div style={cardStyle}>
-            <strong style={{ fontSize: '0.95rem' }}>🔔 Push, not polling</strong>
-            <p style={{ color: 'var(--muted)', fontSize: '0.88rem', lineHeight: 1.55, margin: '0.3rem 0 0' }}>
-              Milestones, errors, and “done” land as real notifications on your phone.
-            </p>
-          </div>
-          <div style={cardStyle}>
-            <strong style={{ fontSize: '0.95rem' }}>💬 Ask &amp; wait</strong>
-            <p style={{ color: 'var(--muted)', fontSize: '0.88rem', lineHeight: 1.55, margin: '0.3rem 0 0' }}>
-              Agents pose a question with buttons or a form and pause until you answer.
-            </p>
-          </div>
-          <div style={cardStyle}>
-            <strong style={{ fontSize: '0.95rem' }}>🔌 One-line setup</strong>
-            <p style={{ color: 'var(--muted)', fontSize: '0.88rem', lineHeight: 1.55, margin: '0.3rem 0 0' }}>
-              Add the skill with <code>npx skills add</code>, paste your key, done. Sign in to get yours.
-            </p>
-          </div>
-        </div>
-
-        <p style={{ color: 'var(--muted)', fontSize: '0.8rem', marginTop: '2rem' }}>
-          Sign in with just your email — no password.
-        </p>
-      </div>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.8rem',
+        flexWrap: 'wrap',
+        padding: '0.7rem 0.9rem',
+        border: '1px solid var(--border)',
+        borderLeft: '3px solid var(--error)',
+        borderRadius: 'var(--radius)',
+        background: 'var(--bg-elev)',
+        fontSize: '0.9rem',
+      }}
+    >
+      <span style={{ color: 'var(--muted)' }}>{message}</span>
+      <button
+        onClick={onRetry}
+        style={{
+          marginLeft: 'auto',
+          padding: '0.35rem 0.8rem',
+          borderRadius: '0.5rem',
+          border: '1px solid var(--border)',
+          background: 'var(--bg-elev2)',
+          color: 'var(--text)',
+          fontWeight: 600,
+          fontSize: '0.85rem',
+          cursor: 'pointer',
+        }}
+      >
+        Retry
+      </button>
     </div>
-  )
-}
-
-export function Spinner() {
-  return (
-    <div style={{ minHeight: '60svh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>
-      Loading…
-    </div>
-  )
-}
-
-export function Badge({ kind }: { kind: string }) {
-  const map: Record<string, [string, string]> = {
-    update: ['Update', 'var(--info)'],
-    question: ['Question', 'var(--accent)'],
-    done: ['Done', 'var(--success)'],
-    error: ['Error', 'var(--error)'],
-  }
-  const [label, color] = map[kind] ?? ['Event', 'var(--muted)']
-  return (
-    <span style={{ fontSize: '0.7rem', fontWeight: 650, textTransform: 'uppercase', letterSpacing: '0.04em', color, background: `color-mix(in srgb, ${color} 15%, transparent)`, padding: '0.15rem 0.5rem', borderRadius: '999px' }}>
-      {label}
-    </span>
   )
 }

@@ -127,3 +127,32 @@ a {
   font-weight: 650;
   color: #fff;
 }
+
+/* Loading placeholders in the content area. */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.skeleton {
+  background: var(--bg-elev);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* The refresh line on the bottom edge of the header. */
+@keyframes refresh-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+.refresh-bar {
+  width: 40%;
+  animation: refresh-slide 0.9s ease-in-out infinite;
+}

@@ -9,17 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as ProRouteImport } from './routes/pro'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as EventIdRouteImport } from './routes/event.$id'
-import { Route as ProjectNameRouteImport } from './routes/project.$name'
-import { Route as ProjectNameTaskKeyRouteImport } from './routes/project.$name.task.$key'
+import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppEventIdRouteImport } from './routes/_app.event.$id'
+import { Route as AppProjectNameIndexRouteImport } from './routes/_app.project.$name.index'
+import { Route as AppProjectNameTaskKeyRouteImport } from './routes/_app.project.$name.task.$key'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -27,106 +26,98 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProRoute = ProRouteImport.update({
-  id: '/pro',
-  path: '/pro',
-  getParentRoute: () => rootRouteImport,
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
+const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const EventIdRoute = EventIdRouteImport.update({
+const AppEventIdRoute = AppEventIdRouteImport.update({
   id: '/event/$id',
   path: '/event/$id',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const ProjectNameRoute = ProjectNameRouteImport.update({
-  id: '/project/$name',
-  path: '/project/$name',
-  getParentRoute: () => rootRouteImport,
+const AppProjectNameIndexRoute = AppProjectNameIndexRouteImport.update({
+  id: '/project/$name/',
+  path: '/project/$name/',
+  getParentRoute: () => AppRoute,
 } as any)
-const ProjectNameTaskKeyRoute = ProjectNameTaskKeyRouteImport.update({
-  id: '/task/$key',
-  path: '/task/$key',
-  getParentRoute: () => ProjectNameRoute,
+const AppProjectNameTaskKeyRoute = AppProjectNameTaskKeyRouteImport.update({
+  id: '/project/$name/task/$key',
+  path: '/project/$name/task/$key',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
-  '/pro': typeof ProRoute
-  '/settings': typeof SettingsRoute
-  '/event/$id': typeof EventIdRoute
-  '/project/$name': typeof ProjectNameRouteWithChildren
-  '/project/$name/task/$key': typeof ProjectNameTaskKeyRoute
+  '/settings': typeof AppSettingsRoute
+  '/event/$id': typeof AppEventIdRoute
+  '/project/$name/': typeof AppProjectNameIndexRoute
+  '/project/$name/task/$key': typeof AppProjectNameTaskKeyRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/pro': typeof ProRoute
-  '/settings': typeof SettingsRoute
-  '/event/$id': typeof EventIdRoute
-  '/project/$name': typeof ProjectNameRouteWithChildren
-  '/project/$name/task/$key': typeof ProjectNameTaskKeyRoute
+  '/settings': typeof AppSettingsRoute
+  '/': typeof AppIndexRoute
+  '/event/$id': typeof AppEventIdRoute
+  '/project/$name': typeof AppProjectNameIndexRoute
+  '/project/$name/task/$key': typeof AppProjectNameTaskKeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/pro': typeof ProRoute
-  '/settings': typeof SettingsRoute
-  '/event/$id': typeof EventIdRoute
-  '/project/$name': typeof ProjectNameRouteWithChildren
-  '/project/$name/task/$key': typeof ProjectNameTaskKeyRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/event/$id': typeof AppEventIdRoute
+  '/_app/project/$name/': typeof AppProjectNameIndexRoute
+  '/_app/project/$name/task/$key': typeof AppProjectNameTaskKeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
-    | '/pro'
     | '/settings'
     | '/event/$id'
-    | '/project/$name'
+    | '/project/$name/'
     | '/project/$name/task/$key'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
     | '/login'
-    | '/pro'
     | '/settings'
+    | '/'
     | '/event/$id'
     | '/project/$name'
     | '/project/$name/task/$key'
   id:
     | '__root__'
-    | '/'
+    | '/_app'
     | '/login'
-    | '/pro'
-    | '/settings'
-    | '/event/$id'
-    | '/project/$name'
-    | '/project/$name/task/$key'
+    | '/_app/settings'
+    | '/_app/'
+    | '/_app/event/$id'
+    | '/_app/project/$name/'
+    | '/_app/project/$name/task/$key'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
-  ProRoute: typeof ProRoute
-  SettingsRoute: typeof SettingsRoute
-  EventIdRoute: typeof EventIdRoute
-  ProjectNameRoute: typeof ProjectNameRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -136,63 +127,65 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/pro': {
-      id: '/pro'
-      path: '/pro'
-      fullPath: '/pro'
-      preLoaderRoute: typeof ProRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_app/': {
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/settings': {
-      id: '/settings'
+    '/_app/settings': {
+      id: '/_app/settings'
       path: '/settings'
       fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/event/$id': {
-      id: '/event/$id'
+    '/_app/event/$id': {
+      id: '/_app/event/$id'
       path: '/event/$id'
       fullPath: '/event/$id'
-      preLoaderRoute: typeof EventIdRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppEventIdRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/project/$name': {
-      id: '/project/$name'
+    '/_app/project/$name/': {
+      id: '/_app/project/$name/'
       path: '/project/$name'
-      fullPath: '/project/$name'
-      preLoaderRoute: typeof ProjectNameRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/project/$name/'
+      preLoaderRoute: typeof AppProjectNameIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/project/$name/task/$key': {
-      id: '/project/$name/task/$key'
-      path: '/task/$key'
+    '/_app/project/$name/task/$key': {
+      id: '/_app/project/$name/task/$key'
+      path: '/project/$name/task/$key'
       fullPath: '/project/$name/task/$key'
-      preLoaderRoute: typeof ProjectNameTaskKeyRouteImport
-      parentRoute: typeof ProjectNameRoute
+      preLoaderRoute: typeof AppProjectNameTaskKeyRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
 
-interface ProjectNameRouteChildren {
-  ProjectNameTaskKeyRoute: typeof ProjectNameTaskKeyRoute
+interface AppRouteChildren {
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppEventIdRoute: typeof AppEventIdRoute
+  AppProjectNameIndexRoute: typeof AppProjectNameIndexRoute
+  AppProjectNameTaskKeyRoute: typeof AppProjectNameTaskKeyRoute
 }
 
-const ProjectNameRouteChildren: ProjectNameRouteChildren = {
-  ProjectNameTaskKeyRoute: ProjectNameTaskKeyRoute,
+const AppRouteChildren: AppRouteChildren = {
+  AppSettingsRoute: AppSettingsRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppEventIdRoute: AppEventIdRoute,
+  AppProjectNameIndexRoute: AppProjectNameIndexRoute,
+  AppProjectNameTaskKeyRoute: AppProjectNameTaskKeyRoute,
 }
 
-const ProjectNameRouteWithChildren = ProjectNameRoute._addFileChildren(
-  ProjectNameRouteChildren,
-)
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
-  ProRoute: ProRoute,
-  SettingsRoute: SettingsRoute,
-  EventIdRoute: EventIdRoute,
-  ProjectNameRoute: ProjectNameRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

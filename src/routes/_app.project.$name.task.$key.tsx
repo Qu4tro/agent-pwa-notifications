@@ -1,124 +1,121 @@
 import { useEffect, useRef, useState } from 'react'
-import { createFileRoute, Link, useParams } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
-import { api, AuthError, timeAgo, type ThreadData, type EventItem } from '../lib/api'
-import { Header, Container, LockedScreen, Spinner } from '../lib/shell'
+import { timeAgo, type ThreadData, type EventItem } from '../lib/api'
+import { Container, InlineError, useHeaderActions } from '../lib/shell'
+import { ensure, threadQuery, useAnswer, useMarkRead } from '../lib/queries'
+import { ThreadSkeleton } from '../lib/skeleton'
 import { BlockRenderer, AnswerForm } from '../lib/blocks'
 import { projectColor, projectLabel, fromParam, KIND_LABEL, KIND_COLOR } from '../lib/project'
 import { getEncKey, encryptValue, decryptValue } from '../lib/e2e'
-import { useLive } from '../lib/live'
 
-export const Route = createFileRoute('/project/$name/task/$key')({
-  component: ThreadView,
+export const Route = createFileRoute('/_app/project/$name/task/$key')({
   ssr: false,
+  loader: ({ context, params }) =>
+    ensure<ThreadData | null>(context.queryClient, threadQuery(fromParam(params.name), params.key)),
+  pendingComponent: ThreadSkeleton,
+  component: ThreadView,
 })
 
 function ThreadView() {
-  const { name, key } = useParams({ from: '/project/$name/task/$key' })
+  const { name, key } = Route.useParams()
   const project = fromParam(name)
-  const [thread, setThread] = useState<ThreadData | null>(null)
-  const [state, setState] = useState<'loading' | 'ok' | 'locked' | 'notfound'>('loading')
-  const [submitting, setSubmitting] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  // Ids already sent to /read during this mount, so a poll that overlaps the
-  // round trip does not POST the same event twice.
-  const markedRead = useRef(new Set<string>())
+  const { data: thread, isError, isFetched, refetch } = useQuery(threadQuery(project, key))
+  const answer = useAnswer(project, key)
+  const markRead = useMarkRead()
+  const [failed, setFailed] = useState<{ id: string; message: string } | null>(null)
 
-  async function load() {
-    try {
-      const res = await api.thread(project, key)
-      if (!res.ok || !res.thread) {
-        setState('notfound')
-        return
-      }
-      setThread(res.thread)
-      setState('ok')
-      // Mark non-pending unread events read on EVERY load, not only the first.
-      // Events that land while the thread is open (the agent's follow-up after
-      // an answer) would otherwise stay unread for ever, which keeps the thread
-      // card on the project page and survives "clear read". Pending questions
-      // stay unread until answered, so they keep surfacing in "Waiting on you".
-      for (const e of res.thread.events) {
-        if (e.read_at != null || e.question?.status === 'pending') continue
-        if (markedRead.current.has(e.id)) continue
-        markedRead.current.add(e.id)
-        api.markRead(e.id).catch(() => markedRead.current.delete(e.id))
-      }
-    } catch (e) {
-      if (e instanceof AuthError) setState('locked')
-    }
-  }
+  useHeaderActions(
+    <Link to="/project/$name" params={{ name }} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--muted)', textDecoration: 'none', fontSize: '0.9rem' }}>
+      <ArrowLeft size={16} /> {projectLabel(project)}
+    </Link>,
+    [name, project],
+  )
 
+  // Ids already sent to /read, so a refresh that overlaps the round trip does
+  // not POST the same event twice.
+  const marked = useRef(new Set<string>())
+  const markMutate = markRead.mutate
   useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, key])
-  useLive(load)
-
-  async function submit(eventId: string, answer: Record<string, unknown>) {
-    setSubmitting(eventId)
-    setError(null)
-    try {
-      const res = await api.answer(eventId, answer)
-      if (!res.ok) {
-        setError(res.error ?? 'Could not submit.')
-        setSubmitting(null)
-        return
-      }
-      await load()
-    } catch {
-      setError('Could not submit.')
+    if (!thread) return
+    // Mark non-pending unread events read on EVERY refresh, not only the
+    // first. Events that land while the thread is open (the agent's follow-up
+    // after an answer) would otherwise stay unread for ever, which keeps the
+    // thread card on the project page and survives "clear read". Pending
+    // questions stay unread until answered, so they keep surfacing in
+    // "Waiting on you".
+    for (const e of thread.events) {
+      if (e.read_at != null || e.question?.status === 'pending') continue
+      if (marked.current.has(e.id)) continue
+      marked.current.add(e.id)
+      markMutate(e.id, { onError: () => marked.current.delete(e.id) })
     }
-    setSubmitting(null)
+  }, [thread, markMutate])
+
+  async function submit(eventId: string, payload: Record<string, unknown>, display: Record<string, unknown>) {
+    setFailed(null)
+    try {
+      await answer.mutateAsync({ eventId, payload, display })
+    } catch (e) {
+      setFailed({ id: eventId, message: (e as Error).message || 'Could not submit.' })
+    }
   }
 
-  if (state === 'loading') return <Spinner />
-  if (state === 'locked') return <LockedScreen />
-  if (state === 'notfound' || !thread)
+  if (!thread) {
+    if (!isFetched && !isError) return <ThreadSkeleton />
     return (
       <Container>
-        <p style={{ color: 'var(--muted)', padding: '2rem 0' }}>This task no longer exists.</p>
-        <Link to="/">← Back to projects</Link>
+        {isError ? (
+          <InlineError message="Could not load this thread." onRetry={() => refetch()} />
+        ) : (
+          <>
+            <p style={{ color: 'var(--muted)', padding: '2rem 0' }}>This task no longer exists.</p>
+            <Link to="/">← Back to projects</Link>
+          </>
+        )}
       </Container>
     )
+  }
 
   const color = projectColor(project)
   const title = thread.task || thread.events[0]?.title || 'Task'
 
   return (
-    <>
-      <Header
-        right={
-          <Link to="/project/$name" params={{ name }} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--muted)', textDecoration: 'none', fontSize: '0.9rem' }}>
-            <ArrowLeft size={16} /> {projectLabel(project)}
-          </Link>
-        }
-      />
-      <Container>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-          <span style={{ width: '0.6rem', height: '0.6rem', borderRadius: '999px', background: color }} />
-          <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{projectLabel(project)}</span>
-        </div>
-        <h1 style={{ fontSize: '1.4rem', lineHeight: 1.3, margin: '0 0 1.3rem' }}>{title}</h1>
+    <Container>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+        <span style={{ width: '0.6rem', height: '0.6rem', borderRadius: '999px', background: color }} />
+        <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{projectLabel(project)}</span>
+      </div>
+      <h1 style={{ fontSize: '1.4rem', lineHeight: 1.3, margin: '0 0 1.3rem' }}>{title}</h1>
 
-        {/* The conversation: each message/question in order. */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-          {thread.events.map((e) => (
-            <Message
-              key={e.id}
-              e={e}
-              submitting={submitting === e.id}
-              error={submitting === null && error != null && e.question?.status === 'pending' ? error : null}
-              onSubmit={(a) => submit(e.id, a)}
-            />
-          ))}
-        </div>
-      </Container>
-    </>
+      {/* The conversation: each message/question in order. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+        {thread.events.map((e) => (
+          <Message
+            key={e.id}
+            e={e}
+            submitting={answer.isPending && answer.variables?.eventId === e.id}
+            error={failed?.id === e.id ? failed.message : null}
+            onSubmit={(payload, display) => submit(e.id, payload, display)}
+          />
+        ))}
+      </div>
+    </Container>
   )
 }
 
-function Message({ e, submitting, error, onSubmit }: { e: EventItem; submitting: boolean; error: string | null; onSubmit: (a: Record<string, unknown>) => void }) {
+function Message({
+  e,
+  submitting,
+  error,
+  onSubmit,
+}: {
+  e: EventItem
+  submitting: boolean
+  error: string | null
+  onSubmit: (payload: Record<string, unknown>, display: Record<string, unknown>) => void
+}) {
   const q = e.question
   const isPending = q?.status === 'pending'
 
@@ -139,7 +136,9 @@ function Message({ e, submitting, error, onSubmit }: { e: EventItem; submitting:
       try {
         const blocks = await decryptValue<unknown[]>(key, e.blocks as string)
         let answer: unknown = null
-        if (q?.answer && typeof q.answer === 'string') answer = await decryptValue(key, q.answer)
+        // A just-submitted answer is still plaintext in the cache; only what
+        // came back from the server is ciphertext.
+        if (q?.answer) answer = typeof q.answer === 'string' ? await decryptValue(key, q.answer) : q.answer
         setDec({ blocks, answer })
         setLocked(false)
       } catch {
@@ -147,15 +146,17 @@ function Message({ e, submitting, error, onSubmit }: { e: EventItem; submitting:
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [e.id, e.enc, typeof e.blocks === 'string' ? e.blocks : '', typeof q?.answer === 'string' ? q?.answer : ''])
+  }, [e.id, e.enc, typeof e.blocks === 'string' ? e.blocks : '', q?.answer])
 
-  // For E2E questions, encrypt the answer before it leaves the device.
+  // For E2E questions, encrypt the answer before it leaves the device. The
+  // plaintext still goes to the optimistic cache write, so the answered state
+  // renders without a round trip.
   async function handleSubmit(a: Record<string, unknown>) {
-    if (!e.enc) return onSubmit(a)
+    if (!e.enc) return onSubmit(a, a)
     const key = getEncKey()
     if (!key) return
     const cipher = await encryptValue(key, a)
-    onSubmit({ enc: true, answer: cipher })
+    onSubmit({ enc: true, answer: cipher }, a)
   }
 
   const blocks = dec?.blocks ?? []

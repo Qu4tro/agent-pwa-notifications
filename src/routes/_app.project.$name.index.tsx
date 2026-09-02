@@ -1,114 +1,99 @@
-import { useEffect, useState } from 'react'
-import { createFileRoute, Link, Outlet, useParams, useRouterState } from '@tanstack/react-router'
+import { useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Trash2 } from 'lucide-react'
-import { api, AuthError, timeAgo, type TaskSummary } from '../lib/api'
-import { Header, Container, LockedScreen, Spinner } from '../lib/shell'
+import { timeAgo, type TaskSummary } from '../lib/api'
+import { Container, InlineError, useHeaderActions } from '../lib/shell'
+import { ensure, tasksQuery, useClear } from '../lib/queries'
+import { TasksSkeleton } from '../lib/skeleton'
 import { projectColor, projectLabel, fromParam, KIND_LABEL, KIND_COLOR } from '../lib/project'
-import { useLive } from '../lib/live'
 
-export const Route = createFileRoute('/project/$name')({
-  component: ProjectRoute,
+export const Route = createFileRoute('/_app/project/$name/')({
   ssr: false,
+  loader: ({ context, params }) =>
+    ensure<TaskSummary[]>(context.queryClient, tasksQuery(fromParam(params.name))),
+  pendingComponent: TasksSkeleton,
+  component: ProjectView,
 })
 
-function ProjectRoute() {
-  const hasTaskRoute = useRouterState({
-    select: (state) => state.matches.some((match) => match.routeId.endsWith('/task/$key')),
-  })
-  return hasTaskRoute ? <Outlet /> : <ProjectView />
-}
-
 function ProjectView() {
-  const { name } = useParams({ from: '/project/$name' })
+  const { name } = Route.useParams()
   const project = fromParam(name)
-  const [tasks, setTasks] = useState<TaskSummary[]>([])
-  const [state, setState] = useState<'loading' | 'ok' | 'locked'>('loading')
+  const { data, isError, refetch } = useQuery(tasksQuery(project))
+  const clear = useClear()
   const [clearOpen, setClearOpen] = useState(false)
 
-  async function load() {
-    try {
-      const res = await api.tasks(project)
-      setTasks(res.tasks)
-      setState('ok')
-    } catch (e) {
-      if (e instanceof AuthError) setState('locked')
-    }
-  }
+  useHeaderActions(
+    <>
+      <button onClick={() => setClearOpen((v) => !v)} title="Clear project" style={{ ...iconBtn, color: clearOpen ? 'var(--error)' : 'var(--text)' }}>
+        <Trash2 size={18} />
+      </button>
+      <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--muted)', textDecoration: 'none', fontSize: '0.9rem' }}>
+        <ArrowLeft size={16} /> Projects
+      </Link>
+    </>,
+    [clearOpen],
+  )
 
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name])
-  useLive(load)
-
-  async function doClear(scope: 'read' | 'all') {
+  function doClear(scope: 'read' | 'all') {
     setClearOpen(false)
-    await api.clear(scope, project).catch(() => {})
-    await load()
+    clear.mutate({ scope, project })
   }
 
-  if (state === 'loading') return <Spinner />
-  if (state === 'locked') return <LockedScreen />
+  if (!data) {
+    if (!isError) return <TasksSkeleton />
+    return (
+      <Container>
+        <InlineError message="Could not load this project." onRetry={() => refetch()} />
+      </Container>
+    )
+  }
 
   const color = projectColor(project)
-  const waiting = tasks.filter((t) => t.pending)
-  const others = tasks.filter((t) => !t.pending)
+  const waiting = data.filter((t) => t.pending)
+  const others = data.filter((t) => !t.pending)
   const active = others.filter((t) => t.unread > 0)
   const done = others.filter((t) => t.unread === 0)
 
   return (
-    <>
-      <Header
-        right={
-          <>
-            <button onClick={() => setClearOpen((v) => !v)} title="Clear project" style={{ ...iconBtn, color: clearOpen ? 'var(--error)' : 'var(--text)' }}>
-              <Trash2 size={18} />
-            </button>
-            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--muted)', textDecoration: 'none', fontSize: '0.9rem' }}>
-              <ArrowLeft size={16} /> Projects
-            </Link>
-          </>
-        }
-      />
-      <Container>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.2rem' }}>
-          <span style={{ width: '0.7rem', height: '0.7rem', borderRadius: '999px', background: color }} />
-          <h1 style={{ fontSize: '1.4rem', margin: 0 }}>{projectLabel(project)}</h1>
-        </div>
+    <Container>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.2rem' }}>
+        <span style={{ width: '0.7rem', height: '0.7rem', borderRadius: '999px', background: color }} />
+        <h1 style={{ fontSize: '1.4rem', margin: 0 }}>{projectLabel(project)}</h1>
+      </div>
 
-        {clearOpen && (
-          <ClearPanel onClear={doClear} onCancel={() => setClearOpen(false)} label={projectLabel(project)} />
-        )}
+      {clearOpen && (
+        <ClearPanel onClear={doClear} onCancel={() => setClearOpen(false)} label={projectLabel(project)} />
+      )}
 
-        {tasks.length === 0 ? (
-          <p style={{ color: 'var(--muted)', padding: '2rem 0', textAlign: 'center' }}>No tasks in this project.</p>
-        ) : (
-          <>
-            {waiting.length > 0 && (
-              <Section title={`Waiting on you · ${waiting.length}`} accent>
-                {waiting.map((t) => (
-                  <TaskCard key={t.key} t={t} project={project} variant="pending" />
-                ))}
-              </Section>
-            )}
-            {active.length > 0 && (
-              <Section title="Active">
-                {active.map((t) => (
-                  <TaskCard key={t.key} t={t} project={project} variant="active" />
-                ))}
-              </Section>
-            )}
-            {done.length > 0 && (
-              <Section title={`Done · ${done.length}`} muted>
-                {done.map((t) => (
-                  <TaskCard key={t.key} t={t} project={project} variant="mono" />
-                ))}
-              </Section>
-            )}
-          </>
-        )}
-      </Container>
-    </>
+      {data.length === 0 ? (
+        <p style={{ color: 'var(--muted)', padding: '2rem 0', textAlign: 'center' }}>No tasks in this project.</p>
+      ) : (
+        <>
+          {waiting.length > 0 && (
+            <Section title={`Waiting on you · ${waiting.length}`} accent>
+              {waiting.map((t) => (
+                <TaskCard key={t.key} t={t} project={project} variant="pending" />
+              ))}
+            </Section>
+          )}
+          {active.length > 0 && (
+            <Section title="Active">
+              {active.map((t) => (
+                <TaskCard key={t.key} t={t} project={project} variant="active" />
+              ))}
+            </Section>
+          )}
+          {done.length > 0 && (
+            <Section title={`Done · ${done.length}`} muted>
+              {done.map((t) => (
+                <TaskCard key={t.key} t={t} project={project} variant="mono" />
+              ))}
+            </Section>
+          )}
+        </>
+      )}
+    </Container>
   )
 }
 

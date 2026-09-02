@@ -3,9 +3,16 @@ import { createFileRoute } from '@tanstack/react-router'
 import { api } from '../lib/api'
 import { Logo } from '../lib/shell'
 
+// `next` is where the app sends a visitor whose session ran out, and `t` is a
+// one-time login-link token. Declaring them here is what lets a route guard
+// build the redirect.
 export const Route = createFileRoute('/login')({
   component: LoginPage,
   ssr: false,
+  validateSearch: (search: Record<string, unknown>): { next?: string; t?: string } => ({
+    next: typeof search.next === 'string' ? search.next : undefined,
+    t: typeof search.t === 'string' ? search.t : undefined,
+  }),
 })
 
 const inputStyle: React.CSSProperties = {
