@@ -48,5 +48,5 @@ export function previewText(blocks: Block[]): string {
     if (b.type === 'callout') return b.text.slice(0, 140)
     if (b.type === 'keyvalue' && b.items[0]) return `${b.items[0].k}: ${b.items[0].v}`
   }
-  return 'Open Agent Dash to see the details.'
+  return 'Open the app to see the details.'
 }

@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 
-// Live-refresh transport. In instant mode (Pro / INSTANT=1) it holds a
-// WebSocket to the Hub Durable Object and refreshes the moment anything
-// changes. Otherwise it polls every 5s while the tab is visible. Either way the
-// caller just passes its `load` function and forgets about the plumbing.
+// Live-refresh transport. In instant mode (INSTANT=1) it holds a WebSocket to
+// the Hub Durable Object and refreshes the moment anything changes. Otherwise
+// it polls every 5s while the tab is visible. Either way the caller just passes
+// its `load` function and forgets about the plumbing.
 export function useLive(onRefresh: () => void) {
   const cb = useRef(onRefresh)
   cb.current = onRefresh

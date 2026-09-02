@@ -1,10 +1,10 @@
 import type { Env } from './env'
 
-// ── Instant mode (opt-in) ────────────────────────────────────────────────────
+// ── Instant mode (opt-in, off by default) ────────────────────────────────────
 // A single Durable Object that fans out a "something changed" ping to every
-// open dashboard tab over a hibernatable WebSocket. Hibernated sockets don't
-// bill duration, so an idle hub costs ~nothing even on the paid plan — and the
-// whole thing only runs when INSTANT=1. When off, the app polls (free tier).
+// open dashboard tab over a hibernatable WebSocket. Hibernated sockets do not
+// bill duration, so an idle hub costs close to nothing, and the whole thing
+// only runs when INSTANT=1. When off, the app polls.
 //
 // We broadcast a tiny {type:'refresh'} signal, not the data — the client then
 // refetches. Keeps the DO trivial and avoids duplicating serialization.

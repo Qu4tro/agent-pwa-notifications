@@ -3,10 +3,10 @@ import { json } from './util'
 import { createEvent, updateEvent, createQuestion, getQuestion, clearEvents } from './api'
 
 // ── Stateless MCP over Streamable HTTP ───────────────────────────────────────
-// A plain JSON-RPC POST handler — NOT Cloudflare's McpAgent (which is a Durable
-// Object and would make a DO mandatory). Our tools are pure request/response
-// with no session state, so a stateless endpoint is all we need and it keeps
-// the whole app free-plan simple. Auth: the same bearer AGENT_KEY.
+// A plain JSON-RPC POST handler, not Cloudflare's McpAgent (which is a Durable
+// Object and would make a DO mandatory). The tools are pure request/response
+// with no session state, so a stateless endpoint is all we need. Auth: the
+// account's bearer agent key.
 
 const PROTOCOL_VERSION = '2024-11-05'
 
@@ -21,12 +21,12 @@ const TOOLS = [
         title: { type: 'string', description: 'Short headline / the message itself.' },
         project: { type: 'string', description: 'Project name, e.g. "Weather app". Used to group and filter.' },
         task: { type: 'string', description: 'Current task, e.g. "Adding children mode".' },
-        model: { type: 'string', description: 'Which model you are, e.g. "claude-opus-4.8", "gpt-5".' },
+        model: { type: 'string', description: 'Which model you are, e.g. "opus-4.8", "gpt-5".' },
         tags: { type: 'array', description: 'Optional freeform tags, e.g. ["backend","urgent"].' },
         blocks: { type: 'array', description: 'Optional display blocks. See /api/v1/schema.json.' },
         priority: { type: 'number', description: '0 info, 1 notify, 2 urgent. Default 0.' },
         task_id: { type: 'string', description: 'Stable key to group updates into one thread / update in place.' },
-        agent: { type: 'string', description: 'The tool/client you run in (e.g. "claude-code", "cursor").' },
+        agent: { type: 'string', description: 'The tool/client you run in (e.g. "cursor", "zed").' },
       },
       required: ['title'],
     },
@@ -166,7 +166,7 @@ export async function handleMcp(request: Request, env: Env, accountId: string): 
         rpcResult(id, {
           protocolVersion: PROTOCOL_VERSION,
           capabilities: { tools: {} },
-          serverInfo: { name: 'agent-dash', version: '0.1.0' },
+          serverInfo: { name: 'agent-pwa-notifications', version: __APP_VERSION__ },
         }),
       )
     case 'notifications/initialized':

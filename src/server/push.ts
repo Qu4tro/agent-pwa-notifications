@@ -39,7 +39,7 @@ async function vapidHeader(env: Env, endpoint: string): Promise<string> {
   const payload = {
     aud,
     exp: Math.floor(Date.now() / 1000) + 12 * 3600,
-    sub: env.VAPID_SUBJECT || 'mailto:admin@agent-dash.local',
+    sub: env.VAPID_SUBJECT || 'mailto:admin@agent-notifications.local',
   }
   const enc = (o: unknown) => b64urlEncode(new TextEncoder().encode(JSON.stringify(o)))
   const signingInput = `${enc(header)}.${enc(payload)}`
