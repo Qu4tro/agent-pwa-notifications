@@ -2,7 +2,7 @@ import type { Env } from './env'
 import { json } from './util'
 import { createEvent, updateEvent, createQuestion, getQuestion, clearEvents } from './api'
 
-// ── Stateless MCP over Streamable HTTP ───────────────────────────────────────
+// -- Stateless MCP over Streamable HTTP ---------------------------------------
 // A plain JSON-RPC POST handler, not Cloudflare's McpAgent (which is a Durable
 // Object and would make a DO mandatory). The tools are pure request/response
 // with no session state, so a stateless endpoint is all we need. Auth: the
@@ -14,7 +14,7 @@ const TOOLS = [
   {
     name: 'notify',
     description:
-      'Push an update to the human. Use for milestones, not every step. ALWAYS pass: project (what you are working on), model (which LLM you are), and task_id — generate ONE stable task_id when you start a task and reuse it on EVERY notify/ask for that task, so all its messages thread together in one conversation instead of scattering into separate cards. Set priority 2 for anything that should ring through quiet hours.',
+      'Push an update to the human. Use for milestones, not every step. ALWAYS pass: project (what you are working on), model (which LLM you are), and task_id - generate ONE stable task_id when you start a task and reuse it on EVERY notify/ask for that task, so all its messages thread together in one conversation instead of scattering into separate cards. Set priority 2 for anything that should ring through quiet hours.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -34,7 +34,7 @@ const TOOLS = [
   {
     name: 'update',
     description:
-      'Update an existing event in place — the way to send LIVE progress. First call notify to create the event and keep its returned id; then call update repeatedly with new blocks (e.g. a progress block going 0→50→100) to move the same card without spamming new rows. Set notify:true on the final call to push a "done" notification.',
+      'Update an existing event in place - the way to send LIVE progress. First call notify to create the event and keep its returned id; then call update repeatedly with new blocks (e.g. a progress block going 0->50->100) to move the same card without spamming new rows. Set notify:true on the final call to push a "done" notification.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -43,7 +43,7 @@ const TOOLS = [
         blocks: { type: 'array', description: 'New display blocks (replaces the old ones).' },
         kind: { type: 'string', description: 'update | done | error' },
         priority: { type: 'number' },
-        notify: { type: 'boolean', description: 'Send a push for this update. Default false — leave off for silent progress ticks.' },
+        notify: { type: 'boolean', description: 'Send a push for this update. Default false - leave off for silent progress ticks.' },
       },
       required: ['event_id'],
     },
@@ -63,12 +63,12 @@ const TOOLS = [
         ack: {
           type: 'string',
           description:
-            'Optional acknowledgment shown to the human the instant they answer, e.g. "Got it — proceeding with {answer}. Watch for updates." Use {answer} as a placeholder for their choice.',
+            'Optional acknowledgment shown to the human the instant they answer, e.g. "Got it - proceeding with {answer}. Watch for updates." Use {answer} as a placeholder for their choice.',
         },
         blocks: {
           type: 'array',
           description:
-            'Must include a buttons or form block. Notification answers require exactly one buttons block with 2–3 labels of at most 20 characters each. Put longer context in markdown; e.g. [{"type":"markdown","text":"The checks passed."},{"type":"buttons","id":"go","options":["Ship","Hold"]}]',
+            'Must include a buttons or form block. Notification answers require exactly one buttons block with 2-3 labels of at most 20 characters each. Put longer context in markdown; e.g. [{"type":"markdown","text":"The checks passed."},{"type":"buttons","id":"go","options":["Ship","Hold"]}]',
         },
         timeout_minutes: { type: 'number', description: 'How long to wait before the question expires. Default 1440 (24h).' },
         task_id: { type: 'string' },
@@ -80,7 +80,7 @@ const TOOLS = [
   {
     name: 'clear',
     description:
-      "Tidy the human's inbox when it's getting cluttered. scope 'read' (the safe default) removes only items they've already seen or answered, keeping anything unread or awaiting an answer. scope 'all' wipes everything — only use 'all' when the human explicitly asked to restart. Optionally limit to one project.",
+      "Tidy the human's inbox when it's getting cluttered. scope 'read' (the safe default) removes only items they've already seen or answered, keeping anything unread or awaiting an answer. scope 'all' wipes everything - only use 'all' when the human explicitly asked to restart. Optionally limit to one project.",
     inputSchema: {
       type: 'object',
       properties: {

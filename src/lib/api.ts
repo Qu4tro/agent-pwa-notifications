@@ -114,7 +114,7 @@ export const api = {
   logout: () => req('/api/logout', { method: 'POST' }),
   logoutAll: () => req('/api/logout-all', { method: 'POST' }),
 
-  // ── Auth (email OTP) ──
+  // -- Auth (email OTP) --
   requestCode: (email: string) =>
     req<{ ok: boolean; error?: string }>('/api/auth/request-code', {
       method: 'POST',

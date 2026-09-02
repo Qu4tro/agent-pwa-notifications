@@ -1,6 +1,6 @@
 import type { Env } from './env'
 
-// ── Transactional email via Resend ───────────────────────────────────────────
+// -- Transactional email via Resend -------------------------------------------
 // One job for now: deliver a login one-time code. In dev (no RESEND_API_KEY) we
 // log the code to the console instead of sending, so the whole OTP flow works
 // locally without a Resend account or a verified sending domain.
@@ -19,7 +19,7 @@ export class EmailCapError extends Error {
 
 export async function sendOtpEmail(env: Env, to: string, code: string): Promise<void> {
   if (!env.RESEND_API_KEY) {
-    // Dev bypass — no external send. The verify endpoint still checks this code.
+    // Dev bypass - no external send. The verify endpoint still checks this code.
     console.log(`\n[agent-notifications] login code for ${to}: ${code}\n`)
     return
   }

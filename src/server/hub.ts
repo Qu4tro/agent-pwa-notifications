@@ -1,12 +1,12 @@
 import type { Env } from './env'
 
-// ── Instant mode (opt-in, off by default) ────────────────────────────────────
+// -- Instant mode (opt-in, off by default) ------------------------------------
 // A single Durable Object that fans out a "something changed" ping to every
 // open dashboard tab over a hibernatable WebSocket. Hibernated sockets do not
 // bill duration, so an idle hub costs close to nothing, and the whole thing
 // only runs when INSTANT=1. When off, the app polls.
 //
-// We broadcast a tiny {type:'refresh'} signal, not the data — the client then
+// We broadcast a tiny {type:'refresh'} signal, not the data - the client then
 // refetches. Keeps the DO trivial and avoids duplicating serialization.
 export class Hub {
   private state: DurableObjectState
@@ -69,7 +69,7 @@ export class Hub {
 
 // Called after any change. No-op unless instant mode is enabled. Each account
 // gets its own Durable Object (idFromName(accountId)) so a poke only wakes that
-// account's open tabs — never broadcasts across tenants.
+// account's open tabs - never broadcasts across tenants.
 export async function pokeHub(env: Env, accountId: string): Promise<void> {
   if (env.INSTANT !== '1' || !env.HUB) return
   try {

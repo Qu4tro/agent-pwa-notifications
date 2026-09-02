@@ -57,9 +57,9 @@ function searchParams(): URLSearchParams {
   return new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search)
 }
 
-// Two ways in. A one-time login link (`/login?t=…`, minted by an agent with
+// Two ways in. A one-time login link (`/login?t=...`, minted by an agent with
 // `agent-notify-pwa open`) trades its token for a session straight away.
-// Otherwise: email → one-time code → (for a brand-new account) the agent key
+// Otherwise: email, then a one-time code, then (for a brand-new account) the agent key
 // shown once, with connect steps. On success we hard-navigate so the
 // freshly-set session cookie is picked up. `?next=` decides where we land,
 // which is how a notification answered on an expired session comes back to its

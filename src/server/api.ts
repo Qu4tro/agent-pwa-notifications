@@ -6,10 +6,10 @@ import { pokeHub } from './hub'
 import { quickAnswerActions, previewText } from './quick-answers'
 
 // Every exported handler takes the resolved `accountId` and scopes all data to
-// it. This is the tenant boundary — miss it on any query and one user could see
+// it. This is the tenant boundary - miss it on any query and one user could see
 // or mutate another's inbox.
 
-// ── retention / settings helpers ─────────────────────────────────────────────
+// -- retention / settings helpers ---------------------------------------------
 function retentionMs(env: Env): number {
   const days = Number(env.EVENT_RETENTION_DAYS ?? '90')
   return Math.max(1, days) * 86_400_000
@@ -58,9 +58,9 @@ async function maybePush(env: Env, accountId: string, event: EventRow): Promise<
   if (event.priority < 2 && (await inQuietHours(env, accountId))) return
   await pushToAll(env, accountId, {
     title: event.project ? `${event.project}: ${event.title}` : event.title,
-    // Encrypted events carry ciphertext blocks the server can't read — the
+    // Encrypted events carry ciphertext blocks the server can't read - the
     // notification stays generic; the app decrypts the detail on open.
-    body: event.enc ? '🔒 Encrypted — open to view' : previewText(JSON.parse(event.blocks)),
+    body: event.enc ? 'Encrypted. Open to view.' : previewText(JSON.parse(event.blocks)),
     tag: event.task_id || event.id,
     eventId: event.id,
     kind: event.kind,
@@ -110,7 +110,7 @@ function normalizeBlocks(
   return { blocks: JSON.stringify(parsed.data), enc: 0 }
 }
 
-// ── Agent endpoints (bearer agent key → accountId) ───────────────────────────
+// -- Agent endpoints (bearer agent key -> accountId) ---------------------------
 
 const VALID_KINDS = new Set(['update', 'question', 'done', 'error'])
 
@@ -181,7 +181,7 @@ export async function createEvent(request: Request, env: Env, accountId: string)
   return json({ ok: true, id })
 }
 
-// Patch an existing event in place — the primitive behind live progress. The
+// Patch an existing event in place - the primitive behind live progress. The
 // agent POSTs the id it got back from createEvent, with new blocks/title/kind.
 // Pushes only if the caller explicitly asks (avoid buzzing on every % tick).
 export async function updateEvent(id: string, request: Request, env: Env, accountId: string): Promise<Response> {
@@ -252,7 +252,7 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
   if (body.notify === true) {
     await pushToAll(env, accountId, {
       title: title ?? 'Update',
-      body: encVal === 1 ? '🔒 Encrypted — open to view' : blocks ? previewText(blocks) : 'Progress updated.',
+      body: encVal === 1 ? 'Encrypted. Open to view.' : blocks ? previewText(blocks) : 'Progress updated.',
       tag: existing.task_id || id,
       eventId: id,
       kind: kind ?? existing.kind,
@@ -278,7 +278,7 @@ export async function createQuestion(request: Request, env: Env, accountId: stri
   const taskId = typeof body.task_id === 'string' ? body.task_id.trim().slice(0, 120) : null
 
   // Encrypted questions can't be validated server-side (the interactive block
-  // is inside the ciphertext) — we trust the agent and enforce shape client-side.
+  // is inside the ciphertext) - we trust the agent and enforce shape client-side.
   const norm = normalizeBlocks(body, { allowInteractive: true })
   if (norm instanceof Response) return norm
 
@@ -335,7 +335,7 @@ export async function getQuestion(id: string, env: Env, accountId: string): Prom
     return json({ ok: true, status: 'expired' })
   }
 
-  // The agent is receiving the answer right now — stamp the delivery receipt
+  // The agent is receiving the answer right now - stamp the delivery receipt
   // (once) so the human's screen can flip to "agent received it", and nudge the
   // live feed so that update is instant.
   if (q.status === 'answered' && q.picked_up_at == null) {
@@ -345,7 +345,7 @@ export async function getQuestion(id: string, env: Env, accountId: string): Prom
     await pokeHub(env, accountId)
   }
 
-  // Encrypted answers are ciphertext strings — pass through for the agent to
+  // Encrypted answers are ciphertext strings - pass through for the agent to
   // decrypt; plaintext answers are JSON.
   const answer = q.answer ? (q.enc === 1 ? q.answer : JSON.parse(q.answer)) : null
   return json({ ok: true, status: q.status, answer, answered_at: q.answered_at })
@@ -398,7 +398,7 @@ export async function getProjects(env: Env, accountId: string): Promise<Response
 }
 
 // The thread key: a stable task_id when the agent sent one, else the event's
-// own id (a singleton thread). NEVER the human `task` label — labels collide.
+// own id (a singleton thread). NEVER the human `task` label - labels collide.
 const THREAD_KEY_SQL = `COALESCE(NULLIF(e.task_id, ''), e.id)`
 
 // Task threads within a project. Groups events by thread key in JS (small,
@@ -478,11 +478,11 @@ export async function getThread(project: string, key: string, env: Env, accountI
   return json({ ok: true, thread: { key, project, task, events } })
 }
 
-// ── Dashboard endpoints (session cookie → accountId) ─────────────────────────
+// -- Dashboard endpoints (session cookie -> accountId) -------------------------
 
 // Timestamp-cursor feed for open dashboard tabs. `since_ts` is the newest
 // updated_at the tab already has; we return anything created OR updated after
-// it — so in-place progress updates flow through, not just brand-new events.
+// it - so in-place progress updates flow through, not just brand-new events.
 // Ordered by created_at so a card stays put while its progress bar moves.
 export async function getFeed(url: URL, env: Env, accountId: string): Promise<Response> {
   const sinceTs = Number(url.searchParams.get('since_ts') ?? '0') || 0
@@ -512,7 +512,7 @@ export async function getEvent(id: string, env: Env, accountId: string): Promise
 
 function hydrate(row: Record<string, unknown>): Record<string, unknown> {
   const enc = Number(row.enc ?? 0) === 1
-  // Encrypted rows carry ciphertext strings the server can't parse — pass them
+  // Encrypted rows carry ciphertext strings the server can't parse - pass them
   // through untouched; the client decrypts. Plaintext rows are JSON.
   const blocks = enc ? (row.blocks as string) : JSON.parse((row.blocks as string) || '[]')
   const answer = row.q_answer
@@ -567,8 +567,8 @@ export async function markUnread(id: string, env: Env, accountId: string): Promi
 }
 
 // Clear the inbox. scope:
-//   'read'    — only items already seen/answered (safe default; keeps unread + pending)
-//   'all'     — everything, including unanswered questions (a full restart)
+//   'read' - only items already seen/answered (safe default; keeps unread + pending)
+//   'all' - everything, including unanswered questions (a full restart)
 // Optionally scoped to a single project. Always scoped to the account.
 const CLEAR_CHUNK = 50
 
@@ -704,7 +704,7 @@ async function settleAnswer(
   return json({ ok: true })
 }
 
-// ── Push subscription management (session) ───────────────────────────────────
+// -- Push subscription management (session) -----------------------------------
 export async function subscribePush(request: Request, env: Env, accountId: string): Promise<Response> {
   let sub: PushSubscription
   try {
@@ -741,7 +741,7 @@ export async function unsubscribePush(request: Request, env: Env, accountId: str
   return json({ ok: true })
 }
 
-// ── Settings (session) ───────────────────────────────────────────────────────
+// -- Settings (session) -------------------------------------------------------
 export async function getSettings(env: Env, accountId: string): Promise<Response> {
   const quiet = await getSetting(env, accountId, 'quiet_hours')
   return json({ ok: true, quiet_hours: quiet ? JSON.parse(quiet) : null })

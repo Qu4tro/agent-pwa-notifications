@@ -3,8 +3,8 @@ import { bearer, hmacSign, hmacVerify, ulid, sha256hex, randomToken, numericCode
 import { sendOtpEmail } from './email'
 
 // Two independent credentials:
-//   agent key  — per-account bearer token agents send. Stored only as a hash.
-//   APP_SECRET — HMAC key for session-cookie integrity + OTP hashing.
+//   agent key - per-account bearer token agents send. Stored only as a hash.
+//   APP_SECRET - HMAC key for session-cookie integrity + OTP hashing.
 // Sessions are bound to one account; all data is scoped to that account.
 
 const COOKIE = 'ad_session'
@@ -15,7 +15,7 @@ function sessionTtlSeconds(env: Env): number {
   return Math.max(1, days) * 86_400
 }
 
-// ── Accounts ─────────────────────────────────────────────────────────────────
+// -- Accounts -----------------------------------------------------------------
 
 export interface Account {
   id: string
@@ -29,7 +29,7 @@ function mintAgentKey(): string {
 }
 
 function keyPrefix(key: string): string {
-  return key.slice(0, 16) // "ad_live_" + 8 chars — enough to identify, not to use
+  return key.slice(0, 16) // "ad_live_" + 8 chars - enough to identify, not to use
 }
 
 // Resolve the account for an agent request from its bearer token. Returns the
@@ -92,7 +92,7 @@ export async function getAccount(env: Env, accountId: string): Promise<Account |
     .first<Account>()
 }
 
-// ── One-time login codes (OTP) ───────────────────────────────────────────────
+// -- One-time login codes (OTP) -----------------------------------------------
 // Stored in KV with a TTL so expiry is automatic. We keep only a hash of the
 // code (salted with APP_SECRET), plus an attempt counter to cap brute force.
 
@@ -122,7 +122,7 @@ export function normalizeEmail(raw: unknown): string | null {
   return EMAIL_RE.test(email) && email.length <= 254 ? email : null
 }
 
-// ── Closed registration ──────────────────────────────────────────────────────
+// -- Closed registration ------------------------------------------------------
 // ALLOWED_EMAILS is an optional Worker secret: a comma-separated allow list. It
 // closes sign-up on a hub that has a Resend key, where anyone who knows the URL
 // could otherwise create an account. Unset (or blank) leaves the hub open.
@@ -141,8 +141,8 @@ interface OtpRecord {
   attempts: number
 }
 
-// Generate + store + send a login code. Rate-limited three ways — per email,
-// per IP, and a global hourly ceiling — so no single address, client, or
+// Generate + store + send a login code. Rate-limited three ways - per email,
+// per IP, and a global hourly ceiling - so no single address, client, or
 // attacker fanning across many addresses can email-bomb or exhaust the Resend
 // quota. Returns false when any limit trips (caller still responds 200 to avoid
 // enumeration). `ip` is the caller's IP (from cf-connecting-ip), '' if unknown.
@@ -208,7 +208,7 @@ export async function verifyLoginCode(env: Env, email: string, code: unknown): P
   return { ok: true, account, agentKey }
 }
 
-// ── Agent-key login links ────────────────────────────────────────────────────
+// -- Agent-key login links ----------------------------------------------------
 // An agent that already holds the account key can mint a one-time link that
 // logs a browser in. It saves the human from an email round trip on a hub with
 // no Resend key. The key already lets an agent post, update and clear the
@@ -295,7 +295,7 @@ export async function consumeLoginLink(
   return { account: record.account, next: safeNext(record.next) }
 }
 
-// ── Sessions (KV with TTL, bound to one account) ─────────────────────────────
+// -- Sessions (KV with TTL, bound to one account) -----------------------------
 // Per-account epoch: bumping it logs that account out everywhere without
 // touching anyone else's sessions.
 
@@ -345,7 +345,7 @@ function readCookie(request: Request): string | null {
 }
 
 // Resolve the account id for a request carrying a valid, unexpired,
-// current-epoch session — or null. Replaces the old boolean isLoggedIn.
+// current-epoch session - or null. Replaces the old boolean isLoggedIn.
 export async function sessionAccount(request: Request, env: Env): Promise<string | null> {
   const cookie = readCookie(request)
   if (!cookie) return null
