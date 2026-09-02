@@ -164,7 +164,7 @@ function SettingsPage() {
           <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 0.5rem' }}>
             Add the skill to your agent, then paste your key when it asks:
           </p>
-          <Snippet text={`npx skills add Prajeevan/agent-dash`} />
+          <Snippet text={`npx skills add Qu4tro/agent-pwa-notifications`} />
           <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '1rem 0 0.5rem' }}>
             Prefer raw HTTP? Any agent can push an update with one curl:
           </p>
