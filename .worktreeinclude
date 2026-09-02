@@ -2,3 +2,4 @@
 # gitignored and listed here to be copied.
 docs/
 .dev.vars
+.claude/
