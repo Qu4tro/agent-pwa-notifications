@@ -5,19 +5,22 @@ export interface Env {
 
   // Secrets (set via `wrangler secret put`)
   APP_SECRET: string // HMAC key for session integrity + OTP hashing
-  RESEND_API_KEY?: string // Resend API key for sending OTP emails. Unset in dev → code is logged.
+  RESEND_API_KEY?: string // Resend API key for sending OTP emails. Unset in dev, the code is logged.
   VAPID_PUBLIC_KEY: string // base64url, also served to the browser
   VAPID_PRIVATE_KEY: string // base64url (raw d) for signing push JWTs
-  VAPID_SUBJECT?: string // "mailto:you@example.com" — optional, has a default
+  VAPID_SUBJECT?: string // "mailto:you@example.com", optional, has a default
+  // Comma-separated allow list of sign-in addresses. Unset leaves the hub open
+  // to anyone who knows the URL, which only matters once RESEND_API_KEY is set.
+  ALLOWED_EMAILS?: string
 
-  // Legacy: single shared agent key. No longer used for auth — each account has
+  // Legacy: single shared agent key. No longer used for auth, each account has
   // its own key now. Left optional so existing deployments don't break on boot.
   AGENT_KEY?: string
 
   // Vars (set in wrangler.jsonc [vars] or left unset for defaults)
-  EMAIL_FROM?: string // "Agent Dash <login@yourdomain>" — sender for OTP mail
-  APP_URL?: string // canonical hosted URL, e.g. "https://agentdash.example"
-  SESSION_TTL_DAYS?: string
-  EVENT_RETENTION_DAYS?: string
-  INSTANT?: string // "1" enables the Durable Object live feed (Pro / opt-in)
+  EMAIL_FROM?: string // "Agent Notifications <login@yourdomain>", sender for OTP mail
+  APP_URL?: string // canonical hosted URL, e.g. "https://notifications.example"
+  SESSION_TTL_DAYS?: string // default 365
+  EVENT_RETENTION_DAYS?: string // default 90
+  INSTANT?: string // "1" enables the Durable Object live feed (opt-in, off by default)
 }

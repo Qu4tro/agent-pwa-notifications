@@ -126,6 +126,12 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ email, code }) },
     ),
   account: () => req<{ ok: boolean; email: string; key_prefix: string }>('/api/account'),
+  // Trade a one-time login-link token for a session cookie.
+  consumeLink: (token: string) =>
+    req<{ ok: boolean; next?: string; error?: string }>('/api/auth/link', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
   rotateKey: () => req<{ ok: boolean; agent_key: string }>('/api/auth/rotate-key', { method: 'POST' }),
 }
 

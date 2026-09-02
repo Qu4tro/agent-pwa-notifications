@@ -11,7 +11,7 @@ const COOKIE = 'ad_session'
 const SESSION_PREFIX = 'sess:'
 
 function sessionTtlSeconds(env: Env): number {
-  const days = Number(env.SESSION_TTL_DAYS ?? '30')
+  const days = Number(env.SESSION_TTL_DAYS ?? '365')
   return Math.max(1, days) * 86_400
 }
 
@@ -122,6 +122,20 @@ export function normalizeEmail(raw: unknown): string | null {
   return EMAIL_RE.test(email) && email.length <= 254 ? email : null
 }
 
+// ── Closed registration ──────────────────────────────────────────────────────
+// ALLOWED_EMAILS is an optional Worker secret: a comma-separated allow list. It
+// closes sign-up on a hub that has a Resend key, where anyone who knows the URL
+// could otherwise create an account. Unset (or blank) leaves the hub open.
+export function emailAllowed(env: Env, email: string): boolean {
+  const raw = env.ALLOWED_EMAILS?.trim()
+  if (!raw) return true
+  return raw
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email)
+}
+
 interface OtpRecord {
   hash: string
   attempts: number
@@ -133,6 +147,10 @@ interface OtpRecord {
 // quota. Returns false when any limit trips (caller still responds 200 to avoid
 // enumeration). `ip` is the caller's IP (from cf-connecting-ip), '' if unknown.
 export async function requestLoginCode(env: Env, email: string, ip: string): Promise<boolean> {
+  // Report success without storing or sending: a rejection here would tell a
+  // stranger whether an address is on the list.
+  if (!emailAllowed(env, email)) return true
+
   const hourBucket = Math.floor(now() / 3_600_000)
   if (!(await underRateLimit(env, `otprl:global:${hourBucket}`, OTP_GLOBAL_MAX, OTP_RATE_WINDOW))) return false
   if (ip && !(await underRateLimit(env, `otprl:ip:${ip}:${hourBucket}`, OTP_IP_MAX, OTP_RATE_WINDOW))) return false
@@ -155,6 +173,10 @@ export type VerifyResult =
 export async function verifyLoginCode(env: Env, email: string, code: unknown): Promise<VerifyResult> {
   if (typeof code !== 'string' || !/^\d{6}$/.test(code.trim())) {
     return { ok: false, error: 'Enter the 6-digit code.' }
+  }
+  // Same wording as a missing code, so the allow list stays invisible.
+  if (!emailAllowed(env, email)) {
+    return { ok: false, error: 'That code has expired. Request a new one.' }
   }
   const otpKey = `otp:${email}`
   const raw = await env.SESSIONS.get(otpKey)
@@ -184,6 +206,93 @@ export async function verifyLoginCode(env: Env, email: string, code: unknown): P
   await env.SESSIONS.delete(otpKey)
   const { account, agentKey } = await findOrCreateAccount(env, email)
   return { ok: true, account, agentKey }
+}
+
+// ── Agent-key login links ────────────────────────────────────────────────────
+// An agent that already holds the account key can mint a one-time link that
+// logs a browser in. It saves the human from an email round trip on a hub with
+// no Resend key. The key already lets an agent post, update and clear the
+// inbox; the link adds read and answer access on top, which is an acceptable
+// trade on a single-user hub.
+//
+// KV holds only sha256(token), so a leaked KV dump cannot be replayed. The
+// stored value carries its own expiry as well as the KV TTL, because KV drops
+// an expired key lazily.
+
+const LINK_PREFIX = 'link:'
+const LINK_RATE_MAX = 10 // links per account per hour
+const LINK_RATE_WINDOW = 60 * 60
+export const LINK_TTL_DEFAULT_MINUTES = 15
+const LINK_TTL_MIN_MINUTES = 1
+const LINK_TTL_MAX_MINUTES = 60
+
+interface LinkRecord {
+  account: string
+  next: string
+  exp: number
+}
+
+// Clamp a caller-supplied ttl_minutes into the allowed range.
+export function linkTtlMinutes(raw: unknown): number {
+  if (raw == null) return LINK_TTL_DEFAULT_MINUTES
+  const n = Math.floor(Number(raw))
+  if (!Number.isFinite(n)) return LINK_TTL_DEFAULT_MINUTES
+  return Math.min(LINK_TTL_MAX_MINUTES, Math.max(LINK_TTL_MIN_MINUTES, n))
+}
+
+// Only same-origin paths may be handed to the browser after login, so a link
+// can never bounce the human to another site.
+export function safeNext(raw: unknown): string {
+  if (typeof raw !== 'string') return '/'
+  const next = raw.trim()
+  if (!next.startsWith('/') || next.startsWith('//')) return '/'
+  return next.slice(0, 512)
+}
+
+export type MintResult =
+  | { ok: true; token: string; expiresAt: number }
+  | { ok: false; error: string }
+
+export async function mintLoginLink(
+  env: Env,
+  accountId: string,
+  next: string,
+  ttlMinutes: number,
+): Promise<MintResult> {
+  const bucket = Math.floor(now() / 3_600_000)
+  if (!(await underRateLimit(env, `linkrl:${accountId}:${bucket}`, LINK_RATE_MAX, LINK_RATE_WINDOW))) {
+    return { ok: false, error: 'Too many login links. Try again in an hour.' }
+  }
+
+  const token = randomToken(32)
+  const ttl = ttlMinutes * 60
+  const expiresAt = now() + ttl * 1000
+  const record: LinkRecord = { account: accountId, next, exp: expiresAt }
+  await env.SESSIONS.put(`${LINK_PREFIX}${await sha256hex(token)}`, JSON.stringify(record), {
+    expirationTtl: ttl,
+  })
+  return { ok: true, token, expiresAt }
+}
+
+// Single use: the key is deleted whether the record is still valid or not.
+export async function consumeLoginLink(
+  env: Env,
+  token: unknown,
+): Promise<{ account: string; next: string } | null> {
+  if (typeof token !== 'string' || !token.trim()) return null
+  const key = `${LINK_PREFIX}${await sha256hex(token.trim())}`
+  const raw = await env.SESSIONS.get(key)
+  if (!raw) return null
+  await env.SESSIONS.delete(key)
+
+  let record: LinkRecord
+  try {
+    record = JSON.parse(raw) as LinkRecord
+  } catch {
+    return null
+  }
+  if (!record.account || record.exp <= now()) return null
+  return { account: record.account, next: safeNext(record.next) }
 }
 
 // ── Sessions (KV with TTL, bound to one account) ─────────────────────────────

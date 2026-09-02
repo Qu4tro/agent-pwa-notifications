@@ -22,6 +22,10 @@ import {
   rotateAgentKey,
   getAccount,
   normalizeEmail,
+  mintLoginLink,
+  consumeLoginLink,
+  linkTtlMinutes,
+  safeNext,
 } from './auth'
 import {
   createEvent,
@@ -148,6 +152,15 @@ export async function handleApi(
       { 'set-cookie': sessionCookie(value, env) },
     )
   }
+  // Agent-key login link, second half: the browser trades the token for a
+  // session. Same-origin, no bearer - the token is the credential.
+  if (path === '/api/auth/link' && method === 'POST') {
+    const body = (await request.json().catch(() => ({}))) as { token?: unknown }
+    const link = await consumeLoginLink(env, body.token)
+    if (!link) return json({ ok: false, error: 'This link expired. Ask for a new one.' }, 400)
+    const value = await createSession(env, link.account)
+    return json({ ok: true, next: link.next }, 200, { 'set-cookie': sessionCookie(value, env) })
+  }
   if (path === '/api/auth/rotate-key' && method === 'POST') {
     const acct = await sessionAccount(request, env)
     if (!acct) return unauthorized()
@@ -188,12 +201,35 @@ export async function handleApi(
       (path === '/api/v1/events' && method === 'POST') ||
       (eventUpdate && method === 'POST') ||
       (path === '/api/v1/questions' && method === 'POST') ||
+      (path === '/api/v1/login-link' && method === 'POST') ||
       (path === '/api/v1/inbox' && method === 'GET') ||
       (/^\/api\/v1\/questions\/[^/]+$/.test(path) && method === 'GET')
 
     if (agentRoute) {
       const acct = await authedAccount(request, env)
       if (!acct) return withCors(unauthorized())
+      // Agent-key login link, first half: mint a one-time URL the human can
+      // open to sign in without an email round trip.
+      if (path === '/api/v1/login-link') {
+        const body = (await request.json().catch(() => ({}))) as {
+          next?: unknown
+          ttl_minutes?: unknown
+        }
+        const minted = await mintLoginLink(
+          env,
+          acct,
+          safeNext(body.next),
+          linkTtlMinutes(body.ttl_minutes),
+        )
+        if (!minted.ok) return withCors(json({ ok: false, error: minted.error }, 429))
+        return withCors(
+          json({
+            ok: true,
+            url: `${url.origin}/login?t=${minted.token}`,
+            expires_at: minted.expiresAt,
+          }),
+        )
+      }
       if (path === '/api/v1/events') return withCors(await createEvent(request, env, acct))
       if (eventUpdate) return withCors(await updateEvent(eventUpdate[1], request, env, acct))
       if (path === '/api/v1/questions') return withCors(await createQuestion(request, env, acct))
