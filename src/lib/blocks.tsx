@@ -8,6 +8,7 @@ import {
   Info,
   TriangleAlert,
 } from 'lucide-react'
+import { CodeBlock } from './highlight'
 import { Button, fieldClass } from './ui'
 
 // -- Minimal, XSS-safe markdown to React -------------------------------------
@@ -324,11 +325,9 @@ function One({ b }: { b: AnyBlock }) {
         />
       )
     case 'code':
-      return (
-        <pre tabIndex={0} className="overflow-x-auto rounded-ui bg-surface p-3">
-          <code>{String(b.text ?? '')}</code>
-        </pre>
-      )
+      // `lang` has been in the schema all along and the renderer used to drop
+      // it on the floor.
+      return <CodeBlock text={String(b.text ?? '')} lang={b.lang ? String(b.lang) : undefined} />
     // Interactive blocks are rendered by AnswerForm, not here.
     case 'buttons':
     case 'form':

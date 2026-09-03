@@ -190,6 +190,46 @@
     color: #fff;
   }
 
+  /* Syntax highlighting, and the one deliberate exception to "colour carries
+     meaning and nothing else". Inside a code block the meaning colour carries
+     is which part of the language a word belongs to, which is a different axis
+     from kind, project and question state - and it never leaves .hl.
+
+     No theme file: five rules on the tokens that are worth telling apart, in
+     colours the app already has. Everything else stays --color-text, which is
+     15.4:1, so the block is readable with the colours ignored entirely. */
+  .hl .token.comment,
+  .hl .token.prolog,
+  .hl .token.doctype,
+  .hl .token.cdata {
+    color: var(--color-muted);
+  }
+  .hl .token.string,
+  .hl .token.char,
+  .hl .token.attr-value,
+  .hl .token.inserted {
+    color: var(--color-kind-done);
+  }
+  .hl .token.keyword,
+  .hl .token.tag,
+  .hl .token.selector,
+  .hl .token.atrule,
+  .hl .token.operator {
+    color: var(--color-kind-question);
+  }
+  .hl .token.number,
+  .hl .token.boolean,
+  .hl .token.constant,
+  .hl .token.deleted {
+    color: var(--color-warn);
+  }
+  .hl .token.function,
+  .hl .token.class-name,
+  .hl .token.attr-name,
+  .hl .token.property {
+    color: var(--color-kind-update);
+  }
+
   /* A message in a thread is a native <details>: the browser already gives it
      a keyboard, a role and an expanded/collapsed announcement, and no state
      library is involved. What it also gives it is a disclosure triangle, in
