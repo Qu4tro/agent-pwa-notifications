@@ -9,7 +9,7 @@ import { APP_NAME } from './brand'
 export function Header({ right }: { right?: React.ReactNode }) {
   return (
     <header className="safe-top sticky top-0 z-10 border-b border-line bg-bg">
-      <div className="mx-auto flex h-11 max-w-[44rem] items-center justify-between gap-3 px-3">
+      <div className="mx-auto flex h-13 max-w-[44rem] items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 items-center gap-2">
           <Link to="/" className="truncate font-semibold text-text no-underline">
             {APP_NAME}
@@ -86,7 +86,7 @@ export function useHeaderActions(node: React.ReactNode, deps: React.DependencyLi
 }
 
 export function Container({ children }: { children: React.ReactNode }) {
-  return <main className="safe-bottom mx-auto max-w-[44rem] pt-3">{children}</main>
+  return <main className="safe-bottom mx-auto max-w-[44rem] pt-5">{children}</main>
 }
 
 // A back link in the header. Always the same shape, so the way out of a page
@@ -97,10 +97,10 @@ export function BackLink({ to, params, label }: { to: string; params?: object; l
       // The router's typed link map cannot see a `to` passed as a prop.
       to={to as never}
       params={params as never}
-      className="inline-flex min-h-9 items-center gap-1 px-1 text-[14px] text-muted no-underline hover:text-text"
+      className="inline-flex min-h-11 items-center gap-1.5 px-1 text-[16px] text-muted no-underline hover:text-text"
     >
-      <ArrowLeft size={16} aria-hidden />
-      <span className="max-w-[9rem] truncate">{label}</span>
+      <ArrowLeft size={18} aria-hidden />
+      <span className="max-w-[10rem] truncate">{label}</span>
     </Link>
   )
 }

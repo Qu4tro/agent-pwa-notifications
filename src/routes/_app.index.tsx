@@ -21,7 +21,7 @@ function Projects() {
   const { data, isError, refetch } = useQuery(projectsQuery())
   useHeaderActions(
     <Link to="/settings" title="Settings" aria-label="Settings" className={iconButtonClass}>
-      <Settings2 size={16} />
+      <Settings2 size={18} />
     </Link>,
     [],
   )
@@ -56,7 +56,7 @@ function Projects() {
           <ProjectLine key={p.project || '__none__'} p={p} />
         ))}
         {rest.length === 0 ? (
-          <p className="px-3 py-2 text-[13px] text-muted">Everything else is up to date.</p>
+          <p className="px-4 py-3 text-[15px] text-muted">Everything else is up to date.</p>
         ) : null}
       </Section>
     </Container>
@@ -78,13 +78,13 @@ function ProjectLine({ p }: { p: ProjectRow }) {
               <span className="truncate">{projectLabel(p.project)}</span>
               {p.pending > 0 ? (
                 <span
-                  className={`shrink-0 text-[11px] font-semibold tracking-wider uppercase ${STATE_TEXT.pending}`}
+                  className={`shrink-0 text-[13px] font-semibold ${STATE_TEXT.pending}`}
                 >
                   {p.pending} pending
                 </span>
               ) : null}
               {p.unread > 0 ? (
-                <span className="shrink-0 text-[12px] text-muted">{p.unread} unread</span>
+                <span className="shrink-0 text-[13px] text-muted">{p.unread} unread</span>
               ) : null}
             </span>
           }
@@ -99,9 +99,9 @@ function ProjectLine({ p }: { p: ProjectRow }) {
 
 function EmptyState() {
   return (
-    <div className="px-3 py-10 text-center text-muted">
+    <div className="px-4 py-12 text-center text-muted">
       <p className="mb-1">No projects yet.</p>
-      <p className="text-[13px]">
+      <p className="text-[15px]">
         An agent's first update with a <code>project</code> starts one. The connection snippet is
         in <Link to="/settings">Settings</Link>.
       </p>

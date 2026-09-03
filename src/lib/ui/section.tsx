@@ -1,5 +1,5 @@
-// A group of rows under a small uppercase heading. The heading is the only
-// structure a list page has; there are no cards and no boxes around it.
+// A group of rows under a heading. The heading is the only structure a list
+// page has; there are no cards and no boxes around it.
 
 export function Section({
   title,
@@ -13,8 +13,8 @@ export function Section({
   className?: string
 }) {
   return (
-    <section className={`mb-6 ${className}`}>
-      <h2 className="mb-1 px-3 text-[11px] font-semibold tracking-wider text-muted uppercase">
+    <section className={`mb-8 ${className}`}>
+      <h2 className="mb-1.5 px-4 text-[14px] font-semibold text-muted">
         {title}
         {count != null ? (
           <>
@@ -23,7 +23,7 @@ export function Section({
                 out of flow, so it separates the two in the name and adds
                 nothing to the layout. */}
             <span className="sr-only"> </span>
-            <span className="ml-1.5 text-faint">{count}</span>
+            <span className="ml-2 text-faint">{count}</span>
           </>
         ) : null}
       </h2>

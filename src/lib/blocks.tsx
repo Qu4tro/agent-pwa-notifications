@@ -87,7 +87,7 @@ const TONE: Record<string, string> = {
 
 export function BlockRenderer({ blocks }: { blocks: unknown[] }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {(blocks as AnyBlock[]).map((b, i) => (
         <One key={i} b={b} />
       ))}
@@ -291,7 +291,7 @@ function FieldInput({
   const req = Boolean(field.required)
 
   const wrap = (child: React.ReactNode) => (
-    <label className="flex flex-col gap-1 text-[13px]">
+    <label className="flex flex-col gap-1 text-[15px]">
       <span className="text-muted">
         {label}
         {req ? <span className="text-kind-error"> *</span> : null}
@@ -317,7 +317,7 @@ function FieldInput({
         required={req}
         value={String(value ?? '')}
         onChange={(e) => onChange(e.target.value)}
-        className={`${fieldClass} min-h-9`}
+        className={`${fieldClass} min-h-11`}
       >
         <option value="">Choose one</option>
         {options.map((o) => (
@@ -367,7 +367,7 @@ function FieldInput({
       placeholder={String(field.placeholder ?? '')}
       value={String(value ?? '')}
       onChange={(e) => onChange(kind === 'number' ? e.target.valueAsNumber : e.target.value)}
-      className={`${fieldClass} min-h-9`}
+      className={`${fieldClass} min-h-11`}
     />,
   )
 }

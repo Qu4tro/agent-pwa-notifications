@@ -45,7 +45,7 @@ function ProjectView() {
         aria-label="Clear project"
         className={`${iconButtonClass} ${clearOpen ? 'text-kind-error' : ''}`}
       >
-        <Trash2 size={16} />
+        <Trash2 size={18} />
       </button>
       <BackLink to="/" label="Projects" />
     </>,
@@ -73,9 +73,9 @@ function ProjectView() {
 
   return (
     <Container>
-      <div className="mb-3 flex items-center gap-2 px-3">
+      <div className="mb-4 flex items-center gap-2 px-4">
         <ProjectDot project={project} />
-        <h1 className="truncate text-[17px] font-semibold">{projectLabel(project)}</h1>
+        <h1 className="truncate text-[22px] font-semibold">{projectLabel(project)}</h1>
       </div>
 
       {clearOpen && (
@@ -87,7 +87,7 @@ function ProjectView() {
       )}
 
       {data.length === 0 ? (
-        <p className="px-3 py-10 text-center text-muted">No tasks in this project.</p>
+        <p className="px-4 py-12 text-center text-muted">No tasks in this project.</p>
       ) : (
         <>
           {waiting.length > 0 && (
@@ -129,7 +129,7 @@ function TaskLine({ t, unread, divider = true }: { t: TaskSummary; unread?: bool
       className="block text-text no-underline hover:bg-surface"
     >
       <Row divider={divider}>
-        <KindLabel kind={t.pending ? 'question' : t.latest_kind} className="w-[4.5rem]" />
+        <KindLabel kind={t.pending ? 'question' : t.latest_kind} className="w-[5rem]" />
         <RowBody
           title={
             <span className="flex items-center gap-1.5">
@@ -166,7 +166,7 @@ function PendingLine({ t, project }: { t: TaskSummary; project: string }) {
   return (
     <div className="border-b border-b-line">
       <TaskLine t={t} divider={false} />
-      <div className="flex flex-wrap items-center gap-2 pr-3 pb-2 pl-[15px]">
+      <div className="flex flex-wrap items-center gap-2 pr-4 pb-3 pl-[19px]">
         {options.length > 0 && eventId ? (
           options.map((o) => (
             <Button
@@ -182,12 +182,12 @@ function PendingLine({ t, project }: { t: TaskSummary; project: string }) {
           <Link
             to="/project/$name/task/$key"
             params={taskParams(t)}
-            className={`text-[13px] no-underline hover:underline ${STATE_TEXT.pending}`}
+            className={`text-[15px] no-underline hover:underline ${STATE_TEXT.pending}`}
           >
             Open to answer
           </Link>
         )}
-        {error ? <span className="text-[13px] text-kind-error">{error}</span> : null}
+        {error ? <span className="text-[15px] text-kind-error">{error}</span> : null}
       </div>
     </div>
   )
@@ -203,8 +203,8 @@ function ClearPanel({
   label: string
 }) {
   return (
-    <div className="mb-4 border-y border-line px-3 py-2">
-      <p className="mb-2 text-[13px] text-muted">
+    <div className="mb-4 border-y border-line px-4 py-3">
+      <p className="mb-2 text-[15px] text-muted">
         Clear "{label}". Only this project. This cannot be undone.
       </p>
       <div className="flex flex-wrap gap-2">

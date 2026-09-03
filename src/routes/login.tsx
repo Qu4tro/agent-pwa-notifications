@@ -120,13 +120,13 @@ function LoginPage() {
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
       <div className="w-full max-w-[22rem]">
-        <h1 className="mb-4 text-center font-semibold">{APP_NAME}</h1>
+        <h1 className="mb-5 text-center text-[22px] font-semibold">{APP_NAME}</h1>
 
-        {linkPending && <p className="text-center text-[14px] text-muted">Signing you in...</p>}
+        {linkPending && <p className="text-center text-[15px] text-muted">Signing you in...</p>}
 
         {!linkPending && stage === 'email' && (
           <form onSubmit={sendCode} className="flex flex-col gap-2">
-            <p className="text-[13px] text-muted">Your email, then a one-time code.</p>
+            <p className="text-[15px] text-muted">Your email, then a one-time code.</p>
             <input
               type="email"
               autoFocus
@@ -134,7 +134,7 @@ function LoginPage() {
               placeholder="you@example.com"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-              className={`${fieldClass} min-h-9`}
+              className={`${fieldClass} min-h-11`}
             />
             <Button type="submit" variant="primary" disabled={busy}>
               {busy ? 'Sending' : 'Send code'}
@@ -144,7 +144,7 @@ function LoginPage() {
 
         {stage === 'code' && (
           <form onSubmit={verify} className="flex flex-col gap-2">
-            <p className="text-[13px] text-muted">
+            <p className="text-[15px] text-muted">
               A 6-digit code went to <span className="text-text">{email}</span>.
             </p>
             <input
@@ -154,7 +154,7 @@ function LoginPage() {
               placeholder="123456"
               value={code}
               onChange={(ev) => setCode(ev.target.value.replace(/\D/g, '').slice(0, 6))}
-              className={`${fieldClass} min-h-9 text-center text-[18px] tracking-[0.3em]`}
+              className={`${fieldClass} min-h-11 text-center text-[22px] tracking-[0.3em]`}
             />
             <Button type="submit" variant="primary" disabled={busy || code.length !== 6}>
               {busy ? 'Verifying' : 'Verify'}
@@ -174,11 +174,11 @@ function LoginPage() {
 
         {stage === 'key' && agentKey && (
           <div className="flex flex-col gap-2">
-            <p className="text-[13px] text-muted">
+            <p className="text-[15px] text-muted">
               Your agent key. Copy it now, it will not be shown again.
             </p>
             <Snippet text={agentKey} />
-            <p className="mt-2 text-[13px] text-muted">
+            <p className="mt-2 text-[15px] text-muted">
               Install the skill, then paste the key when the agent asks for it:
             </p>
             <Snippet text="npx skills add Qu4tro/agent-pwa-notifications" />
@@ -188,7 +188,7 @@ function LoginPage() {
           </div>
         )}
 
-        {error && <p className="mt-3 text-center text-[13px] text-kind-error">{error}</p>}
+        {error && <p className="mt-3 text-center text-[15px] text-kind-error">{error}</p>}
       </div>
     </div>
   )

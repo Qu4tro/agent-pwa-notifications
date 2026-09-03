@@ -77,7 +77,7 @@ function ThreadView() {
         {isError ? (
           <InlineError message="Could not load this thread." onRetry={() => refetch()} />
         ) : (
-          <div className="px-3 py-10 text-center">
+          <div className="px-4 py-12 text-center">
             <p className="mb-2 text-muted">This task no longer exists.</p>
             <Link to="/">Back to projects</Link>
           </div>
@@ -90,12 +90,12 @@ function ThreadView() {
 
   return (
     <Container>
-      <div className="mb-3 px-3">
-        <div className="flex items-center gap-2 text-[13px] text-muted">
+      <div className="mb-4 px-4">
+        <div className="flex items-center gap-2 text-[15px] text-muted">
           <ProjectDot project={project} size={6} />
           <span className="truncate">{projectLabel(project)}</span>
         </div>
-        <h1 className="text-[17px] leading-tight font-semibold">{title}</h1>
+        <h1 className="text-[22px] leading-tight font-semibold">{title}</h1>
       </div>
 
       {/* The conversation: each message and question in order. */}
@@ -119,7 +119,7 @@ function ThreadView() {
 function MessageShell({ kind, children }: { kind: string; children: React.ReactNode }) {
   return (
     <article
-      className={`border-b border-b-line border-l-[3px] px-3 py-2.5 last:border-b-0 ${
+      className={`border-b border-b-line border-l-[3px] px-4 py-3 last:border-b-0 ${
         KIND_BORDER[kind] ?? 'border-l-line'
       }`}
     >
@@ -132,13 +132,13 @@ function MessageHead({ e }: { e: EventItem }) {
   return (
     <div className="mb-1.5 flex items-center gap-2">
       <KindLabel kind={e.kind} />
-      {e.model ? <span className="truncate text-[12px] text-muted">{e.model}</span> : null}
+      {e.model ? <span className="truncate text-[13px] text-muted">{e.model}</span> : null}
       {e.enc ? (
-        <span className="inline-flex items-center gap-1 text-[12px] text-kind-done">
+        <span className="inline-flex items-center gap-1 text-[13px] text-kind-done">
           <Lock size={12} aria-hidden /> encrypted
         </span>
       ) : null}
-      <span className="ml-auto shrink-0 text-[12px] text-faint">{timeAgo(e.created_at)}</span>
+      <span className="ml-auto shrink-0 text-[13px] text-faint">{timeAgo(e.created_at)}</span>
     </div>
   )
 }
@@ -206,7 +206,7 @@ function Message({
       <MessageShell kind={e.kind}>
         <MessageHead e={e} />
         {e.title ? <div className="mb-1 font-semibold">{e.title}</div> : null}
-        <p className="text-[13px] text-muted">
+        <p className="text-[15px] text-muted">
           Encrypted. Add your key under Encryption in <Link to="/settings">Settings</Link> to read
           it.
         </p>
@@ -226,30 +226,30 @@ function Message({
           {isPending ? (
             <>
               <AnswerForm blocks={blocks} disabled={submitting} onSubmit={handleSubmit} />
-              {error ? <p className="mt-2 text-[13px] text-kind-error">{error}</p> : null}
+              {error ? <p className="mt-2 text-[15px] text-kind-error">{error}</p> : null}
             </>
           ) : q.status === 'answered' ? (
             <div className="flex flex-col gap-1">
-              <div className={`text-[14px] ${STATE_TEXT.answered}`}>
+              <div className={`text-[16px] ${STATE_TEXT.answered}`}>
                 You answered: <span className="font-semibold">{shortAnswer(answer)}</span>
               </div>
               {q.picked_up_at ? (
                 <>
-                  <div className="text-[13px] text-muted">
+                  <div className="text-[15px] text-muted">
                     Agent received it {timeAgo(q.picked_up_at)}
                   </div>
                   {e.ack ? (
-                    <p className="mt-1 border-l-[3px] border-l-kind-done pl-2 text-[13px]">
+                    <p className="mt-1 border-l-[3px] border-l-kind-done pl-2 text-[15px]">
                       {e.ack.replace(/\{answer\}/g, shortAnswer(answer))}
                     </p>
                   ) : null}
                 </>
               ) : (
-                <div className="text-[13px] text-muted">Waiting for the agent</div>
+                <div className="text-[15px] text-muted">Waiting for the agent</div>
               )}
             </div>
           ) : (
-            <div className={`text-[13px] ${STATE_TEXT.expired}`}>
+            <div className={`text-[15px] ${STATE_TEXT.expired}`}>
               Expired before you answered.
             </div>
           )}
