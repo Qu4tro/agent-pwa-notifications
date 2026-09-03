@@ -1,31 +1,19 @@
 import { createContext, useContext, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useIsFetching } from '@tanstack/react-query'
+import { ArrowLeft } from 'lucide-react'
+import { APP_NAME } from './brand'
 
 // Mounted once by the app layout, so it never unmounts between pages. Pages
 // contribute their own actions through `useHeaderActions`.
 export function Header({ right }: { right?: React.ReactNode }) {
   return (
-    <header
-      className="safe-top"
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        background: 'color-mix(in srgb, var(--bg) 85%, transparent)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--border)',
-        padding: '0.75rem 1rem',
-      }}
-    >
-      <div style={{ maxWidth: '46rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', textDecoration: 'none', color: 'var(--text)' }}>
-            <Logo />
-            <span style={{ fontWeight: 700, fontSize: '1.05rem', letterSpacing: '-0.01em' }}>Agent Dash</span>
-          </Link>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>{right}</div>
+    <header className="safe-top sticky top-0 z-10 border-b border-line bg-bg">
+      <div className="mx-auto flex h-11 max-w-[44rem] items-center justify-between gap-3 px-3">
+        <Link to="/" className="truncate font-semibold text-text no-underline">
+          {APP_NAME}
+        </Link>
+        <div className="flex items-center gap-1">{right}</div>
       </div>
       <RefreshBar />
     </header>
@@ -40,18 +28,11 @@ function RefreshBar() {
   return (
     <div
       aria-hidden
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: '-1px',
-        height: '2px',
-        overflow: 'hidden',
-        opacity: fetching > 0 ? 1 : 0,
-        transition: 'opacity 150ms linear',
-      }}
+      className={`pointer-events-none absolute right-0 -bottom-px left-0 h-0.5 overflow-hidden transition-opacity duration-150 ${
+        fetching > 0 ? 'opacity-100' : 'opacity-0'
+      }`}
     >
-      <div className="refresh-bar" style={{ height: '2px', background: 'var(--accent)' }} />
+      <div className="refresh-bar h-0.5 bg-kind-question" />
     </div>
   )
 }
@@ -70,59 +51,22 @@ export function useHeaderActions(node: React.ReactNode, deps: React.DependencyLi
   }, deps)
 }
 
-export function Logo() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden>
-      <rect width="32" height="32" rx="8" fill="#7c5cff" />
-      <path d="M16 7a6 6 0 0 0-6 6v3.6l-1.4 2.2a1 1 0 0 0 .85 1.53h13.1a1 1 0 0 0 .85-1.53L22 16.6V13a6 6 0 0 0-6-6Z" fill="#fff" />
-      <path d="M13.6 22.5a2.5 2.5 0 0 0 4.8 0" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 export function Container({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="safe-bottom" style={{ maxWidth: '46rem', margin: '0 auto', padding: '1rem' }}>
-      {children}
-    </main>
-  )
+  return <main className="safe-bottom mx-auto max-w-[44rem] pt-3">{children}</main>
 }
 
-// What a page shows when its query failed and there is nothing cached to show
-// instead. One line, one button, inside the content area.
-export function InlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
+// A back link in the header. Always the same shape, so the way out of a page
+// is always in the same place.
+export function BackLink({ to, params, label }: { to: string; params?: object; label: string }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.8rem',
-        flexWrap: 'wrap',
-        padding: '0.7rem 0.9rem',
-        border: '1px solid var(--border)',
-        borderLeft: '3px solid var(--error)',
-        borderRadius: 'var(--radius)',
-        background: 'var(--bg-elev)',
-        fontSize: '0.9rem',
-      }}
+    <Link
+      // The router's typed link map cannot see a `to` passed as a prop.
+      to={to as never}
+      params={params as never}
+      className="inline-flex min-h-9 items-center gap-1 px-1 text-[14px] text-muted no-underline hover:text-text"
     >
-      <span style={{ color: 'var(--muted)' }}>{message}</span>
-      <button
-        onClick={onRetry}
-        style={{
-          marginLeft: 'auto',
-          padding: '0.35rem 0.8rem',
-          borderRadius: '0.5rem',
-          border: '1px solid var(--border)',
-          background: 'var(--bg-elev2)',
-          color: 'var(--text)',
-          fontWeight: 600,
-          fontSize: '0.85rem',
-          cursor: 'pointer',
-        }}
-      >
-        Retry
-      </button>
-    </div>
+      <ArrowLeft size={16} aria-hidden />
+      <span className="max-w-[9rem] truncate">{label}</span>
+    </Link>
   )
 }

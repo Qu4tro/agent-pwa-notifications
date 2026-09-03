@@ -1,158 +1,175 @@
 @import 'tailwindcss';
 
-:root {
-  --bg: #08080d;
-  --bg-elev: #14141f;
-  --bg-elev2: #1d1d2b;
-  --border: #262638;
-  --border-soft: #1e1e2c;
-  --text: #edecf5;
-  --muted: #9797b0;
-  --faint: #6b6b83;
-  --accent: #8b6dff;
-  --accent-2: #b79bff;
-  --accent-soft: #241d47;
-  --info: #5b9bff;
-  --success: #35d69a;
-  --warn: #ffca4d;
-  --error: #ff6d84;
-  --radius: 0.85rem;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent),
-    0 8px 30px -8px color-mix(in srgb, var(--accent) 35%, transparent);
+/* Every colour, radius and size the app uses. Declared once here; Tailwind
+   turns each one into a utility (bg-surface, text-muted, rounded-ui) and into
+   a plain CSS variable for the few values that can only be set inline, like a
+   project colour or a progress width.
+
+   Colour carries meaning and nothing else: the kind of an event, the project
+   it belongs to, the state of a question. Nothing is coloured for decoration. */
+@theme {
+  /* Surfaces and text. Contrast on --color-bg / --color-surface:
+     text 15.4 / 14.4, muted 6.1 / 5.7, faint 4.9 / 4.5. */
+  --color-bg: #0f1115;
+  --color-surface: #161920;
+  --color-text: #e6e8ee;
+  --color-muted: #8b92a5;
+  --color-faint: #7a8194;
+
+  /* --color-line is a hairline divider and carries no information, so 1.3:1
+     is enough. Anything a user has to see as a boundary - an input outline, a
+     focus ring, a button edge - uses --color-edge instead (3.9 / 3.7). */
+  --color-line: #262a33;
+  --color-edge: #6b7285;
+
+  /* Kind. One colour per kind of event, used for the label and the rail. */
+  --color-kind-update: #5b9bff;
+  --color-kind-question: #a78bfa;
+  --color-kind-done: #34d399;
+  --color-kind-error: #f87171;
+
+  /* A callout block carries its own tone, set by the agent. Three of the four
+     are a kind colour; "warn" is the one value the kind axis has no word for.
+     11.3 / 10.5 on the two surfaces. */
+  --color-warn: #fbbf24;
+
+  --radius-ui: 4px;
 }
 
-* {
-  box-sizing: border-box;
-}
+/* Question state invents no colour of its own: pending is the question
+   colour, answered the done colour, expired stays muted, and unread is
+   full-weight text plus a dot in the kind colour. That mapping is written once
+   as STATE_TEXT in src/lib/project.ts, where the components read it. */
 
-html {
-  color-scheme: dark;
-  -webkit-tap-highlight-color: transparent;
-}
+/* Element defaults live in Tailwind's base layer. Unlayered CSS beats every
+   utility in the cascade, so an unlayered `a { color }` would quietly win over
+   a `text-text` class on a link. */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-body {
-  margin: 0;
-  background: var(--bg);
-  /* Soft aurora glow behind the app — subtle depth, fixed so it doesn't scroll. */
-  background-image:
-    radial-gradient(60rem 34rem at 50% -12rem, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%),
-    radial-gradient(40rem 30rem at 100% 0%, color-mix(in srgb, var(--info) 8%, transparent), transparent 60%);
-  background-attachment: fixed;
-  color: var(--text);
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100svh;
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100svh;
+  }
+
+  /* One visible focus ring for everything keyboard-reachable. The accent is
+     6.9:1 on the background, well past the 3:1 a control boundary needs. */
+  :focus-visible {
+    outline: 2px solid var(--color-kind-question);
+    outline-offset: 2px;
+  }
+
+  /* Underlined by default, so a link inside a paragraph is not told apart by
+     colour alone (WCAG 1.4.1). Links that are really rows or buttons opt out
+     with `no-underline`. */
+  a {
+    color: var(--color-kind-question);
+    text-decoration: underline;
+  }
 }
 
 /* Respect iOS safe areas when installed to the home screen. */
-.safe-top {
-  padding-top: max(1rem, env(safe-area-inset-top));
+@utility safe-top {
+  padding-top: env(safe-area-inset-top);
 }
-.safe-bottom {
+@utility safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
-a {
-  color: var(--accent);
-}
+@layer components {
+  /* Markdown block rendering. */
+  .md h1,
+  .md h2,
+  .md h3 {
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0.6em 0 0.3em;
+  }
+  .md h1 {
+    font-size: 1.13rem;
+  }
+  .md h2 {
+    font-size: 1.06rem;
+  }
+  .md h3 {
+    font-size: 1rem;
+  }
+  .md p {
+    margin: 0.35em 0;
+  }
+  .md p:first-child {
+    margin-top: 0;
+  }
+  .md p:last-child {
+    margin-bottom: 0;
+  }
+  .md ul,
+  .md ol {
+    margin: 0.35em 0;
+    padding-left: 1.2em;
+  }
+  .md li {
+    margin: 0.1em 0;
+  }
+  .md code {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    padding: 0.05em 0.3em;
+    border-radius: var(--radius-ui);
+    font-size: 0.85em;
+  }
+  .md strong {
+    font-weight: 600;
+    color: #fff;
+  }
 
-@keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 1;
+  /* Loading placeholders in the content area. */
+  @keyframes skeleton-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
   }
-  50% {
-    opacity: 0.35;
+  .skeleton {
+    background: var(--color-surface);
+    animation: skeleton-pulse 1.4s ease-in-out infinite;
   }
-}
-.live-dot {
-  animation: pulse-dot 1.8s ease-in-out infinite;
-}
 
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
+  /* The refresh line on the bottom edge of the header. */
+  @keyframes refresh-slide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(250%);
+    }
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  .refresh-bar {
+    width: 40%;
+    animation: refresh-slide 0.9s ease-in-out infinite;
   }
-}
-.animate-in {
-  animation: slide-in 0.22s ease-out both;
-}
 
-/* Markdown block rendering */
-.md h1,
-.md h2,
-.md h3 {
-  font-weight: 650;
-  line-height: 1.25;
-  margin: 0.6em 0 0.3em;
-}
-.md h1 {
-  font-size: 1.25rem;
-}
-.md h2 {
-  font-size: 1.1rem;
-}
-.md h3 {
-  font-size: 1rem;
-}
-.md p {
-  margin: 0.4em 0;
-  line-height: 1.6;
-}
-.md ul,
-.md ol {
-  margin: 0.4em 0;
-  padding-left: 1.2em;
-}
-.md li {
-  margin: 0.15em 0;
-}
-.md code {
-  background: var(--bg-elev2);
-  padding: 0.1em 0.35em;
-  border-radius: 0.3rem;
-  font-size: 0.85em;
-}
-.md a {
-  text-decoration: underline;
-}
-.md strong {
-  font-weight: 650;
-  color: #fff;
-}
-
-/* Loading placeholders in the content area. */
-@keyframes skeleton-pulse {
-  0%,
-  100% {
-    opacity: 1;
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton,
+    .refresh-bar {
+      animation: none;
+    }
   }
-  50% {
-    opacity: 0.45;
-  }
-}
-.skeleton {
-  background: var(--bg-elev);
-  animation: skeleton-pulse 1.4s ease-in-out infinite;
-}
-
-/* The refresh line on the bottom edge of the header. */
-@keyframes refresh-slide {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(250%);
-  }
-}
-.refresh-bar {
-  width: 40%;
-  animation: refresh-slide 0.9s ease-in-out infinite;
 }

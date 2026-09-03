@@ -3,30 +3,18 @@
 // jumps when the data lands.
 
 import { Container } from './shell'
+import { Skeleton } from './ui'
 
-export function Skeleton({ width, height, radius }: { width?: string; height: string; radius?: string }) {
+function RowLines({ count }: { count: number }) {
   return (
-    <div
-      className="skeleton"
-      style={{ width: width ?? '100%', height, borderRadius: radius ?? '0.4rem' }}
-    />
-  )
-}
-
-function Card({ height }: { height: string }) {
-  return (
-    <div
-      className="skeleton"
-      style={{ height, borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}
-    />
-  )
-}
-
-function Rows({ count, height }: { count: number; height: string }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+    <div className="border-t border-line">
       {Array.from({ length: count }, (_, i) => (
-        <Card key={i} height={height} />
+        <div key={i} className="border-b border-l-[3px] border-line border-l-transparent px-3 py-2">
+          <Skeleton width="55%" height="15px" />
+          <div className="mt-1">
+            <Skeleton width="35%" height="13px" />
+          </div>
+        </div>
       ))}
     </div>
   )
@@ -34,19 +22,26 @@ function Rows({ count, height }: { count: number; height: string }) {
 
 function Heading() {
   return (
-    <div style={{ margin: '0 0 0.7rem' }}>
-      <Skeleton width="7rem" height="0.72rem" />
+    <div className="mb-1 px-3">
+      <Skeleton width="6rem" height="11px" />
     </div>
+  )
+}
+
+function Group({ rows }: { rows: number }) {
+  return (
+    <section className="mb-6">
+      <Heading />
+      <RowLines count={rows} />
+    </section>
   )
 }
 
 export function ProjectsSkeleton() {
   return (
     <Container>
-      <section style={{ marginBottom: '1.6rem' }}>
-        <Heading />
-        <Rows count={4} height="4.6rem" />
-      </section>
+      <Group rows={2} />
+      <Group rows={6} />
     </Container>
   )
 }
@@ -54,14 +49,11 @@ export function ProjectsSkeleton() {
 export function TasksSkeleton() {
   return (
     <Container>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.2rem' }}>
-        <Skeleton width="0.7rem" height="0.7rem" radius="999px" />
-        <Skeleton width="11rem" height="1.4rem" />
+      <div className="mb-3 px-3">
+        <Skeleton width="10rem" height="18px" />
       </div>
-      <section style={{ marginBottom: '1.6rem' }}>
-        <Heading />
-        <Rows count={3} height="6rem" />
-      </section>
+      <Group rows={3} />
+      <Group rows={3} />
     </Container>
   )
 }
@@ -69,16 +61,12 @@ export function TasksSkeleton() {
 export function ThreadSkeleton() {
   return (
     <Container>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-        <Skeleton width="0.6rem" height="0.6rem" radius="999px" />
-        <Skeleton width="6rem" height="0.8rem" />
+      <div className="mb-3 px-3">
+        <Skeleton width="60%" height="18px" />
       </div>
-      <div style={{ margin: '0 0 1.3rem' }}>
-        <Skeleton width="60%" height="1.4rem" />
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-        <Card height="9rem" />
-        <Card height="9rem" />
+      <div className="flex flex-col gap-4 px-3">
+        <Skeleton height="7rem" />
+        <Skeleton height="7rem" />
       </div>
     </Container>
   )
@@ -87,13 +75,13 @@ export function ThreadSkeleton() {
 export function SettingsSkeleton() {
   return (
     <Container>
-      <div style={{ margin: '0 0 1.5rem' }}>
-        <Skeleton width="6rem" height="1.4rem" />
+      <div className="mb-4 px-3">
+        <Skeleton width="6rem" height="18px" />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <Card height="9rem" />
-        <Card height="9rem" />
-        <Card height="9rem" />
+      <div className="flex flex-col gap-6 px-3">
+        <Skeleton height="5rem" />
+        <Skeleton height="5rem" />
+        <Skeleton height="5rem" />
       </div>
     </Container>
   )

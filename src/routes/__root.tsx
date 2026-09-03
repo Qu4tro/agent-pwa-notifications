@@ -1,5 +1,6 @@
 import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
+import { APP_NAME, APP_SHORT_NAME, APP_TAGLINE } from '../lib/brand'
 import appCss from '../styles.css?url'
 
 // The router hands every route the one QueryClient, so a loader can warm a
@@ -10,15 +11,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: 'utf-8' },
       {
         name: 'viewport',
-        content: 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1',
+        // No maximum-scale: pinch-zoom stays available (WCAG 1.4.4).
+        content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
-      { title: 'Agent Dash' },
-      { name: 'description', content: 'Your agents report here.' },
-      { name: 'theme-color', content: '#0a0a0f' },
+      { title: APP_NAME },
+      { name: 'description', content: APP_TAGLINE },
+      // Matches --color-bg, so the browser chrome and the app share one surface.
+      { name: 'theme-color', content: '#0f1115' },
       { name: 'mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
-      { name: 'apple-mobile-web-app-title', content: 'Agent Dash' },
+      { name: 'apple-mobile-web-app-title', content: APP_SHORT_NAME },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },

@@ -29,8 +29,10 @@ export const Route = createFileRoute('/_app/event/$id')({
 function EventGone() {
   return (
     <Container>
-      <p style={{ color: 'var(--muted)', padding: '2rem 0' }}>This message no longer exists.</p>
-      <Link to="/">← Back to projects</Link>
+      <div className="px-3 py-10 text-center">
+        <p className="mb-2 text-muted">This message no longer exists.</p>
+        <Link to="/">Back to projects</Link>
+      </div>
     </Container>
   )
 }
