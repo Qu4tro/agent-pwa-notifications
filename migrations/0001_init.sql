@@ -1,4 +1,4 @@
--- Agent Dash schema. One human, many agents. An inbox, not an archive.
+-- Agent Notifications schema. One human, many agents. An inbox, not an archive.
 
 CREATE TABLE IF NOT EXISTS events (
   id          TEXT PRIMARY KEY,          -- ULID, time-sortable
