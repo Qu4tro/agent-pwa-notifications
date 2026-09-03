@@ -136,6 +136,43 @@ export function useAnswer(project: string, key: string) {
   })
 }
 
+// Answering a micro-question straight from the project list. Same endpoint as
+// the thread form; the optimistic write drops the row out of "Needs you" the
+// moment a button is tapped.
+export function useAnswerFromList(project: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      eventId,
+      answer,
+    }: {
+      eventId: string
+      answer: Record<string, unknown>
+    }) => {
+      const res = await api.answer(eventId, answer)
+      if (!res.ok) throw new Error(res.error ?? 'Could not submit.')
+      return res
+    },
+    onMutate: async ({ eventId }) => {
+      const queryKey = queryKeys.tasks(project)
+      await client.cancelQueries({ queryKey })
+      const previous = client.getQueryData<TaskSummary[]>(queryKey)
+      client.setQueryData<TaskSummary[]>(queryKey, (tasks) =>
+        tasks?.map((t) =>
+          t.pending_event_id === eventId
+            ? { ...t, pending: false, pending_event_id: null, pending_question: null, pending_answers: [] }
+            : t,
+        ),
+      )
+      return { previous, queryKey }
+    },
+    onError: (_error, _input, context) => {
+      if (context) client.setQueryData(context.queryKey, context.previous)
+    },
+    onSettled: () => invalidateLists(client),
+  })
+}
+
 export function useMarkRead() {
   const client = useQueryClient()
   return useMutation({
