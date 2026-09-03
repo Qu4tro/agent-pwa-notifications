@@ -10,6 +10,56 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Added
+
+- Design tokens in `src/styles.css`, declared once inside Tailwind's `@theme`
+  so each one is both a utility and a CSS variable. Colour now carries meaning
+  and nothing else: the kind of an event, the project it belongs to and the
+  state of a question. Question state reads off the kind colours, so no state
+  invents a colour of its own.
+- A component set in `src/lib/ui/`: `Row`, `KindLabel`, `ProjectDot`,
+  `UnreadDot`, `Button` (primary, secondary, danger), `Section`, `Skeleton`,
+  `InlineError`, `Snippet`.
+- Inline answers on the project page. A pending micro-question (one buttons
+  block, 2 or 3 short options, not encrypted) shows its options under the row
+  and answers without opening the thread. Anything larger shows "Open to
+  answer". `GET /api/v1/tasks` carries the options as `pending_answers`, built
+  with the same rule as the notification quick answers.
+- `src/lib/brand.ts` holds the app name in one place.
+
+### Changed
+
+- Compact, flat layout. Lists are rows with a hairline between them, not
+  cards: 8px by 12px of padding, one line of content, one muted detail line.
+  A project row is 53px tall and the projects page fits ten of them on a
+  390 by 844 screen without scrolling.
+- Settings is one column of headings, no cards, ending in an About section
+  with the version and the upstream attribution.
+- The thread marks each message with a 3px rail in its kind colour instead of
+  a bordered card. An answered question reads "You answered: X", then whether
+  the agent has picked it up.
+- The app is named "Agent Notifications", short name "Agents". New bell icon
+  and regenerated `icon-192.png`, `icon-512.png`, `icon-maskable.png` and a
+  monochrome `badge.png`.
+
+### Removed
+
+- The aurora background, every gradient, every box shadow and the backdrop
+  blur on the header.
+- Inline style objects, except for the three genuinely dynamic values: a
+  project colour, a progress width and a skeleton size.
+- Every emoji, arrow and other non-ASCII character in `src/` and in the
+  manifest.
+
+### Fixed
+
+- Pinch-zoom is no longer disabled by `maximum-scale=1` (WCAG 1.4.4).
+- Links inside a block of text are underlined, so they are not distinguished
+  by colour alone (WCAG 1.4.1).
+- Horizontally scrollable code blocks and tables are keyboard reachable.
+- Every text token meets 4.5:1 on both surfaces. Input borders and focus rings
+  use their own token at 3.9:1 rather than the hairline divider colour.
+
 ## [0.4.0] - 2026-09-02
 
 ### Added
