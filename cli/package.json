@@ -1,6 +1,6 @@
 {
   "name": "agent-pwa-notifications",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CLI for a self-hosted Agent Notifications hub: connect an agent, mint a sign-in link, and send updates and questions from scripts.",
   "type": "module",
   "bin": {

@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-03
+
 ### Changed
 
 - The header shows a connection dot instead of the refresh bar. The bar tracked
