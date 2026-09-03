@@ -99,7 +99,16 @@ function ThreadView() {
     )
   }
 
+  // Read off the server's array, which is still oldest first: the thread is
+  // named after the event that started it, not the one that ended it.
   const title = thread.task || thread.events[0]?.title || 'Task'
+
+  // Newest first on the page. Reversed here rather than in the query, so the
+  // API's order - which the title above, the tests and everything that reads
+  // the array by position depend on - is left alone. A real reversal, not
+  // flex-col-reverse: that would leave the DOM oldest first, and the keyboard
+  // and a screen reader would walk the thread against the eye.
+  const newestFirst = [...thread.events].reverse()
 
   return (
     <Container>
@@ -111,13 +120,13 @@ function ThreadView() {
         <h1 className="text-[22px] leading-tight font-semibold">{title}</h1>
       </div>
 
-      {/* The conversation: each message and question in order. */}
+      {/* The conversation: each message and question, newest at the top. */}
       <div className="flex flex-col">
-        {thread.events.map((e, i) => (
+        {newestFirst.map((e, i) => (
           <Message
             key={e.id}
             e={e}
-            isNewest={i === thread.events.length - 1}
+            isNewest={i === 0}
             submitting={answer.isPending && answer.variables?.eventId === e.id}
             error={failed?.id === e.id ? failed.message : null}
             onSubmit={(payload, display) => submit(e.id, payload, display)}

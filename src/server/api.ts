@@ -579,8 +579,10 @@ export async function getPending(env: Env, accountId: string): Promise<Response>
   return json({ ok: true, pending: list })
 }
 
-// All events in one thread, oldest-first, so the thread view renders the
-// conversation with the active question (if any) at the bottom.
+// All events in one thread, oldest-first. The order here is the order they
+// happened in: the thread title is the first event's, `hydrate` and the tests
+// read the array by position, and the client reverses it for painting, so the
+// question waiting on you is at the top where the reader lands.
 export async function getThread(project: string, key: string, env: Env, accountId: string): Promise<Response> {
   const { results } = await env.DB.prepare(
     `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
