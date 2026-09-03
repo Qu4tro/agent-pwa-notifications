@@ -13,6 +13,14 @@ import { InlineError, KindLabel, ProjectDot, Time } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/project/$name/task/$key')({
   ssr: false,
+  // Where the reader came from, when the URL cannot say it. The header's back
+  // control is an "up" link, not a history back, and this thread's parent in
+  // the URL is its project - so a question opened from "Needs you", which is
+  // not in that hierarchy, has to be told. One value, and anything else in the
+  // query string is dropped: it survives a reload and a shared link, and the
+  // label can be right, which `history.back()` could never be.
+  validateSearch: (search: Record<string, unknown>): { from?: 'pending' } =>
+    search.from === 'pending' ? { from: 'pending' } : {},
   loader: ({ context, params }) =>
     context.signedIn
       ? ensure<ThreadData | null>(
@@ -26,6 +34,7 @@ export const Route = createFileRoute('/_app/project/$name/task/$key')({
 
 function ThreadView() {
   const { name, key } = Route.useParams()
+  const { from } = Route.useSearch()
   const project = fromParam(name)
   const { data: thread, isError, isFetched, refetch } = useQuery(threadQuery(project, key))
   const answer = useAnswer(project, key)
@@ -33,8 +42,12 @@ function ThreadView() {
   const [failed, setFailed] = useState<{ id: string; message: string } | null>(null)
 
   useHeaderBack(
-    <BackLink to="/project/$name" params={{ name }} label={projectLabel(project)} />,
-    [name, project],
+    from === 'pending' ? (
+      <BackLink to="/pending" label="Needs you" />
+    ) : (
+      <BackLink to="/project/$name" params={{ name }} label={projectLabel(project)} />
+    ),
+    [name, project, from],
   )
 
   // Ids already sent to /read, so a refresh that overlaps the round trip does

@@ -43,7 +43,12 @@ function PendingPage() {
       ) : (
         <div className="border-t border-edge">
           {data.map((t) => (
-            <PendingLine key={`${t.project}/${t.key}`} t={t} queryKey={queryKeys.pending()} />
+            <PendingLine
+              key={`${t.project}/${t.key}`}
+              t={t}
+              queryKey={queryKeys.pending()}
+              from="pending"
+            />
           ))}
         </div>
       )}

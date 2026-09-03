@@ -45,15 +45,24 @@ export function TaskLine({
   t,
   unread,
   answers,
+  from,
 }: {
   t: TaskSummary
   unread?: boolean
   // What can be done to this thread from the list, if anything.
   answers?: React.ReactNode
+  // Which list this row is in, when the thread's own URL cannot say it. The
+  // thread page reads it to know where its way out goes.
+  from?: 'pending'
 }) {
   return (
     <Row time={<Time at={t.last_activity} />} answers={answers}>
-      <Link to="/project/$name/task/$key" params={taskParams(t)} className={rowLinkClass}>
+      <Link
+        to="/project/$name/task/$key"
+        params={taskParams(t)}
+        search={from ? { from } : {}}
+        className={rowLinkClass}
+      >
         <RowBody
           title={
             <span className="flex items-center gap-1.5">
@@ -85,7 +94,15 @@ export function TaskLine({
 // `queryKey` is the list this row is part of, so the optimistic write lands on
 // the right cache entry: the project's tasks on one page, the pending list on
 // the other.
-export function PendingLine({ t, queryKey }: { t: TaskSummary; queryKey: QueryKey }) {
+export function PendingLine({
+  t,
+  queryKey,
+  from,
+}: {
+  t: TaskSummary
+  queryKey: QueryKey
+  from?: 'pending'
+}) {
   const answer = useAnswerFromList(queryKey)
   const [error, setError] = useState<string | null>(null)
   const options = t.pending_answers ?? []
@@ -97,11 +114,12 @@ export function PendingLine({ t, queryKey }: { t: TaskSummary; queryKey: QueryKe
     answer.mutate({ eventId, answer: value }, { onError: (e) => setError((e as Error).message) })
   }
 
-  if (options.length === 0 || !eventId) return <TaskLine t={t} />
+  if (options.length === 0 || !eventId) return <TaskLine t={t} from={from} />
 
   return (
     <TaskLine
       t={t}
+      from={from}
       answers={
         <>
           {options.map((o) => (
