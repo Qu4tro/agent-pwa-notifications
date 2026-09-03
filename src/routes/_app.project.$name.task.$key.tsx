@@ -6,9 +6,9 @@ import { timeAgo, type ThreadData, type EventItem } from '../lib/api'
 import { BackLink, Container, useHeaderBack } from '../lib/shell'
 import { ensure, threadQuery, useAnswer, useMarkRead } from '../lib/queries'
 import { ThreadSkeleton } from '../lib/skeleton'
-import { BlockRenderer, AnswerForm, Callout } from '../lib/blocks'
+import { BlockRenderer, Callout } from '../lib/blocks'
+import { AnswerArea, LockedNote, shortAnswer, useQuestionContent, prepareAnswer } from '../lib/question'
 import { projectLabel, fromParam, KIND_BORDER, STATE_TEXT } from '../lib/project'
-import { getEncKey, encryptValue, decryptValue } from '../lib/e2e'
 import { InlineError, KindLabel, ProjectDot, Time } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/project/$name/task/$key')({
@@ -240,49 +240,12 @@ function Message({
   // it. After that the state is yours: a tap is remembered until you leave.
   const [open, setOpen] = useState(() => isPending || e.read_at == null || isNewest)
 
-  // Decrypt block content (and any answer) locally when the event is E2E.
-  const [dec, setDec] = useState<{ blocks: unknown[]; answer: unknown } | null>(null)
-  const [locked, setLocked] = useState(false)
-  useEffect(() => {
-    if (!e.enc) {
-      setDec({ blocks: e.blocks as unknown[], answer: q?.answer ?? null })
-      return
-    }
-    const key = getEncKey()
-    if (!key) {
-      setLocked(true)
-      return
-    }
-    ;(async () => {
-      try {
-        const blocks = await decryptValue<unknown[]>(key, e.blocks as string)
-        let answer: unknown = null
-        // A just-submitted answer is still plaintext in the cache; only what
-        // came back from the server is ciphertext.
-        if (q?.answer)
-          answer = typeof q.answer === 'string' ? await decryptValue(key, q.answer) : q.answer
-        setDec({ blocks, answer })
-        setLocked(false)
-      } catch {
-        setLocked(true)
-      }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [e.id, e.enc, typeof e.blocks === 'string' ? e.blocks : '', q?.answer])
+  const { blocks, answer, locked } = useQuestionContent(e)
 
-  // For E2E questions, encrypt the answer before it leaves the device. The
-  // plaintext still goes to the optimistic cache write, so the answered state
-  // renders without a round trip.
   async function handleSubmit(a: Record<string, unknown>) {
-    if (!e.enc) return onSubmit(a, a)
-    const key = getEncKey()
-    if (!key) return
-    const cipher = await encryptValue(key, a)
-    onSubmit({ enc: true, answer: cipher }, a)
+    const prepared = await prepareAnswer(e, a)
+    if (prepared) onSubmit(prepared.payload, prepared.display)
   }
-
-  const blocks = dec?.blocks ?? []
-  const answer = dec?.answer ?? null
 
   // The title, and for a settled question the answer you gave: enough to know
   // whether this one is worth opening.
@@ -302,10 +265,7 @@ function Message({
     return (
       <MessageShell kind={e.kind} at={e.created_at}>
         <Collapsible open={open} onOpenChange={setOpen} summary={head}>
-          <p className="text-[15px] text-muted">
-            Encrypted. Add your key under Encryption in <Link to="/settings">Settings</Link> to
-            read it.
-          </p>
+          <LockedNote />
         </Collapsible>
       </MessageShell>
     )
@@ -319,10 +279,12 @@ function Message({
         {q && (
           <div className="mt-3 border-t border-line pt-3">
             {isPending ? (
-              <>
-                <AnswerForm blocks={blocks} disabled={submitting} onSubmit={handleSubmit} />
-                {error ? <p className="mt-2 text-[15px] text-kind-error">{error}</p> : null}
-              </>
+              <AnswerArea
+                blocks={blocks}
+                disabled={submitting}
+                error={error}
+                onSubmit={handleSubmit}
+              />
             ) : q.status === 'answered' ? (
               <div className="flex flex-col gap-1">
                 {q.picked_up_at ? (
@@ -353,18 +315,4 @@ function Message({
       </Collapsible>
     </MessageShell>
   )
-}
-
-// Short inline form of the answer, for the "You answered" line and the ack's
-// {answer} placeholder, e.g. "Ocean" or "audience: VC, tone: Punchy".
-function shortAnswer(answer: unknown): string {
-  if (answer == null) return ''
-  if (typeof answer !== 'object') return String(answer)
-  const parts: string[] = []
-  for (const v of Object.values(answer)) {
-    if (v && typeof v === 'object')
-      for (const [fk, fv] of Object.entries(v as Record<string, unknown>)) parts.push(`${fk}: ${fv}`)
-    else parts.push(String(v))
-  }
-  return parts.join(', ')
 }

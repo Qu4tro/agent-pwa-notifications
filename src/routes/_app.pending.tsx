@@ -1,11 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { Focus } from 'lucide-react'
 import type { TaskSummary } from '../lib/api'
-import { BackLink, Container, useHeaderBack } from '../lib/shell'
+import { BackLink, Container, useHeaderActions, useHeaderBack } from '../lib/shell'
 import { ensure, pendingQuery, queryKeys } from '../lib/queries'
 import { PendingSkeleton } from '../lib/skeleton'
 import { PendingLine } from '../lib/task-line'
-import { InlineError } from '../lib/ui'
+import { InlineError, iconButtonClass } from '../lib/ui'
 
 // Note 6: one page for everything waiting on the human, whatever project it is
 // in. The header's bell links here and carries the count.
@@ -25,6 +26,14 @@ export const Route = createFileRoute('/_app/pending')({
 function PendingPage() {
   const { data, isError, refetch } = useQuery(pendingQuery())
   useHeaderBack(<BackLink to="/" label="Projects" />, [])
+  // The same queue, one question at a time, for when the list is the part that
+  // is in the way.
+  useHeaderActions(
+    <Link to="/pending/live" title="Live mode" aria-label="Live mode" className={iconButtonClass}>
+      <Focus size={18} />
+    </Link>,
+    [],
+  )
 
   if (!data) {
     if (!isError) return <PendingSkeleton />

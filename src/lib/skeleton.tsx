@@ -124,3 +124,24 @@ export function SettingsSkeleton() {
     </Container>
   )
 }
+
+// The live mode is one card in the middle of the screen, so its placeholder is
+// one card in the middle of the screen.
+export function LiveSkeleton() {
+  return (
+    <main className="safe-bottom mx-auto flex min-h-[calc(100svh-3.25rem)] w-full max-w-[44rem] flex-col justify-center px-4 py-6">
+      <div className="rounded-ui border border-edge bg-surface p-5">
+        <Skeleton width="8rem" height="15px" />
+        <div className="mt-2">
+          <Skeleton width="75%" height="22px" />
+        </div>
+        <div className="mt-4">
+          <Skeleton height="4rem" />
+        </div>
+        <div className="mt-4">
+          <Skeleton width="12rem" height="44px" />
+        </div>
+      </div>
+    </main>
+  )
+}

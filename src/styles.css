@@ -266,4 +266,55 @@
       animation: none;
     }
   }
+
+  /* The live mode: one question at a time, and the two movements that carry
+     it. A card rises in and fades out; --live-rise is how far it travels, and
+     the `translate` property is used rather than `transform` so the distance
+     can be a variable the reduced-motion rule sets to zero.
+
+     The 1600ms the acknowledgement holds and the 300ms breath between two
+     questions are not here, because they are time rather than motion: they
+     stay whatever the reader has asked for. */
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      translate: 0 var(--live-rise, 8px);
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+      translate: 0 0;
+    }
+    to {
+      opacity: 0;
+      translate: 0 calc(-1 * var(--live-rise, 8px));
+    }
+  }
+  .live-in {
+    animation: rise-in 400ms ease-out both;
+  }
+  .live-out {
+    animation: fade-out 300ms ease-in both;
+  }
+  .live-calm {
+    animation: rise-in 600ms ease-out both;
+  }
+  .live-note {
+    animation: rise-in 200ms ease-out both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-in,
+    .live-out,
+    .live-calm,
+    .live-note {
+      --live-rise: 0px;
+      animation-duration: 150ms;
+    }
+  }
 }
