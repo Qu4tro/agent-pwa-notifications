@@ -1,5 +1,13 @@
-import { useState } from 'react'
-import { CircleCheck, CircleX, ExternalLink, Info, TriangleAlert } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import {
+  ChevronDown,
+  ChevronUp,
+  CircleCheck,
+  CircleX,
+  ExternalLink,
+  Info,
+  TriangleAlert,
+} from 'lucide-react'
 import { Button, fieldClass } from './ui'
 
 // -- Minimal, XSS-safe markdown to React -------------------------------------
@@ -125,6 +133,124 @@ export function Callout({ tone = 'info', children }: { tone?: string; children: 
   )
 }
 
+// -- Sortable table ----------------------------------------------------------
+// Sorting a table an agent sent is a reading aid, not an edit: the third tap on
+// a column puts the rows back in the order they arrived, and nothing is
+// remembered once the thread is closed. State is per block, so two tables in
+// one message sort independently.
+
+type Sort = { col: number; dir: 'asc' | 'desc' } | null
+
+// "18ms", "4.2 kB", "92%", "-0.01" and "1,024" all sort as numbers: agents
+// write measurements with their units attached, and a column of them sorted as
+// text puts 100ms before 20ms.
+function leadingNumber(cell: string): number | null {
+  const m = /^[+-]?\d[\d,]*\.?\d*/.exec(cell.trim())
+  if (!m) return null
+  const n = Number(m[0].replace(/,/g, ''))
+  return Number.isFinite(n) ? n : null
+}
+
+// "No value" is not a small value, so these sink to the bottom either way.
+function isBlank(cell: string): boolean {
+  const v = cell.trim().toLowerCase()
+  return v === '' || v === '-' || v === '--' || v === 'n/a'
+}
+
+function compareCells(a: string, b: string): number {
+  const na = leadingNumber(a)
+  const nb = leadingNumber(b)
+  if (na != null && nb != null) return na - nb
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+// Exported for its own test: this is the whole behaviour of note 8, and it is
+// the part with the edge cases - units, blanks, ties.
+//
+// Rows carry their arrival index, so blanks and ties keep the order the agent
+// sent them in and the sort is stable whatever the engine does.
+export function sortTableRows(
+  rows: string[][],
+  sort: Sort,
+): { row: string[]; index: number }[] {
+  const indexed = rows.map((row, index) => ({ row, index }))
+  if (!sort) return indexed
+  const { col, dir } = sort
+  return indexed.sort((x, y) => {
+    const a = String(x.row[col] ?? '')
+    const b = String(y.row[col] ?? '')
+    const blankA = isBlank(a)
+    const blankB = isBlank(b)
+    if (blankA !== blankB) return blankA ? 1 : -1
+    if (blankA) return x.index - y.index
+    return (dir === 'asc' ? 1 : -1) * compareCells(a, b) || x.index - y.index
+  })
+}
+
+function TableBlock({ columns, rows }: { columns: string[]; rows: string[][] }) {
+  const [sort, setSort] = useState<Sort>(null)
+
+  const ordered = useMemo(() => sortTableRows(rows, sort), [rows, sort])
+
+  // Ascending, descending, off.
+  function cycle(col: number) {
+    setSort((s) =>
+      s?.col !== col ? { col, dir: 'asc' } : s.dir === 'asc' ? { col, dir: 'desc' } : null,
+    )
+  }
+
+  return (
+    <div tabIndex={0} className="overflow-x-auto">
+      <table className="w-full border-collapse text-[15px]">
+        <thead>
+          <tr>
+            {columns.map((c, i) => {
+              const on = sort?.col === i
+              return (
+                <th
+                  key={i}
+                  // The one thing a screen reader needs to know about a sortable
+                  // column, and the only place that state is written down.
+                  aria-sort={on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="border-b border-line p-0 text-left font-semibold whitespace-nowrap text-muted"
+                >
+                  <button
+                    type="button"
+                    onClick={() => cycle(i)}
+                    className={`flex w-full items-center gap-1 px-2 py-1.5 text-left hover:text-text ${
+                      on ? 'text-text' : ''
+                    }`}
+                  >
+                    {c}
+                    {on ? (
+                      sort.dir === 'asc' ? (
+                        <ChevronUp size={14} aria-hidden />
+                      ) : (
+                        <ChevronDown size={14} aria-hidden />
+                      )
+                    ) : null}
+                  </button>
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {ordered.map(({ row, index }) => (
+            <tr key={index}>
+              {row.map((cell, ci) => (
+                <td key={ci} className="border-b border-line px-2 py-1.5 last:border-b-0">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function BlockRenderer({ blocks }: { blocks: unknown[] }) {
   return (
     <div className="flex flex-col gap-3">
@@ -172,39 +298,10 @@ function One({ b }: { b: AnyBlock }) {
         </div>
       )
     }
-    case 'table': {
-      const columns = (b.columns as string[]) ?? []
-      const rows = (b.rows as string[][]) ?? []
+    case 'table':
       return (
-        <div tabIndex={0} className="overflow-x-auto">
-          <table className="w-full border-collapse text-[15px]">
-            <thead>
-              <tr>
-                {columns.map((c, i) => (
-                  <th
-                    key={i}
-                    className="border-b border-line px-2 py-1 text-left font-semibold whitespace-nowrap text-muted"
-                  >
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, ri) => (
-                <tr key={ri}>
-                  {r.map((cell, ci) => (
-                    <td key={ci} className="border-b border-line px-2 py-1 last:border-b-0">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <TableBlock columns={(b.columns as string[]) ?? []} rows={(b.rows as string[][]) ?? []} />
       )
-    }
     case 'link':
       return (
         <a
