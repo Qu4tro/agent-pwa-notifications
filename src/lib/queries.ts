@@ -10,6 +10,7 @@ export const queryKeys = {
   config: () => ['config'] as const,
   account: () => ['account'] as const,
   projects: () => ['projects'] as const,
+  pending: () => ['pending'] as const,
   tasks: (project: string) => ['tasks', project] as const,
   thread: (project: string, key: string) => ['thread', project, key] as const,
   settings: () => ['settings'] as const,
@@ -19,7 +20,12 @@ export const queryKeys = {
 // The queries that follow the agents: they poll while the tab is visible and
 // they are what a mutation or a live message invalidates. Prefixes, so
 // ['tasks'] covers every project.
-export const LIVE_KEYS: ReadonlyArray<readonly string[]> = [['projects'], ['tasks'], ['thread']]
+export const LIVE_KEYS: ReadonlyArray<readonly string[]> = [
+  ['projects'],
+  ['tasks'],
+  ['thread'],
+  ['pending'],
+]
 
 // Never changes for the life of a deploy, so it is fetched once and kept.
 export const configQuery = () =>
@@ -46,6 +52,15 @@ export const tasksQuery = (project: string) =>
   queryOptions({
     queryKey: queryKeys.tasks(project),
     queryFn: async (): Promise<TaskSummary[]> => (await api.tasks(project)).tasks,
+  })
+
+// Everything waiting on the human, across every project. The header reads it
+// for the badge and the pending page reads it for the rows, so it is fetched
+// once and shared - not once per consumer.
+export const pendingQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.pending(),
+    queryFn: async (): Promise<TaskSummary[]> => (await api.pending()).pending,
   })
 
 export const threadQuery = (project: string, key: string) =>
@@ -136,10 +151,14 @@ export function useAnswer(project: string, key: string) {
   })
 }
 
-// Answering a micro-question straight from the project list. Same endpoint as
-// the thread form; the optimistic write drops the row out of "Needs you" the
-// moment a button is tapped.
-export function useAnswerFromList(project: string) {
+// Answering a micro-question straight from a list. Same endpoint as the thread
+// form; the optimistic write drops the row out of "Needs you" the moment a
+// button is tapped.
+//
+// The key says which list, because there are two now: a project's tasks, and
+// the pending page. Both hold TaskSummary rows, so the write is the same
+// either way.
+export function useAnswerFromList(queryKey: QueryKey) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async ({
@@ -154,7 +173,6 @@ export function useAnswerFromList(project: string) {
       return res
     },
     onMutate: async ({ eventId }) => {
-      const queryKey = queryKeys.tasks(project)
       await client.cancelQueries({ queryKey })
       const previous = client.getQueryData<TaskSummary[]>(queryKey)
       client.setQueryData<TaskSummary[]>(queryKey, (tasks) =>

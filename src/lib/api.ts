@@ -55,6 +55,9 @@ export interface TaskSummary {
   // Non-empty only for a micro-question: the 2 or 3 options that can be
   // answered straight from the project list.
   pending_answers: { label: string; answer: Record<string, string> }[]
+  // When the question was asked. Null unless `pending`; the pending page
+  // orders on it, so the longest wait is at the top.
+  pending_since: number | null
   latest_title: string
   latest_kind: 'update' | 'question' | 'done' | 'error'
   last_activity: number
@@ -109,6 +112,8 @@ export const api = {
     req<{ ok: boolean; thread: ThreadData }>(
       `/api/v1/thread?project=${encodeURIComponent(project)}&key=${encodeURIComponent(key)}`,
     ),
+  // Every question waiting on you, across every project, oldest first.
+  pending: () => req<{ ok: boolean; pending: TaskSummary[] }>('/api/v1/pending'),
   stats: () => req<{ ok: boolean; unread: number; pending_questions: number }>('/api/v1/stats'),
   markRead: (id: string) => req(`/api/v1/event/${id}/read`, { method: 'POST' }),
   markUnread: (id: string) => req(`/api/v1/event/${id}/unread`, { method: 'POST' }),

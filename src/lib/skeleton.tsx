@@ -65,6 +65,19 @@ export function TasksSkeleton() {
 // A thread arrives as a list of message summaries, most of them shut, so the
 // placeholder is a list of rows - not the two tall blocks that stood in for
 // messages back when every one of them was open.
+// The pending page is a single list of question rows, each with its answer
+// buttons hanging under it.
+export function PendingSkeleton() {
+  return (
+    <Container>
+      <div className="mb-4 px-4">
+        <Skeleton width="8rem" height="22px" />
+      </div>
+      <Group rows={3} detail={1} />
+    </Container>
+  )
+}
+
 export function ThreadSkeleton() {
   return (
     <Container>

@@ -436,23 +436,21 @@ export type ThreadState = 'pending' | 'active' | 'done'
 // was note 3: the row said "3" where it could have said what the three were.
 const RECENT_ON_A_ROW = 3
 
-// Task threads within a project. Groups events by thread key in JS (small,
-// single-user data), summarizing each thread for the project view.
-export async function getTasks(project: string, env: Env, accountId: string): Promise<Response> {
-  const { results } = await env.DB.prepare(
-    `SELECT e.*, ${THREAD_KEY_SQL} AS thread_key,
+// Group rows into one summary per thread. The rows must arrive oldest first
+// and may span projects: two projects are allowed to use the same task_id, so
+// the map is keyed by both. Shared by the project list and the pending page,
+// which is why it is a function and not a loop inside getTasks.
+const SELECT_THREAD_ROWS = `SELECT e.*, ${THREAD_KEY_SQL} AS thread_key,
        q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
-     FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
-     ORDER BY e.created_at ASC`,
-  )
-    .bind(accountId, project)
-    .all<Record<string, unknown>>()
+     FROM events e LEFT JOIN questions q ON q.event_id = e.id`
 
+function summarizeThreads(rows: Record<string, unknown>[]): any[] {
   const threads = new Map<string, any>()
-  for (const row of results ?? []) {
+  for (const row of rows) {
     const key = String(row.thread_key)
-    let t = threads.get(key)
+    const project = String(row.project ?? '')
+    const id = `${project}\u0000${key}`
+    let t = threads.get(id)
     if (!t) {
       t = {
         key,
@@ -465,6 +463,7 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
         pending: false,
         pending_event_id: null,
         pending_question: null,
+        pending_since: null,
         pending_answers: [],
         latest_title: '',
         latest_kind: 'update',
@@ -480,7 +479,7 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
           read_at: unknown
         }[],
       }
-      threads.set(key, t)
+      threads.set(id, t)
     }
     t.count++
     if (row.task) t.task = row.task
@@ -508,6 +507,7 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
       t.pending = true
       t.pending_event_id = row.id
       t.pending_question = row.title // what is being asked, shown on the row
+      t.pending_since = Number(row.created_at) // how the queue is ordered
       // A micro-question (one buttons block, 2 or 3 short options, not
       // encrypted) can be answered from the list without opening the thread.
       // Same rule, and the same helper, as the notification quick answers.
@@ -528,12 +528,55 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
     // the human has not seen how it ended yet.
     t.state = t.pending ? 'pending' : !finished || t.unread > 0 ? 'active' : 'done'
   }
+  return [...threads.values()]
+}
 
-  const list = [...threads.values()].sort((a, b) => {
+// Task threads within a project, summarized for the project view.
+export async function getTasks(project: string, env: Env, accountId: string): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    `${SELECT_THREAD_ROWS}
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
+     ORDER BY e.created_at ASC`,
+  )
+    .bind(accountId, project)
+    .all<Record<string, unknown>>()
+
+  const list = summarizeThreads(results ?? []).sort((a, b) => {
     if (a.pending !== b.pending) return a.pending ? -1 : 1
     return b.last_activity - a.last_activity
   })
   return json({ ok: true, tasks: list })
+}
+
+// Note 6: everything waiting on the human, across every project, in one list.
+// getStats has the count and getProjects has it per project, but neither can
+// say what is being asked; getFeed stops at the 100 most recent events, so a
+// question older than that would simply not be there.
+//
+// Same shape as getTasks, so the pending page renders the same rows as the
+// project page. Oldest question first: the one that has been waiting longest
+// is the one to answer.
+export async function getPending(env: Env, accountId: string): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    `${SELECT_THREAD_ROWS}
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL
+       AND ${THREAD_KEY_SQL} IN (
+         SELECT COALESCE(NULLIF(p.task_id, ''), p.id) FROM events p
+         JOIN questions pq ON pq.event_id = p.id
+         WHERE p.account_id = ?1 AND p.archived_at IS NULL AND pq.status = 'pending'
+       )
+     ORDER BY e.created_at ASC`,
+  )
+    .bind(accountId)
+    .all<Record<string, unknown>>()
+
+  // The subquery matches on the thread key alone, so a thread in another
+  // project that happens to share a task_id comes back too. The filter drops
+  // it: only a thread with a question of its own belongs here.
+  const list = summarizeThreads(results ?? [])
+    .filter((t) => t.pending)
+    .sort((a, b) => a.pending_since - b.pending_since)
+  return json({ ok: true, pending: list })
 }
 
 // All events in one thread, oldest-first, so the thread view renders the

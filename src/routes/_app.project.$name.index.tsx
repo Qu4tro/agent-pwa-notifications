@@ -1,25 +1,14 @@
 import { useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
-import { timeAgo, type TaskSummary } from '../lib/api'
+import type { TaskSummary } from '../lib/api'
 import { BackLink, Container, useHeaderActions, useHeaderBack } from '../lib/shell'
-import { ensure, tasksQuery, useAnswerFromList, useArchive, useClear } from '../lib/queries'
+import { ensure, queryKeys, tasksQuery, useArchive, useClear } from '../lib/queries'
 import { TasksSkeleton } from '../lib/skeleton'
-import { projectLabel, fromParam, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../lib/project'
-import {
-  Button,
-  ConfirmPanel,
-  InlineError,
-  KindLabel,
-  ProjectDot,
-  Row,
-  RowBody,
-  RowMeta,
-  Section,
-  UnreadDot,
-  iconButtonClass,
-} from '../lib/ui'
+import { PendingLine, TaskLine } from '../lib/task-line'
+import { projectLabel, fromParam } from '../lib/project'
+import { Button, ConfirmPanel, InlineError, ProjectDot, Section, iconButtonClass } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/project/$name/')({
   ssr: false,
@@ -95,7 +84,7 @@ function ProjectView() {
           {waiting.length > 0 && (
             <Section title="Needs you" count={waiting.length}>
               {waiting.map((t) => (
-                <PendingLine key={t.key} t={t} project={project} />
+                <PendingLine key={t.key} t={t} queryKey={queryKeys.tasks(project)} />
               ))}
             </Section>
           )}
@@ -132,108 +121,6 @@ function ProjectView() {
         </>
       )}
     </Container>
-  )
-}
-
-function taskParams(t: TaskSummary) {
-  return { name: t.project === '' ? '__none__' : t.project, key: t.key }
-}
-
-// What goes under the title of a task row. A pending question asks itself; any
-// other thread lists what actually happened on it, one line per event, newest
-// last - the count on the right used to be the only trace of the other two.
-//
-// The title of the row is the task label when the agent set one, and the
-// newest event's own title when it did not, so in that second case the newest
-// line is already the title and is left off rather than said twice.
-function detailLines(t: TaskSummary): React.ReactNode[] {
-  if (t.pending) return t.pending_question ? [t.pending_question] : []
-
-  const shown = t.task ? t.recent : t.recent.slice(0, -1)
-  const earlier = t.count - t.recent.length
-  const lines: React.ReactNode[] = []
-  if (earlier > 0 && shown.length > 0) lines.push(<span className="text-faint">+{earlier} earlier</span>)
-  for (const r of shown) {
-    lines.push(
-      // Unread keeps full-weight text, the same signal the row itself uses.
-      <span className={r.read_at == null ? 'text-text' : undefined}>
-        <span className={KIND_TEXT[r.kind] ?? 'text-muted'}>{KIND_LABEL[r.kind] ?? 'Event'}</span>{' '}
-        {r.title}
-      </span>,
-    )
-  }
-  return lines
-}
-
-function TaskLine({ t, unread, divider = true }: { t: TaskSummary; unread?: boolean; divider?: boolean }) {
-  return (
-    <Link
-      to="/project/$name/task/$key"
-      params={taskParams(t)}
-      className="block text-text no-underline hover:bg-surface"
-    >
-      <Row divider={divider}>
-        <KindLabel kind={t.pending ? 'question' : t.latest_kind} className="w-[5rem]" />
-        <RowBody
-          title={
-            <span className="flex items-center gap-1.5">
-              {unread ? <UnreadDot kind={t.latest_kind} /> : null}
-              <span className="truncate">{t.task || t.latest_title}</span>
-            </span>
-          }
-          detail={detailLines(t)}
-          bold={unread || t.pending}
-        />
-        <RowMeta>
-          {t.count > 1 ? <span>{t.count}</span> : null}
-          <span>{timeAgo(t.last_activity)}</span>
-        </RowMeta>
-      </Row>
-    </Link>
-  )
-}
-
-// A pending question keeps the same row, and hangs its answer under it. Two or
-// three short options are answered here; anything larger is opened.
-function PendingLine({ t, project }: { t: TaskSummary; project: string }) {
-  const answer = useAnswerFromList(project)
-  const [error, setError] = useState<string | null>(null)
-  const options = t.pending_answers ?? []
-  const eventId = t.pending_event_id
-
-  function submit(value: Record<string, string>) {
-    if (!eventId) return
-    setError(null)
-    answer.mutate({ eventId, answer: value }, { onError: (e) => setError((e as Error).message) })
-  }
-
-  return (
-    <div className="border-b border-b-line">
-      <TaskLine t={t} divider={false} />
-      <div className="flex flex-wrap items-center gap-2 pr-4 pb-3 pl-[19px]">
-        {options.length > 0 && eventId ? (
-          options.map((o) => (
-            <Button
-              key={o.label}
-              variant="primary"
-              disabled={answer.isPending}
-              onClick={() => submit(o.answer)}
-            >
-              {o.label}
-            </Button>
-          ))
-        ) : (
-          <Link
-            to="/project/$name/task/$key"
-            params={taskParams(t)}
-            className={`text-[15px] no-underline hover:underline ${STATE_TEXT.pending}`}
-          >
-            Open to answer
-          </Link>
-        )}
-        {error ? <span className="text-[15px] text-kind-error">{error}</span> : null}
-      </div>
-    </div>
   )
 }
 

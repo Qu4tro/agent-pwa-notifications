@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { onlineManager, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { onlineManager, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Bell } from 'lucide-react'
 import { APP_NAME } from './brand'
+import { pendingQuery } from './queries'
+import { iconButtonClass } from './ui'
 
 // Mounted once by the app layout, so it never unmounts between pages. Pages
 // contribute their own slots through `useHeaderBack` and `useHeaderActions`.
@@ -23,9 +25,40 @@ export function Header({ left, right }: { left?: React.ReactNode; right?: React.
           )}
           <ConnectionDot />
         </div>
-        <div className="flex items-center gap-1">{right}</div>
+        <div className="flex items-center gap-1">
+          <PendingButton />
+          {right}
+        </div>
       </div>
     </header>
+  )
+}
+
+// Everything waiting on you, from wherever you are. The count is the one thing
+// worth carrying on every page, and the app already knows it: the pending query
+// polls with the lists, so the badge is as live as the rows behind it.
+//
+// Nothing at all when nothing is waiting. A bell that is always there, always
+// at zero, is a bell nobody looks at.
+function PendingButton() {
+  const { data } = useQuery(pendingQuery())
+  const waiting = data?.length ?? 0
+  if (waiting === 0) return null
+  return (
+    <Link
+      to="/pending"
+      title="Needs you"
+      aria-label={`Needs you: ${waiting} question${waiting === 1 ? '' : 's'}`}
+      className={`${iconButtonClass} relative text-kind-question hover:text-kind-question`}
+    >
+      <Bell size={18} aria-hidden />
+      <span
+        aria-hidden
+        className="absolute top-1 right-0.5 min-w-[1.1rem] rounded-full bg-kind-question px-1 text-center text-[12px] leading-[1.1rem] font-semibold text-bg"
+      >
+        {waiting}
+      </span>
+    </Link>
   )
 }
 

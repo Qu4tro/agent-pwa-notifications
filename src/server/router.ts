@@ -49,6 +49,7 @@ import {
   getProjects,
   getTasks,
   getThread,
+  getPending,
 } from './api'
 import { EmailCapError } from './email'
 import { handleMcp } from './mcp'
@@ -249,6 +250,7 @@ export async function handleApi(
       return getTasks(url.searchParams.get('project') ?? '', env, acct)
     if (path === '/api/v1/thread' && method === 'GET')
       return getThread(url.searchParams.get('project') ?? '', url.searchParams.get('key') ?? '', env, acct)
+    if (path === '/api/v1/pending' && method === 'GET') return getPending(env, acct)
     if (path === '/api/v1/stats' && method === 'GET') return getStats(env, acct)
     if (path === '/api/v1/settings' && method === 'GET') return getSettings(env, acct)
     if (path === '/api/v1/settings' && method === 'POST') return putSettings(request, env, acct)
