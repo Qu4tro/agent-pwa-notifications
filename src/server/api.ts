@@ -430,6 +430,7 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
         pending: false,
         pending_event_id: null,
         pending_question: null,
+        pending_answers: [],
         latest_title: '',
         latest_kind: 'update',
         last_activity: 0,
@@ -448,7 +449,16 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
     if (row.q_status === 'pending') {
       t.pending = true
       t.pending_event_id = row.id
-      t.pending_question = row.title // what is being asked, shown on the card
+      t.pending_question = row.title // what is being asked, shown on the row
+      // A micro-question (one buttons block, 2 or 3 short options, not
+      // encrypted) can be answered from the list without opening the thread.
+      // Same rule, and the same helper, as the notification quick answers.
+      t.pending_answers = quickAnswerActions({
+        kind: String(row.kind),
+        enc: Number(row.enc ?? 0),
+        title: String(row.title ?? ''),
+        blocks: String(row.blocks ?? '[]'),
+      }).map((a) => ({ label: a.title, answer: a.answer }))
     }
   }
 

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Bell, BellOff } from 'lucide-react'
+import { Bell, BellOff } from 'lucide-react'
 import { api } from '../lib/api'
-import { Container, InlineError, useHeaderActions } from '../lib/shell'
+import { APP_NAME, REPO_URL, UPSTREAM_URL } from '../lib/brand'
+import { BackLink, Container } from '../lib/shell'
+import { useHeaderActions } from '../lib/shell'
 import { SettingsSkeleton } from '../lib/skeleton'
 import {
   accountQuery,
@@ -17,6 +19,7 @@ import {
 } from '../lib/queries'
 import { clearPersistedCache } from '../lib/query'
 import { getEncKey, setEncKey, clearEncKey, generateEncKey } from '../lib/e2e'
+import { Button, InlineError, Snippet, fieldClass } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/settings')({
   ssr: false,
@@ -37,6 +40,24 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   return out
 }
 
+// One column, one heading per topic, no cards. The order is the order a new
+// hub is set up in: turn on notifications, quieten them, get the key, connect
+// an agent, then the housekeeping.
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-6 px-3">
+      <h2 className="mb-2 border-b border-line pb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">
+        {title}
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+function Note({ children }: { children: React.ReactNode }) {
+  return <p className="mb-2 text-[13px] text-muted">{children}</p>
+}
+
 function SettingsPage() {
   const { data: quiet, isError, isFetched, refetch } = useQuery(settingsQuery())
   const putSettings = usePutSettings()
@@ -46,12 +67,7 @@ function SettingsPage() {
   const [pushBusy, setPushBusy] = useState(false)
   const [pushMsg, setPushMsg] = useState<string | null>(null)
 
-  useHeaderActions(
-    <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--muted)', textDecoration: 'none', fontSize: '0.9rem' }}>
-      <ArrowLeft size={16} /> Inbox
-    </Link>,
-    [],
-  )
+  useHeaderActions(<BackLink to="/" label="Projects" />, [])
 
   // Whether this device has a push subscription is a browser fact, not a
   // server one, so it stays out of the query cache.
@@ -69,7 +85,9 @@ function SettingsPage() {
     setPushMsg(null)
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        setPushMsg('This browser does not support push. On iOS, add this app to your Home Screen first.')
+        setPushMsg(
+          'This browser does not support push. On iOS, add this app to your Home Screen first.',
+        )
         setPushBusy(false)
         return
       }
@@ -122,61 +140,69 @@ function SettingsPage() {
 
   return (
     <Container>
-      <h1 style={{ fontSize: '1.4rem', margin: '0 0 1.5rem' }}>Settings</h1>
+      <h1 className="mb-4 px-3 text-[17px] font-semibold">Settings</h1>
 
       {isError && quiet === undefined ? (
-        <div style={{ marginBottom: '1rem' }}>
+        <div className="mb-4">
           <InlineError message="Could not load your settings." onRetry={() => refetch()} />
         </div>
       ) : null}
 
-      <Card title="Notifications">
-        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
+      <Group title="Notifications">
+        <Note>
           Get a push on this device when an agent needs you or flags something important.
-        </p>
+        </Note>
         {pushOn ? (
-          <button onClick={disablePush} disabled={pushBusy} style={btn(false)}>
-            <BellOff size={16} /> Disable on this device
-          </button>
+          <Button onClick={disablePush} disabled={pushBusy}>
+            <BellOff size={16} aria-hidden /> Disable on this device
+          </Button>
         ) : (
-          <button onClick={enablePush} disabled={pushBusy} style={btn(true)}>
-            <Bell size={16} /> Enable notifications
-          </button>
+          <Button variant="primary" onClick={enablePush} disabled={pushBusy}>
+            <Bell size={16} aria-hidden /> Enable notifications
+          </Button>
         )}
-        {pushMsg ? <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.8rem' }}>{pushMsg}</p> : null}
-      </Card>
+        {pushMsg ? <p className="mt-2 text-[13px] text-muted">{pushMsg}</p> : null}
+      </Group>
 
-      <Card title="Quiet hours">
-        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
+      <Group title="Quiet hours">
+        <Note>
           Silence non-urgent pings during these hours. Urgent (priority 2) always rings through.
-        </p>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.9rem' }}>
+        </Note>
+        <label className="mb-2 flex min-h-9 items-center gap-2 text-[14px]">
           <input
             type="checkbox"
             checked={!!quiet}
-            onChange={(e) => putSettings.mutate(e.target.checked ? { start: 22 * 60, end: 7 * 60 } : null)}
+            onChange={(e) =>
+              putSettings.mutate(e.target.checked ? { start: 22 * 60, end: 7 * 60 } : null)
+            }
           />
-          <span style={{ fontSize: '0.9rem' }}>Enable quiet hours</span>
+          <span>Enable quiet hours</span>
         </label>
         {quiet && (
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <TimeField label="From" minutes={quiet.start} onChange={(m) => putSettings.mutate({ ...quiet, start: m })} />
-            <TimeField label="To" minutes={quiet.end} onChange={(m) => putSettings.mutate({ ...quiet, end: m })} />
+          <div className="flex items-center gap-4">
+            <TimeField
+              label="From"
+              minutes={quiet.start}
+              onChange={(m) => putSettings.mutate({ ...quiet, start: m })}
+            />
+            <TimeField
+              label="To"
+              minutes={quiet.end}
+              onChange={(m) => putSettings.mutate({ ...quiet, end: m })}
+            />
           </div>
         )}
-      </Card>
+      </Group>
 
-      <Card title="Your agent key">
-        <AgentKeyCard />
-      </Card>
+      <Group title="Agent key">
+        <AgentKeySection />
+      </Group>
 
-      <Card title="Connect an agent">
-        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 0.5rem' }}>
-          Add the skill to your agent, then paste your key when it asks:
-        </p>
-        <Snippet text={`npx skills add Qu4tro/agent-pwa-notifications`} />
-        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '1rem 0 0.5rem' }}>
-          Prefer raw HTTP? Any agent can push an update with one curl:
+      <Group title="Connect an agent">
+        <Note>Install the skill, then paste your key when the agent asks for it:</Note>
+        <Snippet text="npx skills add Qu4tro/agent-pwa-notifications" />
+        <p className="mt-3 mb-2 text-[13px] text-muted">
+          Any agent can also push an update with one curl:
         </p>
         <Snippet
           text={`curl -X POST ${origin}/api/v1/events \\
@@ -184,39 +210,64 @@ function SettingsPage() {
   -H "Content-Type: application/json" \\
   -d '{"agent":"claude","title":"Build finished","priority":1}'`}
         />
-        <p style={{ fontSize: '0.85rem', marginTop: '0.8rem' }}>
-          Full contract: <a href="/api/v1/schema.json" target="_blank" rel="noreferrer">block schema</a> ·{' '}
-          <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">OpenAPI</a>
+        <p className="mt-2 text-[13px]">
+          <a href="/api/v1/schema.json" target="_blank" rel="noreferrer">
+            Block schema
+          </a>
+          {' | '}
+          <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">
+            OpenAPI
+          </a>
         </p>
-      </Card>
+      </Group>
 
-      <Card title="Encryption (E2E)">
-        <EncryptionCard />
-      </Card>
+      <Group title="Encryption">
+        <EncryptionSection />
+      </Group>
 
-      <Card title="Clear inbox">
-        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
+      <Group title="Clear inbox">
+        <Note>
           Tidy up or start fresh. Agents can also clear things themselves when it gets cluttered.
-        </p>
+        </Note>
         <ClearButtons />
-      </Card>
+      </Group>
 
-      <Card title="Session">
+      <Group title="Session">
         <SessionButtons />
-      </Card>
+      </Group>
 
-      <p style={{ color: 'var(--muted)', fontSize: '0.8rem', textAlign: 'center', margin: '1.5rem 0 0' }}>
-        Version {__APP_VERSION__}
-      </p>
+      <Group title="About">
+        <p className="text-[13px] text-muted">
+          {APP_NAME} {__APP_VERSION__}
+        </p>
+        <p className="mt-1 text-[13px] text-muted">
+          <a href={REPO_URL} target="_blank" rel="noreferrer">
+            Source
+          </a>
+          . A fork of{' '}
+          <a href={UPSTREAM_URL} target="_blank" rel="noreferrer">
+            Prajeevan/agent-dash
+          </a>
+          , MIT licensed.
+        </p>
+      </Group>
     </Container>
   )
 }
 
-function TimeField({ label, minutes, onChange }: { label: string; minutes: number; onChange: (m: number) => void }) {
+function TimeField({
+  label,
+  minutes,
+  onChange,
+}: {
+  label: string
+  minutes: number
+  onChange: (m: number) => void
+}) {
   const hh = String(Math.floor(minutes / 60)).padStart(2, '0')
   const mm = String(minutes % 60).padStart(2, '0')
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--muted)' }}>
+    <label className="flex flex-col gap-1 text-[13px] text-muted">
       {label}
       <input
         type="time"
@@ -225,7 +276,7 @@ function TimeField({ label, minutes, onChange }: { label: string; minutes: numbe
           const [h, m] = e.target.value.split(':').map(Number)
           onChange(h * 60 + m)
         }}
-        style={{ background: 'var(--bg-elev2)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.5rem', color: 'var(--text)' }}
+        className={`${fieldClass} min-h-9 w-auto`}
       />
     </label>
   )
@@ -244,18 +295,16 @@ function SessionButtons() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-      <button onClick={() => end(false)} style={btn(false)}>
-        Log out (this device)
-      </button>
-      <button onClick={() => end(true)} style={{ ...btn(false), color: 'var(--error)', borderColor: 'var(--error)' }}>
+    <div className="flex flex-wrap gap-2">
+      <Button onClick={() => end(false)}>Log out (this device)</Button>
+      <Button variant="danger" onClick={() => end(true)}>
         Log out everywhere
-      </button>
+      </Button>
     </div>
   )
 }
 
-function EncryptionCard() {
+function EncryptionSection() {
   const [key, setKey] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -275,38 +324,47 @@ function EncryptionCard() {
 
   return (
     <div>
-      <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
-        With a key set, message content is decrypted here on your device — the server only ever
-        stores ciphertext it can’t read. The key never leaves this device. Give the same key to
-        your agent so it can encrypt.
-      </p>
+      <Note>
+        With a key set, message content is decrypted on this device and the server only ever
+        stores ciphertext it cannot read. The key never leaves this device. Give the same key to
+        your agent so it can encrypt. Quick answers from a notification are skipped for encrypted
+        questions by design.
+      </Note>
       {saved ? (
-        <div style={{ marginBottom: '0.9rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--success)', fontWeight: 600, fontSize: '0.9rem' }}>
-            🔒 Encryption on
-          </div>
-          <pre style={{ margin: '0.5rem 0 0', background: 'var(--bg-elev2)', padding: '0.6rem', borderRadius: '0.5rem', fontSize: '0.72rem', overflowX: 'auto', color: 'var(--muted)' }}>
+        <div>
+          <p className="mb-1 text-[13px] text-kind-done">Encryption is on for this device.</p>
+          <pre className="overflow-x-auto rounded-ui bg-surface p-2 text-[12px] text-muted">
             <code>{saved}</code>
           </pre>
-          <button onClick={() => { clearEncKey(); setSaved(null); setMsg('Encryption turned off on this device.') }} style={{ ...btn(false), marginTop: '0.7rem', color: 'var(--error)', borderColor: 'var(--error)' }}>
+          <Button
+            variant="danger"
+            className="mt-2"
+            onClick={() => {
+              clearEncKey()
+              setSaved(null)
+              setMsg('Encryption turned off on this device.')
+            }}
+          >
             Turn off
-          </button>
+          </Button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div className="flex flex-col gap-2">
           <input
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="Paste your encryption key"
-            style={{ background: 'var(--bg-elev2)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.6rem 0.7rem', color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace' }}
+            className={`${fieldClass} min-h-9 font-mono`}
           />
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <button onClick={() => save(key)} style={btn(true)}>Save key</button>
-            <button onClick={() => save(generateEncKey())} style={btn(false)}>Generate a new key</button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" onClick={() => save(key)}>
+              Save key
+            </Button>
+            <Button onClick={() => save(generateEncKey())}>Generate a new key</Button>
           </div>
         </div>
       )}
-      {msg ? <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.8rem' }}>{msg}</p> : null}
+      {msg ? <p className="mt-2 text-[13px] text-muted">{msg}</p> : null}
     </div>
   )
 }
@@ -324,39 +382,35 @@ function ClearButtons() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-        <button onClick={() => setConfirming('read')} style={btn(false)}>
-          Clear read &amp; answered
-        </button>
-        <button onClick={() => setConfirming('all')} style={{ ...btn(false), color: 'var(--error)', borderColor: 'var(--error)' }}>
-          Restart — clear everything
-        </button>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => setConfirming('read')}>Clear read and answered</Button>
+        <Button variant="danger" onClick={() => setConfirming('all')}>
+          Clear everything
+        </Button>
       </div>
       {confirming ? (
-        <div style={{ marginTop: '0.9rem', padding: '0.8rem', border: '1px solid var(--error)', borderRadius: '0.6rem', background: 'color-mix(in srgb, var(--error) 8%, transparent)' }}>
-          <p style={{ margin: '0 0 0.7rem', fontSize: '0.9rem' }}>
+        <div className="mt-2 border-l-[3px] border-l-kind-error pl-2">
+          <p className="mb-2 text-[13px]">
             {confirming === 'all'
-              ? 'Delete ALL messages, including unanswered questions? This cannot be undone.'
+              ? 'Delete every message, including unanswered questions? This cannot be undone.'
               : 'Delete everything you have already read or answered?'}
           </p>
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
-            <button onClick={() => run(confirming)} style={{ ...btn(true), background: 'var(--error)' }}>
+          <div className="flex gap-2">
+            <Button variant="danger" onClick={() => run(confirming)}>
               Yes, clear
-            </button>
-            <button onClick={() => setConfirming(null)} style={btn(false)}>
-              Cancel
-            </button>
+            </Button>
+            <Button onClick={() => setConfirming(null)}>Cancel</Button>
           </div>
         </div>
       ) : null}
-      {msg ? <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.8rem' }}>{msg}</p> : null}
+      {msg ? <p className="mt-2 text-[13px] text-muted">{msg}</p> : null}
     </div>
   )
 }
 
-// Shows the account's key prefix (the raw key is never stored, so it can't be
-// re-shown) and lets the user rotate to a fresh key — revealed once.
-function AgentKeyCard() {
+// Shows the account's key prefix (the raw key is never stored, so it cannot be
+// re-shown) and lets the user rotate to a fresh key, revealed once.
+function AgentKeySection() {
   const client = useQueryClient()
   const { data: account } = useQuery(accountQuery())
   const [rotated, setRotated] = useState<string | null>(null)
@@ -380,87 +434,45 @@ function AgentKeyCard() {
 
   return (
     <div>
-      <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 0.8rem' }}>
-        {account?.email ? <>Signed in as <strong style={{ color: 'var(--text)' }}>{account.email}</strong>. </> : null}
-        Agents authenticate with this key. It's stored only as a hash — we can't show it again, so
-        rotate if you lose it.
-      </p>
+      <Note>
+        {account?.email ? (
+          <>
+            Signed in as <span className="text-text">{account.email}</span>.{' '}
+          </>
+        ) : null}
+        Agents authenticate with this key. It is stored only as a hash, so it cannot be shown
+        again. Rotate it if you lose it.
+      </Note>
 
       {rotated ? (
-        <div style={{ marginBottom: '0.9rem' }}>
-          <p style={{ fontSize: '0.85rem', color: 'var(--success)', margin: '0 0 0.4rem', fontWeight: 600 }}>
-            New key — copy it now, it won't be shown again:
+        <div className="mb-2">
+          <p className="mb-1 text-[13px] text-kind-done">
+            New key. Copy it now, it will not be shown again:
           </p>
           <Snippet text={rotated} />
         </div>
       ) : (
-        <p style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--muted)', margin: '0 0 0.9rem' }}>
-          {prefix ? `${prefix}…` : 'Loading…'}
+        <p className="mb-2 font-mono text-[13px] text-muted">
+          {prefix ? `${prefix}...` : 'Loading'}
         </p>
       )}
 
       {confirming ? (
-        <div style={{ padding: '0.8rem', border: '1px solid var(--error)', borderRadius: '0.6rem', background: 'color-mix(in srgb, var(--error) 8%, transparent)' }}>
-          <p style={{ margin: '0 0 0.7rem', fontSize: '0.9rem' }}>
-            Rotate the key? The current key stops working immediately — every connected agent must be
-            updated with the new one.
+        <div className="border-l-[3px] border-l-kind-error pl-2">
+          <p className="mb-2 text-[13px]">
+            Rotate the key? The current key stops working at once, and every connected agent has
+            to be updated with the new one.
           </p>
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
-            <button onClick={rotate} disabled={busy} style={{ ...btn(true), background: 'var(--error)' }}>
+          <div className="flex gap-2">
+            <Button variant="danger" onClick={rotate} disabled={busy}>
               Yes, rotate
-            </button>
-            <button onClick={() => setConfirming(false)} style={btn(false)}>Cancel</button>
+            </Button>
+            <Button onClick={() => setConfirming(false)}>Cancel</Button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setConfirming(true)} style={btn(false)}>Rotate key</button>
+        <Button onClick={() => setConfirming(true)}>Rotate key</Button>
       )}
     </div>
   )
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: '0.9rem', padding: '1.1rem', marginBottom: '1rem' }}>
-      <h2 style={{ fontSize: '1rem', margin: '0 0 0.8rem' }}>{title}</h2>
-      {children}
-    </section>
-  )
-}
-
-function Snippet({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <div style={{ position: 'relative' }}>
-      <pre style={{ margin: 0, background: 'var(--bg-elev2)', padding: '0.8rem', borderRadius: '0.5rem', fontSize: '0.78rem', overflowX: 'auto' }}>
-        <code>{text}</code>
-      </pre>
-      <button
-        onClick={() => {
-          navigator.clipboard?.writeText(text)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1500)
-        }}
-        style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: '0.4rem', padding: '0.25rem 0.5rem', fontSize: '0.72rem', color: 'var(--text)', cursor: 'pointer' }}
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-    </div>
-  )
-}
-
-function btn(primary: boolean): React.CSSProperties {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '0.45rem',
-    padding: '0.6rem 1rem',
-    borderRadius: '0.6rem',
-    border: primary ? 'none' : '1px solid var(--border)',
-    background: primary ? 'var(--accent)' : 'var(--bg-elev2)',
-    color: primary ? '#fff' : 'var(--text)',
-    fontWeight: 600,
-    fontSize: '0.9rem',
-    cursor: 'pointer',
-  }
 }

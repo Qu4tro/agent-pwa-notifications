@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { api } from '../lib/api'
+import { APP_NAME } from '../lib/brand'
 import { clearPersistedCache } from '../lib/query'
-import { Logo } from '../lib/shell'
+import { Button, Snippet, fieldClass } from '../lib/ui'
 
 // `next` is where the app sends a visitor whose session ran out, and `t` is a
 // one-time login-link token. Declaring them here is what lets a route guard
@@ -15,44 +16,6 @@ export const Route = createFileRoute('/login')({
     t: typeof search.t === 'string' ? search.t : undefined,
   }),
 })
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '0.7rem 0.85rem',
-  fontSize: '1rem',
-  borderRadius: '0.6rem',
-  border: '1px solid var(--border)',
-  background: 'var(--bg-elev2)',
-  color: 'var(--text)',
-  outline: 'none',
-}
-
-const btnStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.7rem 0.85rem',
-  fontSize: '1rem',
-  fontWeight: 700,
-  borderRadius: '0.6rem',
-  border: 'none',
-  cursor: 'pointer',
-  color: '#fff',
-  background: 'linear-gradient(135deg, var(--accent), #c78bff)',
-}
-
-const codeBox: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--bg-elev2)',
-  border: '1px solid var(--border)',
-  padding: '0.6rem 0.7rem',
-  borderRadius: '0.5rem',
-  color: '#c9b6ff',
-  fontFamily: 'ui-monospace, monospace',
-  fontSize: '0.82rem',
-  wordBreak: 'break-all',
-}
 
 // Only a same-origin path is ever used as a landing target, so neither a login
 // link nor a crafted `?next=` can bounce the browser to another site.
@@ -67,9 +30,9 @@ function searchParams(): URLSearchParams {
 
 // Two ways in. A one-time login link (`/login?t=...`, minted by an agent with
 // `agent-notify-pwa open`) trades its token for a session straight away.
-// Otherwise: email, then a one-time code, then (for a brand-new account) the agent key
-// shown once, with connect steps. On success we hard-navigate so the
-// freshly-set session cookie is picked up. `?next=` decides where we land,
+// Otherwise: email, then a one-time code, then (for a brand-new account) the
+// agent key shown once, with the connect step. On success we hard-navigate so
+// the freshly-set session cookie is picked up. `?next=` decides where we land,
 // which is how a notification answered on an expired session comes back to its
 // own thread.
 function LoginPage() {
@@ -79,14 +42,7 @@ function LoginPage() {
   const [agentKey, setAgentKey] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState<'' | 'key' | 'cmd'>('')
   const [linkPending, setLinkPending] = useState(() => searchParams().has('t'))
-
-  function copy(what: 'key' | 'cmd', text: string) {
-    navigator.clipboard?.writeText(text)
-    setCopied(what)
-    setTimeout(() => setCopied(''), 1500)
-  }
 
   function land(next?: string | null) {
     window.location.href = safeNext(next ?? null) ?? safeNext(searchParams().get('next')) ?? '/'
@@ -118,8 +74,10 @@ function LoginPage() {
         })
       return
     }
-    // Already signed in? Skip straight to the dashboard.
-    api.account().then(() => { land() }).catch(() => {})
+    // Already signed in? Skip straight to the projects.
+    api.account().then(() => {
+      land()
+    }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -160,22 +118,15 @@ function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      <div style={{ maxWidth: '25rem', width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-          <a href="/" aria-label="Home"><Logo /></a>
-        </div>
+    <div className="flex min-h-svh items-center justify-center p-6">
+      <div className="w-full max-w-[22rem]">
+        <h1 className="mb-4 text-center font-semibold">{APP_NAME}</h1>
 
-        {linkPending && (
-          <p style={{ color: 'var(--muted)', textAlign: 'center' }}>Signing you in...</p>
-        )}
+        {linkPending && <p className="text-center text-[14px] text-muted">Signing you in...</p>}
 
         {!linkPending && stage === 'email' && (
-          <form onSubmit={sendCode} style={{ textAlign: 'center' }}>
-            <h1 style={{ fontSize: '1.4rem', margin: '0 0 0.5rem' }}>Sign in to Agent Dash</h1>
-            <p style={{ color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
-              Enter your email and we'll send a one-time code.
-            </p>
+          <form onSubmit={sendCode} className="flex flex-col gap-2">
+            <p className="text-[13px] text-muted">Your email, then a one-time code.</p>
             <input
               type="email"
               autoFocus
@@ -183,19 +134,18 @@ function LoginPage() {
               placeholder="you@example.com"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-              style={{ ...inputStyle, marginBottom: '0.75rem' }}
+              className={`${fieldClass} min-h-9`}
             />
-            <button type="submit" disabled={busy} style={{ ...btnStyle, opacity: busy ? 0.6 : 1 }}>
-              {busy ? 'Sending…' : 'Send code'}
-            </button>
+            <Button type="submit" variant="primary" disabled={busy}>
+              {busy ? 'Sending' : 'Send code'}
+            </Button>
           </form>
         )}
 
         {stage === 'code' && (
-          <form onSubmit={verify} style={{ textAlign: 'center' }}>
-            <h1 style={{ fontSize: '1.4rem', margin: '0 0 0.5rem' }}>Enter your code</h1>
-            <p style={{ color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
-              We sent a 6-digit code to <strong style={{ color: 'var(--text)' }}>{email}</strong>.
+          <form onSubmit={verify} className="flex flex-col gap-2">
+            <p className="text-[13px] text-muted">
+              A 6-digit code went to <span className="text-text">{email}</span>.
             </p>
             <input
               inputMode="numeric"
@@ -204,74 +154,41 @@ function LoginPage() {
               placeholder="123456"
               value={code}
               onChange={(ev) => setCode(ev.target.value.replace(/\D/g, '').slice(0, 6))}
-              style={{ ...inputStyle, marginBottom: '0.75rem', textAlign: 'center', letterSpacing: '0.3rem', fontSize: '1.3rem' }}
+              className={`${fieldClass} min-h-9 text-center text-[18px] tracking-[0.3em]`}
             />
-            <button type="submit" disabled={busy || code.length !== 6} style={{ ...btnStyle, opacity: busy || code.length !== 6 ? 0.6 : 1 }}>
-              {busy ? 'Verifying…' : 'Verify'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setStage('email'); setCode(''); setError(null) }}
-              style={{ marginTop: '0.75rem', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.85rem' }}
+            <Button type="submit" variant="primary" disabled={busy || code.length !== 6}>
+              {busy ? 'Verifying' : 'Verify'}
+            </Button>
+            <Button
+              className="border-transparent text-muted"
+              onClick={() => {
+                setStage('email')
+                setCode('')
+                setError(null)
+              }}
             >
-              ← Use a different email
-            </button>
+              Use a different email
+            </Button>
           </form>
         )}
 
         {stage === 'key' && agentKey && (
-          <div>
-            <h1 style={{ fontSize: '1.4rem', margin: '0 0 0.5rem', textAlign: 'center' }}>You're in 🎉</h1>
-            <p style={{ color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 1rem', textAlign: 'center' }}>
-              Here's your agent key. <strong style={{ color: 'var(--text)' }}>Copy it now — it won't be shown again.</strong>
+          <div className="flex flex-col gap-2">
+            <p className="text-[13px] text-muted">
+              Your agent key. Copy it now, it will not be shown again.
             </p>
-            <code style={codeBox}>{agentKey}</code>
-            <button
-              type="button"
-              onClick={() => copy('key', agentKey)}
-              style={{ ...btnStyle, marginTop: '0.75rem' }}
-            >
-              {copied === 'key' ? 'Copied ✓' : 'Copy key'}
-            </button>
-            <div style={{ marginTop: '1.5rem', textAlign: 'left' }}>
-              <p style={{ color: 'var(--muted)', fontSize: '0.85rem', margin: '0 0 0.4rem' }}>
-                <strong style={{ color: 'var(--text)' }}>Step 1.</strong> Add Agent Dash to your agent:
-              </p>
-              <div style={{ position: 'relative' }}>
-                <code style={{ ...codeBox, fontSize: '0.78rem', paddingRight: '4.5rem' }}>
-                  npx skills add Prajeevan/agent-dash
-                </code>
-                <button
-                  type="button"
-                  onClick={() => copy('cmd', 'npx skills add Prajeevan/agent-dash')}
-                  style={{
-                    position: 'absolute', top: '0.4rem', right: '0.4rem',
-                    background: 'var(--bg-elev)', border: '1px solid var(--border)',
-                    borderRadius: '0.4rem', padding: '0.25rem 0.55rem', fontSize: '0.72rem',
-                    color: 'var(--text)', cursor: 'pointer',
-                  }}
-                >
-                  {copied === 'cmd' ? 'Copied ✓' : 'Copy'}
-                </button>
-              </div>
-              <p style={{ color: 'var(--muted)', fontSize: '0.85rem', margin: '0.8rem 0 0' }}>
-                <strong style={{ color: 'var(--text)' }}>Step 2.</strong> When your agent asks, paste the
-                key above. That's it — it'll start reporting here.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => { landAsNewSession() }}
-              style={{ marginTop: '1.25rem', width: '100%', padding: '0.6rem', background: 'none', border: '1px solid var(--border)', borderRadius: '0.6rem', color: 'var(--text)', cursor: 'pointer', fontSize: '0.95rem' }}
-            >
-              Continue to dashboard →
-            </button>
+            <Snippet text={agentKey} />
+            <p className="mt-2 text-[13px] text-muted">
+              Install the skill, then paste the key when the agent asks for it:
+            </p>
+            <Snippet text="npx skills add Qu4tro/agent-pwa-notifications" />
+            <Button variant="primary" className="mt-2" onClick={() => landAsNewSession()}>
+              Continue
+            </Button>
           </div>
         )}
 
-        {error && (
-          <p style={{ color: 'var(--danger, #ff6b6b)', textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem' }}>{error}</p>
-        )}
+        {error && <p className="mt-3 text-center text-[13px] text-kind-error">{error}</p>}
       </div>
     </div>
   )

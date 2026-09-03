@@ -47,6 +47,9 @@ export interface TaskSummary {
   pending: boolean
   pending_event_id: string | null
   pending_question: string | null
+  // Non-empty only for a micro-question: the 2 or 3 options that can be
+  // answered straight from the project list.
+  pending_answers: { label: string; answer: Record<string, string> }[]
   latest_title: string
   latest_kind: 'update' | 'question' | 'done' | 'error'
   last_activity: number

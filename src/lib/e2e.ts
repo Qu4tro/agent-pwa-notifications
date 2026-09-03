@@ -1,4 +1,4 @@
-// Browser-side end-to-end encryption. The key lives only here (localStorage) —
+// Browser-side end-to-end encryption. The key lives only here (localStorage):
 // it never goes to the server. Same AES-256-GCM envelope as the CLI:
 // base64url( iv(12) || ciphertext+tag ).
 
@@ -26,7 +26,7 @@ export function generateEncKey(): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-// The login QR can carry the key in the URL fragment (#k=…) so it never hits
+// The login QR can carry the key in the URL fragment (#k=...) so it never hits
 // the server. Capture it on load and scrub the hash.
 export function captureKeyFromHash() {
   if (typeof window === 'undefined' || !window.location.hash) return

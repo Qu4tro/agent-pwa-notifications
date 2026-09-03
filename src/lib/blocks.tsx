@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { ExternalLink } from 'lucide-react'
+import { Button, fieldClass } from './ui'
 
-// ── Minimal, XSS-safe markdown → React ───────────────────────────────────────
+// -- Minimal, XSS-safe markdown to React -------------------------------------
 // We never dangerouslySetInnerHTML agent content. Text is escaped by React by
 // default; here we only turn a small, known set of markdown into real elements.
 function inline(text: string, key: string): React.ReactNode[] {
-  // Split on **bold**, `code`, and [label](url) — everything else is plain text.
+  // Split on **bold**, `code`, and [label](url); everything else is plain text.
   const parts: React.ReactNode[] = []
   const re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\))/g
   let last = 0
@@ -68,22 +70,24 @@ function MiniMarkdown({ text }: { text: string }) {
     }
   })
   flush('end')
-  return <div className="md">{out}</div>
+  return <div className="md text-[14px]">{out}</div>
 }
 
-// ── Display blocks ───────────────────────────────────────────────────────────
+// -- Display blocks ----------------------------------------------------------
 type AnyBlock = Record<string, unknown> & { type: string }
 
+// A callout's tone is the agent's word for what it is saying. Three of them
+// are kind colours; warn is its own token.
 const TONE: Record<string, string> = {
-  info: 'var(--info)',
-  success: 'var(--success)',
-  warn: 'var(--warn)',
-  error: 'var(--error)',
+  info: 'border-l-kind-update',
+  success: 'border-l-kind-done',
+  warn: 'border-l-warn',
+  error: 'border-l-kind-error',
 }
 
 export function BlockRenderer({ blocks }: { blocks: unknown[] }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+    <div className="flex flex-col gap-2">
       {(blocks as AnyBlock[]).map((b, i) => (
         <One key={i} b={b} />
       ))}
@@ -98,15 +102,7 @@ function One({ b }: { b: AnyBlock }) {
     case 'callout': {
       const tone = String(b.tone ?? 'info')
       return (
-        <div
-          style={{
-            borderLeft: `3px solid ${TONE[tone] ?? TONE.info}`,
-            background: 'var(--bg-elev2)',
-            padding: '0.7rem 0.9rem',
-            borderRadius: '0.4rem',
-            lineHeight: 1.5,
-          }}
-        >
+        <div className={`border-l-[3px] py-0.5 pl-2 text-[14px] ${TONE[tone] ?? TONE.info}`}>
           {String(b.text ?? '')}
         </div>
       )
@@ -118,13 +114,13 @@ function One({ b }: { b: AnyBlock }) {
       return (
         <div>
           {b.label ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem', color: 'var(--muted)' }}>
+            <div className="mb-1 flex justify-between text-[13px] text-muted">
               <span>{String(b.label)}</span>
               <span>{Math.round(pct)}%</span>
             </div>
           ) : null}
-          <div style={{ height: '0.5rem', background: 'var(--bg-elev2)', borderRadius: '999px', overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: '999px', transition: 'width .3s' }} />
+          <div className="h-1 overflow-hidden bg-surface">
+            <div className="h-full bg-kind-question" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )
@@ -132,11 +128,11 @@ function One({ b }: { b: AnyBlock }) {
     case 'keyvalue': {
       const items = (b.items as { k: string; v: string }[]) ?? []
       return (
-        <div style={{ display: 'grid', gap: '0.4rem' }}>
+        <div className="grid gap-1 text-[14px]">
           {items.map((it, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.9rem' }}>
-              <span style={{ color: 'var(--muted)' }}>{it.k}</span>
-              <span style={{ textAlign: 'right', fontWeight: 550 }}>{it.v}</span>
+            <div key={i} className="flex justify-between gap-4">
+              <span className="text-muted">{it.k}</span>
+              <span className="text-right">{it.v}</span>
             </div>
           ))}
         </div>
@@ -146,12 +142,17 @@ function One({ b }: { b: AnyBlock }) {
       const columns = (b.columns as string[]) ?? []
       const rows = (b.rows as string[][]) ?? []
       return (
-        <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: '0.5rem' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+        <div tabIndex={0} className="overflow-x-auto">
+          <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>
                 {columns.map((c, i) => (
-                  <th key={i} style={{ textAlign: 'left', padding: '0.5rem 0.7rem', color: 'var(--muted)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{c}</th>
+                  <th
+                    key={i}
+                    className="border-b border-line px-2 py-1 text-left font-semibold whitespace-nowrap text-muted"
+                  >
+                    {c}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -159,7 +160,9 @@ function One({ b }: { b: AnyBlock }) {
               {rows.map((r, ri) => (
                 <tr key={ri}>
                   {r.map((cell, ci) => (
-                    <td key={ci} style={{ padding: '0.5rem 0.7rem', borderBottom: ri === rows.length - 1 ? 'none' : '1px solid var(--border)' }}>{cell}</td>
+                    <td key={ci} className="border-b border-line px-2 py-1 last:border-b-0">
+                      {cell}
+                    </td>
                   ))}
                 </tr>
               ))}
@@ -170,17 +173,28 @@ function One({ b }: { b: AnyBlock }) {
     }
     case 'link':
       return (
-        <a href={String(b.url)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 550 }}>
-          {String(b.label ?? b.url)} ↗
+        <a
+          href={String(b.url)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[14px]"
+        >
+          {String(b.label ?? b.url)}
+          <ExternalLink size={14} aria-hidden />
         </a>
       )
     case 'image':
       return (
-        <img src={String(b.url)} alt={String(b.alt ?? '')} style={{ maxWidth: '100%', borderRadius: '0.5rem' }} loading="lazy" />
+        <img
+          src={String(b.url)}
+          alt={String(b.alt ?? '')}
+          className="max-w-full rounded-ui"
+          loading="lazy"
+        />
       )
     case 'code':
       return (
-        <pre style={{ overflowX: 'auto', background: 'var(--bg-elev2)', padding: '0.8rem', borderRadius: '0.5rem', fontSize: '0.82rem', margin: 0 }}>
+        <pre tabIndex={0} className="overflow-x-auto rounded-ui bg-surface p-2 text-[12.5px]">
           <code>{String(b.text ?? '')}</code>
         </pre>
       )
@@ -193,7 +207,7 @@ function One({ b }: { b: AnyBlock }) {
   }
 }
 
-// ── Interactive: collect the answer and submit ───────────────────────────────
+// -- Interactive: collect the answer and submit -------------------------------
 export function AnswerForm({
   blocks,
   disabled,
@@ -203,29 +217,31 @@ export function AnswerForm({
   disabled?: boolean
   onSubmit: (answer: Record<string, unknown>) => void
 }) {
-  const interactive = (blocks as AnyBlock[]).filter((b) => b.type === 'buttons' || b.type === 'form')
+  const interactive = (blocks as AnyBlock[]).filter(
+    (b) => b.type === 'buttons' || b.type === 'form',
+  )
   const [form, setForm] = useState<Record<string, Record<string, unknown>>>({})
 
   const setField = (formId: string, fieldId: string, value: unknown) =>
     setForm((f) => ({ ...f, [formId]: { ...(f[formId] ?? {}), [fieldId]: value } }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+    <div className="flex flex-col gap-4">
       {interactive.map((b, i) => {
         if (b.type === 'buttons') {
           const options = (b.options as string[]) ?? []
           const id = String(b.id)
           return (
-            <div key={i} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+            <div key={i} className="flex flex-wrap gap-2">
               {options.map((opt) => (
-                <button
+                <Button
                   key={opt}
+                  variant="primary"
                   disabled={disabled}
                   onClick={() => onSubmit({ [id]: opt })}
-                  style={btnStyle(false, disabled)}
                 >
                   {opt}
-                </button>
+                </Button>
               ))}
             </div>
           )
@@ -240,14 +256,19 @@ export function AnswerForm({
               e.preventDefault()
               onSubmit({ [id]: form[id] ?? {} })
             }}
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}
+            className="flex flex-col gap-3"
           >
             {fields.map((f, fi) => (
-              <FieldInput key={fi} field={f} value={form[id]?.[String(f.id)]} onChange={(v) => setField(id, String(f.id), v)} />
+              <FieldInput
+                key={fi}
+                field={f}
+                value={form[id]?.[String(f.id)]}
+                onChange={(v) => setField(id, String(f.id), v)}
+              />
             ))}
-            <button type="submit" disabled={disabled} style={btnStyle(true, disabled)}>
+            <Button type="submit" variant="primary" disabled={disabled} className="self-start">
               {String(b.submitLabel ?? 'Submit')}
-            </button>
+            </Button>
           </form>
         )
       })}
@@ -255,75 +276,85 @@ export function AnswerForm({
   )
 }
 
-function FieldInput({ field, value, onChange }: { field: AnyBlock; value: unknown; onChange: (v: unknown) => void }) {
+function FieldInput({
+  field,
+  value,
+  onChange,
+}: {
+  field: AnyBlock
+  value: unknown
+  onChange: (v: unknown) => void
+}) {
   const kind = String(field.kind)
   const label = String(field.label ?? '')
   const options = (field.options as string[]) ?? []
   const req = Boolean(field.required)
 
   const wrap = (child: React.ReactNode) => (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.9rem' }}>
-      <span style={{ color: 'var(--muted)' }}>
+    <label className="flex flex-col gap-1 text-[13px]">
+      <span className="text-muted">
         {label}
-        {req ? <span style={{ color: 'var(--error)' }}> *</span> : null}
+        {req ? <span className="text-kind-error"> *</span> : null}
       </span>
       {child}
     </label>
   )
 
-  const inputStyle: React.CSSProperties = {
-    background: 'var(--bg-elev2)',
-    border: '1px solid var(--border)',
-    borderRadius: '0.5rem',
-    padding: '0.6rem 0.7rem',
-    color: 'var(--text)',
-    fontSize: '0.95rem',
-    width: '100%',
-  }
-
   if (kind === 'textarea')
     return wrap(
-      <textarea required={req} rows={3} placeholder={String(field.placeholder ?? '')} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} style={inputStyle} />,
+      <textarea
+        required={req}
+        rows={3}
+        placeholder={String(field.placeholder ?? '')}
+        value={String(value ?? '')}
+        onChange={(e) => onChange(e.target.value)}
+        className={fieldClass}
+      />,
     )
   if (kind === 'select')
     return wrap(
-      <select required={req} value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} style={inputStyle}>
-        <option value="">Choose…</option>
+      <select
+        required={req}
+        value={String(value ?? '')}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${fieldClass} min-h-9`}
+      >
+        <option value="">Choose one</option>
         {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
+          <option key={o} value={o}>
+            {o}
+          </option>
         ))}
       </select>,
     )
   if (kind === 'radio')
     return wrap(
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div className="flex flex-wrap gap-2">
         {options.map((o) => (
-          <button
+          <Button
             key={o}
-            type="button"
+            variant={value === o ? 'primary' : 'secondary'}
             onClick={() => onChange(o)}
-            style={{ ...pillStyle, ...(value === o ? pillActive : {}) }}
           >
             {o}
-          </button>
+          </Button>
         ))}
       </div>,
     )
   if (kind === 'checkbox') {
     const arr = Array.isArray(value) ? (value as string[]) : []
     return wrap(
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div className="flex flex-wrap gap-2">
         {options.map((o) => {
           const on = arr.includes(o)
           return (
-            <button
+            <Button
               key={o}
-              type="button"
+              variant={on ? 'primary' : 'secondary'}
               onClick={() => onChange(on ? arr.filter((x) => x !== o) : [...arr, o])}
-              style={{ ...pillStyle, ...(on ? pillActive : {}) }}
             >
-              {on ? '✓ ' : ''}{o}
-            </button>
+              {o}
+            </Button>
           )
         })}
       </div>,
@@ -336,36 +367,7 @@ function FieldInput({ field, value, onChange }: { field: AnyBlock; value: unknow
       placeholder={String(field.placeholder ?? '')}
       value={String(value ?? '')}
       onChange={(e) => onChange(kind === 'number' ? e.target.valueAsNumber : e.target.value)}
-      style={inputStyle}
+      className={`${fieldClass} min-h-9`}
     />,
   )
-}
-
-function btnStyle(primary: boolean, disabled?: boolean): React.CSSProperties {
-  return {
-    padding: '0.7rem 1.1rem',
-    borderRadius: '0.6rem',
-    border: primary ? 'none' : '1px solid var(--border)',
-    background: primary ? 'var(--accent)' : 'var(--bg-elev2)',
-    color: primary ? '#fff' : 'var(--text)',
-    fontWeight: 600,
-    fontSize: '0.95rem',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.5 : 1,
-  }
-}
-
-const pillStyle: React.CSSProperties = {
-  padding: '0.5rem 0.85rem',
-  borderRadius: '999px',
-  border: '1px solid var(--border)',
-  background: 'var(--bg-elev2)',
-  color: 'var(--text)',
-  fontSize: '0.9rem',
-  cursor: 'pointer',
-}
-const pillActive: React.CSSProperties = {
-  background: 'var(--accent)',
-  borderColor: 'var(--accent)',
-  color: '#fff',
 }
