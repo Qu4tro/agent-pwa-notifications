@@ -3,10 +3,10 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Lock } from 'lucide-react'
 import { timeAgo, type ThreadData, type EventItem } from '../lib/api'
-import { BackLink, Container, useHeaderActions } from '../lib/shell'
+import { BackLink, Container, useHeaderBack } from '../lib/shell'
 import { ensure, threadQuery, useAnswer, useMarkRead } from '../lib/queries'
 import { ThreadSkeleton } from '../lib/skeleton'
-import { BlockRenderer, AnswerForm } from '../lib/blocks'
+import { BlockRenderer, AnswerForm, Callout } from '../lib/blocks'
 import { projectLabel, fromParam, KIND_BORDER, STATE_TEXT } from '../lib/project'
 import { getEncKey, encryptValue, decryptValue } from '../lib/e2e'
 import { InlineError, KindLabel, ProjectDot } from '../lib/ui'
@@ -32,7 +32,7 @@ function ThreadView() {
   const markRead = useMarkRead()
   const [failed, setFailed] = useState<{ id: string; message: string } | null>(null)
 
-  useHeaderActions(
+  useHeaderBack(
     <BackLink to="/project/$name" params={{ name }} label={projectLabel(project)} />,
     [name, project],
   )
@@ -238,10 +238,15 @@ function Message({
                   <div className="text-[15px] text-muted">
                     Agent received it {timeAgo(q.picked_up_at)}
                   </div>
+                  {/* The agent's word back to you. Same chip as a callout the
+                      agent sent in its blocks, so "a note in a tone" has one
+                      look wherever it comes from. */}
                   {e.ack ? (
-                    <p className="mt-1 border-l-[3px] border-l-kind-done pl-2 text-[15px]">
-                      {e.ack.replace(/\{answer\}/g, shortAnswer(answer))}
-                    </p>
+                    <div className="mt-1">
+                      <Callout tone="success">
+                        {e.ack.replace(/\{answer\}/g, shortAnswer(answer))}
+                      </Callout>
+                    </div>
                   ) : null}
                 </>
               ) : (

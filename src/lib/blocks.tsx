@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { CircleCheck, CircleX, ExternalLink, Info, TriangleAlert } from 'lucide-react'
 import { Button, fieldClass } from './ui'
 
 // -- Minimal, XSS-safe markdown to React -------------------------------------
@@ -70,7 +70,7 @@ function MiniMarkdown({ text }: { text: string }) {
     }
   })
   flush('end')
-  return <div className="md text-[14px]">{out}</div>
+  return <div className="md">{out}</div>
 }
 
 // -- Display blocks ----------------------------------------------------------
@@ -78,11 +78,51 @@ type AnyBlock = Record<string, unknown> & { type: string }
 
 // A callout's tone is the agent's word for what it is saying. Three of them
 // are kind colours; warn is its own token.
-const TONE: Record<string, string> = {
-  info: 'border-l-kind-update',
-  success: 'border-l-kind-done',
-  warn: 'border-l-warn',
-  error: 'border-l-kind-error',
+//
+// Four tones one under another, told apart by a 3px rail and nothing else, is
+// colour carrying the whole message (WCAG 1.4.1). So each tone gets an icon as
+// well, and the block reads as a chip - a tinted surface with an edge - which
+// is also what stops a callout from disappearing into the paragraph above it.
+//
+// Every class is written out in full, because Tailwind reads the source.
+const TONE = {
+  info: {
+    className: 'border-kind-update/40 bg-kind-update/10 text-kind-update',
+    Icon: Info,
+    label: 'Info',
+  },
+  success: {
+    className: 'border-kind-done/40 bg-kind-done/10 text-kind-done',
+    Icon: CircleCheck,
+    label: 'Success',
+  },
+  warn: {
+    className: 'border-warn/40 bg-warn/10 text-warn',
+    Icon: TriangleAlert,
+    label: 'Warning',
+  },
+  error: {
+    className: 'border-kind-error/40 bg-kind-error/10 text-kind-error',
+    Icon: CircleX,
+    label: 'Error',
+  },
+} as const
+
+export type Tone = keyof typeof TONE
+
+// The tone colours the chip and the icon; the words stay --color-text, so the
+// contrast of the message itself never depends on which tone it is.
+export function Callout({ tone = 'info', children }: { tone?: string; children: React.ReactNode }) {
+  const t = TONE[tone as Tone] ?? TONE.info
+  return (
+    <div className={`flex items-start gap-2 rounded-ui border px-3 py-2 ${t.className}`}>
+      <t.Icon size={18} className="mt-[3px] shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1 text-text">
+        <span className="sr-only">{t.label}: </span>
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export function BlockRenderer({ blocks }: { blocks: unknown[] }) {
@@ -99,14 +139,8 @@ function One({ b }: { b: AnyBlock }) {
   switch (b.type) {
     case 'markdown':
       return <MiniMarkdown text={String(b.text ?? '')} />
-    case 'callout': {
-      const tone = String(b.tone ?? 'info')
-      return (
-        <div className={`border-l-[3px] py-0.5 pl-2 text-[14px] ${TONE[tone] ?? TONE.info}`}>
-          {String(b.text ?? '')}
-        </div>
-      )
-    }
+    case 'callout':
+      return <Callout tone={String(b.tone ?? 'info')}>{String(b.text ?? '')}</Callout>
     case 'progress': {
       const value = Number(b.value ?? 0)
       const max = Number(b.max ?? 100) || 100
@@ -114,7 +148,7 @@ function One({ b }: { b: AnyBlock }) {
       return (
         <div>
           {b.label ? (
-            <div className="mb-1 flex justify-between text-[13px] text-muted">
+            <div className="mb-1 flex justify-between text-[15px] text-muted">
               <span>{String(b.label)}</span>
               <span>{Math.round(pct)}%</span>
             </div>
@@ -128,7 +162,7 @@ function One({ b }: { b: AnyBlock }) {
     case 'keyvalue': {
       const items = (b.items as { k: string; v: string }[]) ?? []
       return (
-        <div className="grid gap-1 text-[14px]">
+        <div className="grid gap-1">
           {items.map((it, i) => (
             <div key={i} className="flex justify-between gap-4">
               <span className="text-muted">{it.k}</span>
@@ -143,7 +177,7 @@ function One({ b }: { b: AnyBlock }) {
       const rows = (b.rows as string[][]) ?? []
       return (
         <div tabIndex={0} className="overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
+          <table className="w-full border-collapse text-[15px]">
             <thead>
               <tr>
                 {columns.map((c, i) => (
@@ -177,7 +211,7 @@ function One({ b }: { b: AnyBlock }) {
           href={String(b.url)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[14px]"
+          className="inline-flex items-center gap-1"
         >
           {String(b.label ?? b.url)}
           <ExternalLink size={14} aria-hidden />
@@ -194,7 +228,7 @@ function One({ b }: { b: AnyBlock }) {
       )
     case 'code':
       return (
-        <pre tabIndex={0} className="overflow-x-auto rounded-ui bg-surface p-2 text-[12.5px]">
+        <pre tabIndex={0} className="overflow-x-auto rounded-ui bg-surface p-3">
           <code>{String(b.text ?? '')}</code>
         </pre>
       )

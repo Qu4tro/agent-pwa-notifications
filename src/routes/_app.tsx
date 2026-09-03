@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate, Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 import { AuthError } from '../lib/api'
 import { accountQuery } from '../lib/queries'
@@ -39,8 +39,13 @@ function AppRoute() {
 }
 
 function AppLayout() {
-  const [actions, setActions] = useState<React.ReactNode>(null)
+  const [left, setLeft] = useState<React.ReactNode>(null)
+  const [right, setRight] = useState<React.ReactNode>(null)
   useLiveRefresh()
+
+  // The setters are stable, so the context value has to be too - a new object
+  // every render would re-run every page's slot effect.
+  const slots = useMemo(() => ({ setLeft, setRight }), [])
 
   useEffect(() => {
     markAppMounted() // hydration is over; a redirect may navigate from here on
@@ -48,8 +53,8 @@ function AppLayout() {
   }, [])
 
   return (
-    <HeaderActionsContext.Provider value={setActions}>
-      <Header right={actions} />
+    <HeaderActionsContext.Provider value={slots}>
+      <Header left={left} right={right} />
       <Outlet />
     </HeaderActionsContext.Provider>
   )

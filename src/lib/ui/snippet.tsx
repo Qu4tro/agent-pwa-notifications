@@ -6,7 +6,7 @@ export function Snippet({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   return (
     <div className="relative">
-      <pre tabIndex={0} className="overflow-x-auto rounded-ui bg-surface p-2 pr-24 text-[12px]">
+      <pre tabIndex={0} className="overflow-x-auto rounded-ui bg-surface p-3 pr-24">
         <code>{text}</code>
       </pre>
       <button

@@ -5,7 +5,7 @@ import { Bell, BellOff } from 'lucide-react'
 import { api } from '../lib/api'
 import { APP_NAME, REPO_URL, UPSTREAM_URL } from '../lib/brand'
 import { BackLink, Container } from '../lib/shell'
-import { useHeaderActions } from '../lib/shell'
+import { useHeaderBack } from '../lib/shell'
 import { SettingsSkeleton } from '../lib/skeleton'
 import {
   accountQuery,
@@ -19,7 +19,7 @@ import {
 } from '../lib/queries'
 import { clearPersistedCache } from '../lib/query'
 import { getEncKey, setEncKey, clearEncKey, generateEncKey } from '../lib/e2e'
-import { Button, InlineError, Snippet, fieldClass } from '../lib/ui'
+import { Button, ConfirmPanel, InlineError, Snippet, fieldClass, sectionHeadingClass } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/settings')({
   ssr: false,
@@ -46,9 +46,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8 px-4">
-      <h2 className="mb-3 border-b border-line pb-1.5 text-[14px] font-semibold text-muted">
-        {title}
-      </h2>
+      <h2 className={`mb-3 border-b border-edge pb-1.5 ${sectionHeadingClass}`}>{title}</h2>
       {children}
     </section>
   )
@@ -67,7 +65,7 @@ function SettingsPage() {
   const [pushBusy, setPushBusy] = useState(false)
   const [pushMsg, setPushMsg] = useState<string | null>(null)
 
-  useHeaderActions(<BackLink to="/" label="Projects" />, [])
+  useHeaderBack(<BackLink to="/" label="Projects" />, [])
 
   // Whether this device has a push subscription is a browser fact, not a
   // server one, so it stays out of the query cache.
@@ -389,19 +387,21 @@ function ClearButtons() {
         </Button>
       </div>
       {confirming ? (
-        <div className="mt-2 border-l-[3px] border-l-kind-error pl-2">
-          <p className="mb-2 text-[15px]">
-            {confirming === 'all'
-              ? 'Delete every message, including unanswered questions? This cannot be undone.'
-              : 'Delete everything you have already read or answered?'}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="danger" onClick={() => run(confirming)}>
-              Yes, clear
-            </Button>
-            <Button onClick={() => setConfirming(null)}>Cancel</Button>
-          </div>
-        </div>
+        <ConfirmPanel
+          className="mt-3"
+          actions={
+            <>
+              <Button variant="danger" onClick={() => run(confirming)}>
+                Yes, clear
+              </Button>
+              <Button onClick={() => setConfirming(null)}>Cancel</Button>
+            </>
+          }
+        >
+          {confirming === 'all'
+            ? 'Delete every message, including unanswered questions? This cannot be undone.'
+            : 'Delete everything you have already read or answered?'}
+        </ConfirmPanel>
       ) : null}
       {msg ? <p className="mt-2 text-[15px] text-muted">{msg}</p> : null}
     </div>
@@ -458,18 +458,19 @@ function AgentKeySection() {
       )}
 
       {confirming ? (
-        <div className="border-l-[3px] border-l-kind-error pl-2">
-          <p className="mb-2 text-[15px]">
-            Rotate the key? The current key stops working at once, and every connected agent has
-            to be updated with the new one.
-          </p>
-          <div className="flex gap-2">
-            <Button variant="danger" onClick={rotate} disabled={busy}>
-              Yes, rotate
-            </Button>
-            <Button onClick={() => setConfirming(false)}>Cancel</Button>
-          </div>
-        </div>
+        <ConfirmPanel
+          actions={
+            <>
+              <Button variant="danger" onClick={rotate} disabled={busy}>
+                Yes, rotate
+              </Button>
+              <Button onClick={() => setConfirming(false)}>Cancel</Button>
+            </>
+          }
+        >
+          Rotate the key? The current key stops working at once, and every connected agent has to
+          be updated with the new one.
+        </ConfirmPanel>
       ) : (
         <Button onClick={() => setConfirming(true)}>Rotate key</Button>
       )}

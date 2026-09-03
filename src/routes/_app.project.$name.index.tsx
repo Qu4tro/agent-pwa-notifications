@@ -3,12 +3,13 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { timeAgo, type TaskSummary } from '../lib/api'
-import { BackLink, Container, useHeaderActions } from '../lib/shell'
+import { BackLink, Container, useHeaderActions, useHeaderBack } from '../lib/shell'
 import { ensure, tasksQuery, useAnswerFromList, useClear } from '../lib/queries'
 import { TasksSkeleton } from '../lib/skeleton'
 import { projectLabel, fromParam, STATE_TEXT } from '../lib/project'
 import {
   Button,
+  ConfirmPanel,
   InlineError,
   KindLabel,
   ProjectDot,
@@ -37,18 +38,16 @@ function ProjectView() {
   const clear = useClear()
   const [clearOpen, setClearOpen] = useState(false)
 
+  useHeaderBack(<BackLink to="/" label="Projects" />, [])
   useHeaderActions(
-    <>
-      <button
-        onClick={() => setClearOpen((v) => !v)}
-        title="Clear project"
-        aria-label="Clear project"
-        className={`${iconButtonClass} ${clearOpen ? 'text-kind-error' : ''}`}
-      >
-        <Trash2 size={18} />
-      </button>
-      <BackLink to="/" label="Projects" />
-    </>,
+    <button
+      onClick={() => setClearOpen((v) => !v)}
+      title="Clear project"
+      aria-label="Clear project"
+      className={`${iconButtonClass} ${clearOpen ? 'text-kind-error' : ''}`}
+    >
+      <Trash2 size={18} />
+    </button>,
     [clearOpen],
   )
 
@@ -203,19 +202,21 @@ function ClearPanel({
   label: string
 }) {
   return (
-    <div className="mb-4 border-y border-line px-4 py-3">
-      <p className="mb-2 text-[15px] text-muted">
-        Clear "{label}". Only this project. This cannot be undone.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => onClear('read')}>Read and answered</Button>
-        <Button variant="danger" onClick={() => onClear('all')}>
-          Everything
-        </Button>
-        <Button className="ml-auto border-transparent text-muted" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </div>
+    <ConfirmPanel
+      className="mx-4 mb-4"
+      actions={
+        <>
+          <Button onClick={() => onClear('read')}>Read and answered</Button>
+          <Button variant="danger" onClick={() => onClear('all')}>
+            Everything
+          </Button>
+          <Button className="ml-auto border-transparent text-muted" onClick={onCancel}>
+            Cancel
+          </Button>
+        </>
+      }
+    >
+      Clear "{label}". Only this project. This cannot be undone.
+    </ConfirmPanel>
   )
 }

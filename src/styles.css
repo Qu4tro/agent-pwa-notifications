@@ -36,8 +36,14 @@
   /* One web font, self-hosted, with a metric-matched fallback under it. The
      stack is only reached for a glyph Atkinson's Latin subset does not have. */
   --font-sans:
-    'Atkinson Hyperlegible Next', 'Atkinson fallback', ui-sans-serif, system-ui, -apple-system,
-    'Segoe UI', Roboto, 'Noto Sans', Ubuntu, Cantarell, Helvetica, Arial, sans-serif;
+    'Atkinson Hyperlegible Next', 'Atkinson fallback', -apple-system, 'Segoe UI', Roboto,
+    'Noto Sans', Ubuntu, Cantarell, ui-sans-serif, system-ui, Helvetica, Arial, sans-serif;
+
+  /* Named faces first, for the same reason as the sans stack: left to the
+     generic `monospace` keyword, Linux picks a face that is a size and a
+     colour apart from the body text. */
+  --font-mono:
+    ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
 
   --radius-ui: 8px;
 }
@@ -96,6 +102,20 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     min-height: 100svh;
+  }
+
+  /* Code is set in the mono stack everywhere, not in whatever the browser
+     defaults to. 14px is a step down from the 17px body and no further: the
+     note that started this said the font was too small to read. */
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+    font-size: 14px;
+  }
+  pre {
+    line-height: 1.6;
   }
 
   /* One visible focus ring for everything keyboard-reachable. The accent is
@@ -162,7 +182,8 @@
     border: 1px solid var(--color-line);
     padding: 0.05em 0.3em;
     border-radius: var(--radius-ui);
-    font-size: 0.85em;
+    /* Relative, so inline code tracks whatever it sits in. */
+    font-size: 0.9em;
   }
   .md strong {
     font-weight: 600;
