@@ -58,15 +58,27 @@ export function TasksSkeleton() {
   )
 }
 
+// A thread arrives as a list of message summaries, most of them shut, so the
+// placeholder is a list of rows - not the two tall blocks that stood in for
+// messages back when every one of them was open.
 export function ThreadSkeleton() {
   return (
     <Container>
       <div className="mb-4 px-4">
         <Skeleton width="60%" height="22px" />
       </div>
-      <div className="flex flex-col gap-4 px-4">
-        <Skeleton height="7rem" />
-        <Skeleton height="7rem" />
+      <div>
+        {Array.from({ length: 5 }, (_, i) => (
+          <div
+            key={i}
+            className="border-b border-b-line border-l-[3px] border-l-line px-4 py-3"
+          >
+            <Skeleton width="7rem" height="13px" />
+            <div className="mt-1.5">
+              <Skeleton width="70%" height="17px" />
+            </div>
+          </div>
+        ))}
       </div>
     </Container>
   )

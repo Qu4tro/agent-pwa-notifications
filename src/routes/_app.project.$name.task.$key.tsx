@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Lock } from 'lucide-react'
+import { ChevronDown, Lock } from 'lucide-react'
 import { timeAgo, type ThreadData, type EventItem } from '../lib/api'
 import { BackLink, Container, useHeaderBack } from '../lib/shell'
 import { ensure, threadQuery, useAnswer, useMarkRead } from '../lib/queries'
@@ -100,10 +100,11 @@ function ThreadView() {
 
       {/* The conversation: each message and question in order. */}
       <div className="flex flex-col">
-        {thread.events.map((e) => (
+        {thread.events.map((e, i) => (
           <Message
             key={e.id}
             e={e}
+            isNewest={i === thread.events.length - 1}
             submitting={answer.isPending && answer.variables?.eventId === e.id}
             error={failed?.id === e.id ? failed.message : null}
             onSubmit={(payload, display) => submit(e.id, payload, display)}
@@ -116,15 +117,43 @@ function ThreadView() {
 
 // One message. The 3px rail on the left is the kind colour; the rest of the
 // block has no border and no background, so a long thread reads as one column.
+// The padding lives on the summary and the body, not here, because a closed
+// message is only its summary.
 function MessageShell({ kind, children }: { kind: string; children: React.ReactNode }) {
   return (
     <article
-      className={`border-b border-b-line border-l-[3px] px-4 py-3 last:border-b-0 ${
+      className={`border-b border-b-line border-l-[3px] last:border-b-0 ${
         KIND_BORDER[kind] ?? 'border-l-line'
       }`}
     >
       {children}
     </article>
+  )
+}
+
+// A message opens and closes as a native <details>. Nothing is wired up for the
+// keyboard or for a screen reader here because the element already is: enter
+// and space toggle it, and the summary is announced as expanded or collapsed.
+function Collapsible({
+  open,
+  onOpenChange,
+  summary,
+  children,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  summary: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <details
+      className="message group"
+      open={open}
+      onToggle={(ev) => onOpenChange(ev.currentTarget.open)}
+    >
+      <summary className="px-4 py-3">{summary}</summary>
+      <div className="px-4 pb-3">{children}</div>
+    </details>
   )
 }
 
@@ -139,23 +168,43 @@ function MessageHead({ e }: { e: EventItem }) {
         </span>
       ) : null}
       <span className="ml-auto shrink-0 text-[13px] text-faint">{timeAgo(e.created_at)}</span>
+      {/* The one thing that says this row opens. It points down when the
+          message is shut and up when it is open. */}
+      <ChevronDown
+        size={16}
+        aria-hidden
+        className="shrink-0 text-faint transition-transform group-open:rotate-180"
+      />
     </div>
   )
 }
 
 function Message({
   e,
+  isNewest,
   submitting,
   error,
   onSubmit,
 }: {
   e: EventItem
+  isNewest: boolean
   submitting: boolean
   error: string | null
   onSubmit: (payload: Record<string, unknown>, display: Record<string, unknown>) => void
 }) {
   const q = e.question
   const isPending = q?.status === 'pending'
+
+  // Open on arrival: a question still waiting on you, anything you have not
+  // seen, and the last message in the thread, which is what you opened the
+  // thread to read. Everything settled starts shut, which is the whole point
+  // of the note: a long thread should read as a list of titles.
+  //
+  // Worked out once, at mount, and never again. The page marks what is on
+  // screen as read and the 5 second poll brings that back, so a rule that was
+  // re-read on every render would fold a message shut while you were reading
+  // it. After that the state is yours: a tap is remembered until you leave.
+  const [open, setOpen] = useState(() => isPending || e.read_at == null || isNewest)
 
   // Decrypt block content (and any answer) locally when the event is E2E.
   const [dec, setDec] = useState<{ blocks: unknown[]; answer: unknown } | null>(null)
@@ -201,65 +250,73 @@ function Message({
   const blocks = dec?.blocks ?? []
   const answer = dec?.answer ?? null
 
+  // The title, and for a settled question the answer you gave: enough to know
+  // whether this one is worth opening.
+  const head = (
+    <>
+      <MessageHead e={e} />
+      {e.title ? <div className="leading-snug font-semibold">{e.title}</div> : null}
+      {q?.status === 'answered' ? (
+        <div className={`mt-0.5 truncate text-[15px] ${STATE_TEXT.answered}`}>
+          You answered: <span className="font-semibold">{shortAnswer(answer)}</span>
+        </div>
+      ) : null}
+    </>
+  )
+
   if (locked) {
     return (
       <MessageShell kind={e.kind}>
-        <MessageHead e={e} />
-        {e.title ? <div className="mb-1 font-semibold">{e.title}</div> : null}
-        <p className="text-[15px] text-muted">
-          Encrypted. Add your key under Encryption in <Link to="/settings">Settings</Link> to read
-          it.
-        </p>
+        <Collapsible open={open} onOpenChange={setOpen} summary={head}>
+          <p className="text-[15px] text-muted">
+            Encrypted. Add your key under Encryption in <Link to="/settings">Settings</Link> to
+            read it.
+          </p>
+        </Collapsible>
       </MessageShell>
     )
   }
 
   return (
     <MessageShell kind={e.kind}>
-      <MessageHead e={e} />
-      {e.title ? <div className="mb-1.5 leading-snug font-semibold">{e.title}</div> : null}
+      <Collapsible open={open} onOpenChange={setOpen} summary={head}>
+        <BlockRenderer blocks={blocks} />
 
-      <BlockRenderer blocks={blocks} />
-
-      {q && (
-        <div className="mt-3 border-t border-line pt-3">
-          {isPending ? (
-            <>
-              <AnswerForm blocks={blocks} disabled={submitting} onSubmit={handleSubmit} />
-              {error ? <p className="mt-2 text-[15px] text-kind-error">{error}</p> : null}
-            </>
-          ) : q.status === 'answered' ? (
-            <div className="flex flex-col gap-1">
-              <div className={`text-[16px] ${STATE_TEXT.answered}`}>
-                You answered: <span className="font-semibold">{shortAnswer(answer)}</span>
-              </div>
-              {q.picked_up_at ? (
-                <>
-                  <div className="text-[15px] text-muted">
-                    Agent received it {timeAgo(q.picked_up_at)}
-                  </div>
-                  {/* The agent's word back to you. Same chip as a callout the
-                      agent sent in its blocks, so "a note in a tone" has one
-                      look wherever it comes from. */}
-                  {e.ack ? (
-                    <div className="mt-1">
-                      <Callout tone="success">
-                        {e.ack.replace(/\{answer\}/g, shortAnswer(answer))}
-                      </Callout>
+        {q && (
+          <div className="mt-3 border-t border-line pt-3">
+            {isPending ? (
+              <>
+                <AnswerForm blocks={blocks} disabled={submitting} onSubmit={handleSubmit} />
+                {error ? <p className="mt-2 text-[15px] text-kind-error">{error}</p> : null}
+              </>
+            ) : q.status === 'answered' ? (
+              <div className="flex flex-col gap-1">
+                {q.picked_up_at ? (
+                  <>
+                    <div className="text-[15px] text-muted">
+                      Agent received it {timeAgo(q.picked_up_at)}
                     </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="text-[15px] text-muted">Waiting for the agent</div>
-              )}
-            </div>
-          ) : (
-            <div className={`text-[15px] ${STATE_TEXT.expired}`}>
-              Expired before you answered.
-            </div>
-          )}
-        </div>
-      )}
+                    {/* The agent's word back to you. Same chip as a callout the
+                        agent sent in its blocks, so "a note in a tone" has one
+                        look wherever it comes from. */}
+                    {e.ack ? (
+                      <div className="mt-1">
+                        <Callout tone="success">
+                          {e.ack.replace(/\{answer\}/g, shortAnswer(answer))}
+                        </Callout>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="text-[15px] text-muted">Waiting for the agent</div>
+                )}
+              </div>
+            ) : (
+              <div className={`text-[15px] ${STATE_TEXT.expired}`}>Expired before you answered.</div>
+            )}
+          </div>
+        )}
+      </Collapsible>
     </MessageShell>
   )
 }
