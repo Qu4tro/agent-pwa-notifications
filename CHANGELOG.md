@@ -10,6 +10,48 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Added
+
+- `public_docs/development.md`: the layout, the two test projects and why they
+  need different runtimes, how to add an endpoint or a block type, and how to
+  pull a change from upstream by hand.
+- `public_docs/release.md`: what `scripts/release.sh` does, what the tag
+  triggers, the repository secret and variable the deploy needs, and how to
+  roll back.
+- A `publish-cli` job in the release workflow. It publishes `cli/` to npm with
+  provenance, and checks the package version against the tag first. Without an
+  `NPM_TOKEN` secret it reports the skip and succeeds, so a release still
+  deploys and still cuts a GitHub Release.
+- The CLI is packaged for Arch Linux as `agent-pwa-notifications`, built from
+  the GitHub release tarball. It installs under
+  `/usr/lib/agent-pwa-notifications` with `agent-notify-pwa` on the PATH, so it
+  does not depend on npm.
+
+### Changed
+
+- The README is rewritten around this app: what it is, deploying your own,
+  connecting an agent over MCP, the skill, the CLI or plain HTTP, how
+  notification answers work, and what the fork changes. The attribution to
+  Prajeevan/agent-dash and the MIT licence stay.
+- `public_docs/notifications.md` carries the measured desktop row:
+  Firefox 154 on Linux reports `Notification.maxActions` 2, so a two-option
+  question shows both answers and no More, and a three-option question shows
+  one answer plus More.
+- The CLI install instructions name the checkout and the AUR package. The
+  package is not on npm, so nothing tells you to install it from there.
+- The local setup secrets file is `.agent-notify-pwa.local.json`. A checkout
+  that still holds the old `.agent-dash.local.json` is read as before, and both
+  names stay out of git.
+- The root package is named `agent-pwa-notifications`, like the repository and
+  the CLI package.
+
+### Removed
+
+- Upstream's `PLAN.md` architecture report. It describes a hosted service with
+  endpoints, an MCP tool and a skill path that this server does not have, so it
+  now misleads more than it explains. It is unchanged upstream at
+  Prajeevan/agent-dash, and in this repository's history.
+
 ## [0.5.0] - 2026-09-03
 
 ### Added

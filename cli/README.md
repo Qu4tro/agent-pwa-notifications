@@ -108,9 +108,13 @@ encrypted blocks, so encrypted questions never get notification answer buttons.
 
 ## Install
 
+Run it straight from a checkout of the hub repository:
+
 ```bash
-npm install -g agent-pwa-notifications
+node cli/bin.mjs <command>
 ```
 
-Or run it from a checkout with `node cli/bin.mjs <command>`. The only dependency
-is `qrcode-terminal`. Needs Node 20 or newer.
+On Arch Linux, install the AUR package `agent-pwa-notifications`, which puts
+`agent-notify-pwa` on the PATH. It builds from the GitHub release tarball.
+
+The only dependency is `qrcode-terminal`. Needs Node 20 or newer.

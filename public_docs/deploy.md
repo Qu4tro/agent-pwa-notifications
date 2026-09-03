@@ -44,7 +44,7 @@ pnpm setup
 ```
 
 That generates `APP_SECRET` and a VAPID key pair, writes them to
-`.agent-dash.local.json` (gitignored), sets them as Worker secrets, applies the
+`.agent-notify-pwa.local.json` (gitignored), sets them as Worker secrets, applies the
 D1 migrations and deploys. Re-running it reuses the existing keys; pass
 `--rotate` to mint new ones, which invalidates every session and every push
 subscription.
@@ -109,9 +109,14 @@ browser tab is enough, but installing it gives a better result.
 ## 7. Connect an agent
 
 ```bash
-npx agent-pwa-notifications login --url https://<your-worker>.workers.dev --key ad_live_...
-agent-notify-pwa connect      # writes ./.mcp.json for an MCP client
+node cli/bin.mjs login --url https://<your-worker>.workers.dev --key ad_live_...
+node cli/bin.mjs connect      # writes ./.mcp.json for an MCP client
 ```
+
+The CLI runs straight from the checkout, with `qrcode-terminal` as its only
+dependency. On Arch Linux the AUR package `agent-pwa-notifications` installs it
+system wide and puts `agent-notify-pwa` on the PATH; the examples below use
+that name.
 
 Or install the skill for an agent that reads Agent Skills:
 
