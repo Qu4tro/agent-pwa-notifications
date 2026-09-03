@@ -374,11 +374,11 @@ export async function getInbox(url: URL, env: Env, accountId: string): Promise<R
   const q = agent
     ? env.DB.prepare(
         `SELECT id, agent, task_id, kind, title, priority, created_at, project, task, model FROM events
-         WHERE account_id = ?1 AND agent = ?2 ORDER BY created_at DESC LIMIT ?3`,
+         WHERE account_id = ?1 AND agent = ?2 AND archived_at IS NULL ORDER BY created_at DESC LIMIT ?3`,
       ).bind(accountId, agent, limit)
     : env.DB.prepare(
         `SELECT id, agent, task_id, kind, title, priority, created_at, project, task, model FROM events
-         WHERE account_id = ?1 ORDER BY created_at DESC LIMIT ?2`,
+         WHERE account_id = ?1 AND archived_at IS NULL ORDER BY created_at DESC LIMIT ?2`,
       ).bind(accountId, limit)
   const { results } = await q.all()
   return json({ ok: true, events: results ?? [] })
@@ -396,7 +396,7 @@ export async function getProjects(env: Env, accountId: string): Promise<Response
        MAX(e.created_at) AS last_activity,
        GROUP_CONCAT(DISTINCT e.model) AS models
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL
      GROUP BY COALESCE(e.project, '')
      ORDER BY pending DESC, last_activity DESC`,
   )
@@ -443,7 +443,7 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
     `SELECT e.*, ${THREAD_KEY_SQL} AS thread_key,
        q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1 AND COALESCE(e.project, '') = ?2
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
      ORDER BY e.created_at ASC`,
   )
     .bind(accountId, project)
@@ -542,7 +542,8 @@ export async function getThread(project: string, key: string, env: Env, accountI
   const { results } = await env.DB.prepare(
     `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1 AND COALESCE(e.project, '') = ?2 AND ${THREAD_KEY_SQL} = ?3
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
+       AND ${THREAD_KEY_SQL} = ?3
      ORDER BY e.created_at ASC`,
   )
     .bind(accountId, project, key)
@@ -567,7 +568,8 @@ export async function getFeed(url: URL, env: Env, accountId: string): Promise<Re
   const rows = await env.DB.prepare(
     `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1 AND COALESCE(e.updated_at, e.created_at) > ?2
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL
+       AND COALESCE(e.updated_at, e.created_at) > ?2
      ORDER BY e.created_at DESC LIMIT ?3`,
   )
     .bind(accountId, sinceTs, limit)
@@ -579,7 +581,7 @@ export async function getEvent(id: string, env: Env, accountId: string): Promise
   const row = await env.DB.prepare(
     `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.id = ?1 AND e.account_id = ?2`,
+     WHERE e.id = ?1 AND e.account_id = ?2 AND e.archived_at IS NULL`,
   )
     .bind(id, accountId)
     .first()
@@ -655,8 +657,10 @@ export async function clearEvents(
   scope: 'read' | 'all',
   project?: string | null,
 ): Promise<Response> {
-  // account_id is always ?1; project (when present) is ?2.
-  const clauses = ['account_id = ?1']
+  // account_id is always ?1; project (when present) is ?2. Archived rows are
+  // out of the app already and are the one copy that is left, so no clear -
+  // not even scope 'all' - touches them.
+  const clauses = ['account_id = ?1', 'archived_at IS NULL']
   const bind: unknown[] = [accountId]
   if (project != null) {
     clauses.push(`COALESCE(project, '') = ?2`)
@@ -692,6 +696,74 @@ export async function clearEvents(
   }
   await pokeHub(env, accountId)
   return json({ ok: true, cleared: ids.length })
+}
+
+// -- Archive (session) --------------------------------------------------------
+// Note 4: take finished threads out of the app without taking them out of the
+// database. An archived event is invisible to every dashboard read and to the
+// agent inbox, and no clear - not even scope 'all' - will delete it afterwards.
+// Nothing in the app ever lists it again; it is there for whoever goes looking
+// in the database.
+//
+// The client sends the thread keys it is showing under Done, so what you see
+// is what goes. A thread with a question still waiting on you is refused, as a
+// whole thread: half-archiving one would leave a question in the app with no
+// conversation behind it.
+const ARCHIVE_CHUNK = 50
+
+export async function archiveThreads(
+  request: Request,
+  env: Env,
+  accountId: string,
+): Promise<Response> {
+  let body: { project?: unknown; keys?: unknown }
+  try {
+    body = (await request.json()) as { project?: unknown; keys?: unknown }
+  } catch {
+    return json({ ok: false, error: 'Invalid JSON.' }, 400)
+  }
+  const project = typeof body.project === 'string' ? body.project : ''
+  const keys = Array.isArray(body.keys)
+    ? [...new Set(body.keys.filter((k): k is string => typeof k === 'string' && k.trim() !== ''))]
+    : []
+  if (keys.length === 0) return json({ ok: true, archived: 0 })
+
+  const t = now()
+  let archived = 0
+  for (let i = 0; i < keys.length; i += ARCHIVE_CHUNK) {
+    const chunk = keys.slice(i, i + ARCHIVE_CHUNK)
+    const marks = chunk.map((_, n) => `?${n + 3}`).join(', ')
+    // Which of the asked-for threads may actually go. Resolved first, so the
+    // response counts threads the human recognises rather than rows.
+    const { results } = await env.DB.prepare(
+      `SELECT DISTINCT ${THREAD_KEY_SQL} AS thread_key
+       FROM events e
+       WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
+         AND ${THREAD_KEY_SQL} IN (${marks})
+         AND ${THREAD_KEY_SQL} NOT IN (
+           SELECT COALESCE(NULLIF(p.task_id, ''), p.id) FROM events p
+           JOIN questions q ON q.event_id = p.id
+           WHERE p.account_id = ?1 AND q.status = 'pending'
+         )`,
+    )
+      .bind(accountId, project, ...chunk)
+      .all<{ thread_key: string }>()
+    const allowed = (results ?? []).map((r) => r.thread_key)
+    if (allowed.length === 0) continue
+
+    const stampMarks = allowed.map((_, n) => `?${n + 4}`).join(', ')
+    await env.DB.prepare(
+      `UPDATE events SET archived_at = ?1
+       WHERE account_id = ?2 AND archived_at IS NULL AND COALESCE(project, '') = ?3
+         AND COALESCE(NULLIF(task_id, ''), id) IN (${stampMarks})`,
+    )
+      .bind(t, accountId, project, ...allowed)
+      .run()
+    archived += allowed.length
+  }
+
+  await pokeHub(env, accountId)
+  return json({ ok: true, archived })
 }
 
 // You answer a question in the UI. Validate the answer against the question's
@@ -838,12 +910,12 @@ export async function putSettings(request: Request, env: Env, accountId: string)
 }
 
 export async function getStats(env: Env, accountId: string): Promise<Response> {
-  const unread = await env.DB.prepare('SELECT COUNT(*) AS n FROM events WHERE account_id = ?1 AND read_at IS NULL')
+  const unread = await env.DB.prepare('SELECT COUNT(*) AS n FROM events WHERE account_id = ?1 AND read_at IS NULL AND archived_at IS NULL')
     .bind(accountId)
     .first<{ n: number }>()
   const pending = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM questions q JOIN events e ON e.id = q.event_id
-     WHERE e.account_id = ?1 AND q.status = 'pending'`,
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND q.status = 'pending'`,
   )
     .bind(accountId)
     .first<{ n: number }>()

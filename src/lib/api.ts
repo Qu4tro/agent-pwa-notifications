@@ -119,6 +119,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ scope, ...(project != null ? { project } : {}) }),
     }),
+  // Take finished threads out of the app. The keys are the ones the page is
+  // showing, so what the human sees go is what goes.
+  archive: (project: string, keys: string[]) =>
+    req<{ ok: boolean; archived: number }>('/api/v1/archive', {
+      method: 'POST',
+      body: JSON.stringify({ project, keys }),
+    }),
   answer: (id: string, answer: Record<string, unknown>) =>
     req<{ ok: boolean; error?: string }>(`/api/v1/questions/${id}/answer`, {
       method: 'POST',

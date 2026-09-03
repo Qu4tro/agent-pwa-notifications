@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { timeAgo, type TaskSummary } from '../lib/api'
 import { BackLink, Container, useHeaderActions, useHeaderBack } from '../lib/shell'
-import { ensure, tasksQuery, useAnswerFromList, useClear } from '../lib/queries'
+import { ensure, tasksQuery, useAnswerFromList, useArchive, useClear } from '../lib/queries'
 import { TasksSkeleton } from '../lib/skeleton'
 import { projectLabel, fromParam, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../lib/project'
 import {
@@ -36,6 +36,7 @@ function ProjectView() {
   const project = fromParam(name)
   const { data, isError, refetch } = useQuery(tasksQuery(project))
   const clear = useClear()
+  const archive = useArchive(project)
   const [clearOpen, setClearOpen] = useState(false)
 
   useHeaderBack(<BackLink to="/" label="Projects" />, [])
@@ -106,7 +107,23 @@ function ProjectView() {
             </Section>
           )}
           {done.length > 0 && (
-            <Section title="Done" count={done.length}>
+            <Section
+              title="Done"
+              count={done.length}
+              // Archive, not delete: these threads leave the app and stay in
+              // the database. What is on screen is what goes, so the keys go
+              // with the request rather than the server deciding again.
+              action={
+                <button
+                  type="button"
+                  disabled={archive.isPending}
+                  onClick={() => archive.mutate({ keys: done.map((t) => t.key) })}
+                  className="-my-1.5 inline-flex min-h-11 items-center rounded-ui px-2 text-[14px] text-muted hover:text-text disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              }
+            >
               {done.map((t) => (
                 <TaskLine key={t.key} t={t} unread={t.unread > 0} />
               ))}

@@ -39,6 +39,7 @@ import {
   markAllRead,
   markUnread,
   clearEvents,
+  archiveThreads,
   answerQuestion,
   subscribePush,
   unsubscribePush,
@@ -252,6 +253,8 @@ export async function handleApi(
     if (path === '/api/v1/settings' && method === 'GET') return getSettings(env, acct)
     if (path === '/api/v1/settings' && method === 'POST') return putSettings(request, env, acct)
     if (path === '/api/v1/read-all' && method === 'POST') return markAllRead(env, acct)
+    // Session only. Archiving is a human action - no agent-facing equivalent.
+    if (path === '/api/v1/archive' && method === 'POST') return archiveThreads(request, env, acct)
     if (path === '/api/v1/push/subscribe' && method === 'POST') return subscribePush(request, env, acct)
     if (path === '/api/v1/push/unsubscribe' && method === 'POST') return unsubscribePush(request, env, acct)
 

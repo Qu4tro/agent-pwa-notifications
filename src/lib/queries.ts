@@ -173,6 +173,30 @@ export function useAnswerFromList(project: string) {
   })
 }
 
+// Note 4's Clear: the Done rows leave the list on the tap, before the round
+// trip, because there is nothing to undo on the server if it fails - the write
+// is idempotent and the next poll puts anything back that did not go.
+export function useArchive(project: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ keys }: { keys: string[] }) => api.archive(project, keys),
+    onMutate: async ({ keys }) => {
+      const queryKey = queryKeys.tasks(project)
+      await client.cancelQueries({ queryKey })
+      const previous = client.getQueryData<TaskSummary[]>(queryKey)
+      const going = new Set(keys)
+      client.setQueryData<TaskSummary[]>(queryKey, (tasks) =>
+        tasks?.filter((t) => !going.has(t.key)),
+      )
+      return { previous, queryKey }
+    },
+    onError: (_error, _input, context) => {
+      if (context) client.setQueryData(context.queryKey, context.previous)
+    },
+    onSettled: () => invalidateLists(client),
+  })
+}
+
 export function useMarkRead() {
   const client = useQueryClient()
   return useMutation({

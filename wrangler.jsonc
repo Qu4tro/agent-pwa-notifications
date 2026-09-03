@@ -16,7 +16,8 @@
   // Instant mode is OFF by default: the app polls (free tier, no DO usage).
   // Flip INSTANT to "1" (and keep the binding below) for sub-second live updates
   // via a hibernating Durable Object. A SQLite-backed class is free-plan eligible.
-  // EVENT_RETENTION_DAYS: the hourly cron deletes events older than this.
+  // EVENT_RETENTION_DAYS: the hourly cron archives events older than this.
+  // Archived means out of the app, still in the database - nothing is deleted.
   // SESSION_TTL_DAYS: how long a signed-in browser stays signed in. Long, so a
   // notification answer button still works weeks later.
   "vars": {
