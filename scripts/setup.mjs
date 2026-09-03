@@ -5,7 +5,7 @@
 //   pnpm setup
 //
 // Safe to re-run: pass --rotate to mint brand-new keys (invalidates old ones).
-import { generateVapidKeys, randomKey, loadSecrets, saveSecrets, putSecret, wrangler, readWorkerName } from './lib.mjs'
+import { generateVapidKeys, randomKey, loadSecrets, saveSecrets, putSecret, wrangler, readWorkerName, SECRETS_FILE } from './lib.mjs'
 
 const rotate = process.argv.includes('--rotate')
 const existing = loadSecrets()
@@ -24,7 +24,7 @@ if (existing && !rotate) {
     WORKER_URL: existing?.WORKER_URL,
   }
   saveSecrets(secrets)
-  console.log('Generated credentials into .agent-dash.local.json (gitignored).\n')
+  console.log(`Generated credentials into ${SECRETS_FILE} (gitignored).\n`)
 }
 
 console.log('Applying the database schema...')
@@ -65,8 +65,8 @@ console.log('  pnpm exec wrangler secret put ALLOWED_EMAILS')
 console.log('')
 console.log('Connect an agent with that key:')
 console.log('')
-console.log('  npx agent-pwa-notifications login --url ' + url + ' --key <AGENT_KEY>')
-console.log('  npx agent-pwa-notifications connect')
+console.log('  node cli/bin.mjs login --url ' + url + ' --key <AGENT_KEY>')
+console.log('  node cli/bin.mjs connect')
 console.log('')
 console.log('After that, `agent-notify-pwa open` mints a one-time link to sign')
 console.log('in on the phone, with no email round trip.')

@@ -64,3 +64,50 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes-file notes.md
+
+  publish-cli:
+    name: publish the CLI to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      # No npm account is attached to this repo yet, so the whole job is a
+      # no-op until an NPM_TOKEN secret exists. The AUR package builds from the
+      # GitHub release tarball and does not need npm.
+      - name: Look for an npm token
+        id: token
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN}" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'No NPM_TOKEN secret: skipping the npm publish.'
+          fi
+
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Check the CLI version against the tag
+        if: steps.token.outputs.present == 'true'
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have="$(node -p "require('./cli/package.json').version")"
+          if [ "$want" != "$have" ]; then
+            echo "cli/package.json is $have but the tag is $want." >&2
+            exit 1
+          fi
+
+      - name: Publish
+        if: steps.token.outputs.present == 'true'
+        working-directory: cli
+        run: npm publish --access public --provenance

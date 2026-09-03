@@ -3,7 +3,11 @@ import { generateKeyPairSync, randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
-export const SECRETS_FILE = '.agent-dash.local.json'
+export const SECRETS_FILE = '.agent-notify-pwa.local.json'
+
+// The file was called .agent-dash.local.json before the rename. A checkout
+// that still has one keeps working; nothing writes that name any more.
+const LEGACY_SECRETS_FILE = '.agent-dash.local.json'
 
 export function b64url(buf) {
   return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -30,8 +34,9 @@ export function generateVapidKeys() {
 }
 
 export function loadSecrets() {
-  if (!existsSync(SECRETS_FILE)) return null
-  return JSON.parse(readFileSync(SECRETS_FILE, 'utf8'))
+  const file = [SECRETS_FILE, LEGACY_SECRETS_FILE].find((f) => existsSync(f))
+  if (!file) return null
+  return JSON.parse(readFileSync(file, 'utf8'))
 }
 
 export function saveSecrets(secrets) {
@@ -56,5 +61,5 @@ export function wrangler(args, opts = {}) {
 export function readWorkerName() {
   const raw = readFileSync('wrangler.jsonc', 'utf8').replace(/\/\/.*$/gm, '')
   const m = raw.match(/"name"\s*:\s*"([^"]+)"/)
-  return m ? m[1] : 'agent-dash'
+  return m ? m[1] : '<worker-name>'
 }

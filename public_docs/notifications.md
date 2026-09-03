@@ -60,15 +60,23 @@ The rule lives in `public/sw.js` and is covered by
 
 | Platform | Browser | `maxActions` | Result |
 |---|---|---|---|
-| Linux desktop | Firefox | to be filled in | to be filled in |
-| Android | Firefox | to be filled in | to be filled in |
+| Linux desktop | Firefox 154 | 2 | measured: 2 answers both show and no More; 3 answers give the first answer plus More |
+| Android | Firefox | to be measured | to be measured |
 | Android | Chrome | 2 (documented) | 2 answers both show; 3 answers give 1 answer plus More |
 | iOS | Safari | 0 (documented) | no buttons; tap opens the thread |
 
-The rows marked "to be filled in" are measured on the real devices as part of
-the cutover, not guessed. The Chrome and Safari rows come from the platform
-documentation; iOS has no device here to test on. iOS also needs the app added
-to the home screen before Web Push works at all.
+The desktop row was measured on the device: `Notification.maxActions` read in
+the browser, then a two-option and a three-option question posted from the CLI.
+The two-option notification showed both answers and no More; clicking one
+answered the question and the waiting agent received the choice. The
+three-option notification showed one answer and More; More opened the thread in
+the app and left the question pending, and answering there reached the agent
+just the same.
+
+The Android row is measured on the phone the same way. The Chrome and Safari
+rows come from the platform documentation; there is no device here to test them
+on. iOS also needs the app added to the home screen before Web Push works at
+all.
 
 ## What a tap does
 
