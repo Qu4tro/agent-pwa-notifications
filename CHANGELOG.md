@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-03
+
 ### Changed
 
 - The Worker is named `agent-pwa-notifications`. Its `workers.dev` URL changes
