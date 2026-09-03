@@ -10,8 +10,8 @@ import { InlineError } from '../lib/ui'
 // Note 6: one page for everything waiting on the human, whatever project it is
 // in. The header's bell links here and carries the count.
 //
-// The rows are the same rows as the project page - micro-answers inline,
-// "Open to answer" for anything larger - and they leave the same way: the
+// The rows are the same rows as the project page - micro-answers inline, and
+// the row on its own for anything larger - and they leave the same way: the
 // optimistic write drops a row the moment its button is tapped, and the poll
 // brings new ones in. Nothing is dismissed by hand.
 export const Route = createFileRoute('/_app/pending')({
@@ -39,7 +39,7 @@ function PendingPage() {
     <Container>
       <h1 className="mb-4 px-4 text-[22px] font-semibold">Needs you</h1>
       {data.length === 0 ? (
-        <p className="px-4 py-12 text-center text-muted">Nothing needs you.</p>
+        <p className="px-4 py-12 text-center text-muted">You&apos;re all caught up.</p>
       ) : (
         <div className="border-t border-edge">
           {data.map((t) => (
