@@ -10,6 +10,14 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Changed
+
+- The Worker is named `agent-pwa-notifications`. Its `workers.dev` URL changes
+  with it, so the old origin stops serving this app. A push subscription, a
+  session and an installed PWA are all bound to an origin, so each device signs
+  in and enables notifications once more. The D1 database keeps the name
+  `agent-dash`, because D1 cannot rename one, and no data moves.
+
 ### Added
 
 - `public_docs/development.md`: the layout, the two test projects and why they

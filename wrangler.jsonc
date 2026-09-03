@@ -3,7 +3,7 @@
   // (from `wrangler d1 create agent-dash` and `wrangler kv namespace create SESSIONS`),
   // or just run `pnpm setup` which walks you through it.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "agent-dash",
+  "name": "agent-pwa-notifications",
   "account_id": "f4d71022dd6ed8ada4e294c096d51fc5",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
