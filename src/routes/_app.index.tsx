@@ -6,7 +6,16 @@ import { Container, useHeaderActions } from '../lib/shell'
 import { ensure, projectsQuery } from '../lib/queries'
 import { ProjectsSkeleton } from '../lib/skeleton'
 import { projectLabel, toParam, STATE_TEXT } from '../lib/project'
-import { InlineError, ProjectDot, Row, RowBody, Section, Time, iconButtonClass } from '../lib/ui'
+import {
+  InlineError,
+  ProjectDot,
+  Row,
+  RowBody,
+  Section,
+  Time,
+  iconButtonClass,
+  rowLinkClass,
+} from '../lib/ui'
 
 export const Route = createFileRoute('/_app/')({
   ssr: false,
@@ -65,12 +74,8 @@ function Projects() {
 
 function ProjectLine({ p }: { p: ProjectRow }) {
   return (
-    <Link
-      to="/project/$name"
-      params={{ name: toParam(p.project) }}
-      className="block text-text no-underline hover:bg-surface"
-    >
-      <Row time={<Time at={p.last_activity} />}>
+    <Row time={<Time at={p.last_activity} />}>
+      <Link to="/project/$name" params={{ name: toParam(p.project) }} className={rowLinkClass}>
         {/* Nudged down to sit on the title's optical centre, now that the row
             hangs its content from the top rather than centring it. */}
         <span className="mt-[7px] flex shrink-0">
@@ -95,8 +100,8 @@ function ProjectLine({ p }: { p: ProjectRow }) {
           detail={p.models.length > 0 ? p.models.join(', ') : null}
           bold={p.unread > 0}
         />
-      </Row>
-    </Link>
+      </Link>
+    </Row>
   )
 }
 

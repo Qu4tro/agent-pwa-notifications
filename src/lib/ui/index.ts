@@ -1,4 +1,4 @@
-export { Row, RowBody, type TimelineItem } from './row'
+export { Row, RowBody, rowLinkClass, type TimelineItem } from './row'
 export { Time } from './time'
 export { KindLabel, ProjectDot, UnreadDot } from './kind'
 export { Button, IconButton, buttonClass, iconButtonClass } from './button'

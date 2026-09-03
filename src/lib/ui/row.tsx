@@ -8,30 +8,47 @@ import { Time } from './time'
 // The gutter is 56px wide and holds the row's own time, top-aligned with the
 // title. A thread page's messages stand their times in a gutter of the same
 // width, so a row and the message it opens into line up down the same column.
+//
+// The whole row is one wrapping flex line: gutter, body, answers. The body
+// takes every scrap of slack (grow 9999 against the answers' 1), so when the
+// answers fit they sit at the right of the row at their own width. When they
+// do not, they wrap to a line of their own and their grow makes them span it,
+// which is what "full width if they do not fit" means here. Nothing measures
+// anything in JavaScript.
+
+// The row's body is a link to whatever the row is about. The padding is on the
+// link, not around it, so the whole body is the target.
+export const rowLinkClass =
+  'flex min-w-0 flex-1 items-start gap-2.5 py-3 pr-4 pl-2.5 text-text no-underline'
 
 export function Row({
   children,
   time,
+  answers,
   className = '',
-  divider = true,
 }: {
   children: React.ReactNode
   // What the gutter holds. Rows that have no time of their own leave it empty
   // and keep the column, so nothing shifts left.
   time?: React.ReactNode
+  // Controls that belong to this row and cannot live inside its link, because
+  // a button cannot sit inside one.
+  answers?: React.ReactNode
   className?: string
-  // Off when something sits under the row inside the same entry, such as the
-  // answer buttons of a pending micro-question.
-  divider?: boolean
 }) {
   return (
-    <div className={`flex ${divider ? 'border-b border-b-line' : ''} ${className}`}>
+    <div className={`flex flex-wrap items-start border-b border-b-line hover:bg-surface ${className}`}>
       <div className="w-14 shrink-0 py-3 pr-1.5 pl-4 text-right text-[13px] leading-[21px] whitespace-nowrap text-faint">
         {time}
       </div>
-      <div className="flex min-w-0 flex-1 items-start gap-2.5 border-l-[3px] border-l-transparent py-3 pr-4 pl-2.5">
+      <div className="flex min-w-0 grow-[9999] basis-[16rem] border-l-[3px] border-l-transparent">
         {children}
       </div>
+      {answers ? (
+        <div className="flex grow basis-auto flex-wrap items-start gap-2 pt-3 pr-4 pb-3 pl-4">
+          {answers}
+        </div>
+      ) : null}
     </div>
   )
 }
