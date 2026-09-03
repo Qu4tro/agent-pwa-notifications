@@ -1,14 +1,19 @@
-// Three button roles and nothing else. Primary is the one accent colour in the
-// app; secondary is an outline; danger is an outline that has gone red. Every
-// one is at least 44px tall, so it stays a comfortable touch target.
+// Four button roles and nothing else. Primary is the one accent colour in the
+// app; secondary is an outline; danger is an outline that has gone red; answer
+// is one option on a question, wearing the colour that tells it from its
+// siblings. Every one is at least 44px tall, so it stays a comfortable touch
+// target.
 
-type Variant = 'primary' | 'secondary' | 'danger'
+type Variant = 'primary' | 'secondary' | 'danger' | 'answer'
 
 const VARIANT: Record<Variant, string> = {
   // Dark label on the accent: 6.9:1. A light label on it would be 2.2:1.
   primary: 'bg-kind-question text-bg font-semibold hover:opacity-90',
   secondary: 'border border-edge text-text hover:bg-surface',
   danger: 'border border-kind-error text-kind-error hover:bg-surface',
+  // Both values come from answerStyle in src/lib/answers.ts, which picks the
+  // label colour by luminance so a dark fill never gets a dark label.
+  answer: 'bg-[var(--answer-bg)] text-[var(--answer-fg)] font-semibold hover:opacity-90',
 }
 
 const BASE =

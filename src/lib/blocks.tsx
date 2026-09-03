@@ -8,6 +8,7 @@ import {
   Info,
   TriangleAlert,
 } from 'lucide-react'
+import { answerStyle } from './answers'
 import { CodeBlock } from './highlight'
 import { Button, fieldClass } from './ui'
 
@@ -360,13 +361,17 @@ export function AnswerForm({
       {interactive.map((b, i) => {
         if (b.type === 'buttons') {
           const options = (b.options as string[]) ?? []
+          // Parallel to `options`, and short or absent: an option with no
+          // entry falls back to its place in the palette.
+          const colors = (b.colors as string[] | undefined) ?? []
           const id = String(b.id)
           return (
             <div key={i} className="flex flex-wrap gap-2">
-              {options.map((opt) => (
+              {options.map((opt, oi) => (
                 <Button
                   key={opt}
-                  variant="primary"
+                  variant="answer"
+                  style={answerStyle(oi, colors[oi])}
                   disabled={disabled}
                   onClick={() => onSubmit({ [id]: opt })}
                 >

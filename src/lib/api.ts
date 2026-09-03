@@ -53,8 +53,9 @@ export interface TaskSummary {
   pending_event_id: string | null
   pending_question: string | null
   // Non-empty only for a micro-question: the 2 or 3 options that can be
-  // answered straight from the project list.
-  pending_answers: { label: string; answer: Record<string, string> }[]
+  // answered straight from the project list. `color` is what the agent asked
+  // for, if it asked; absent means the option takes its place in the palette.
+  pending_answers: { label: string; answer: Record<string, string>; color?: string }[]
   // When the question was asked. Null unless `pending`; the pending page
   // orders on it, so the longest wait is at the top.
   pending_since: number | null

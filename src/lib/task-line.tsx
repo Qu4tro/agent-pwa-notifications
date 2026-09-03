@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import type { QueryKey } from '@tanstack/react-query'
 import { type TaskSummary } from './api'
 import { useAnswerFromList } from './queries'
+import { answerStyle } from './answers'
 import { toParam } from './project'
 import { Button, KindLabel, Row, RowBody, Time, UnreadDot, rowLinkClass, type TimelineItem } from './ui'
 
@@ -122,10 +123,11 @@ export function PendingLine({
       from={from}
       answers={
         <>
-          {options.map((o) => (
+          {options.map((o, i) => (
             <Button
               key={o.label}
-              variant="primary"
+              variant="answer"
+              style={answerStyle(i, o.color)}
               // flex-1 splits a wrapped line into equal shares; min-w-fit
               // stops that split from squeezing the longest label into two
               // lines when the buttons are riding the row instead.
