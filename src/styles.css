@@ -152,23 +152,8 @@
     animation: skeleton-pulse 1.4s ease-in-out infinite;
   }
 
-  /* The refresh line on the bottom edge of the header. */
-  @keyframes refresh-slide {
-    from {
-      transform: translateX(-100%);
-    }
-    to {
-      transform: translateX(250%);
-    }
-  }
-  .refresh-bar {
-    width: 40%;
-    animation: refresh-slide 0.9s ease-in-out infinite;
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .skeleton,
-    .refresh-bar {
+    .skeleton {
       animation: none;
     }
   }

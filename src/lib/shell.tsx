@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useIsFetching } from '@tanstack/react-query'
+import { onlineManager, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { APP_NAME } from './brand'
 
@@ -10,30 +10,64 @@ export function Header({ right }: { right?: React.ReactNode }) {
   return (
     <header className="safe-top sticky top-0 z-10 border-b border-line bg-bg">
       <div className="mx-auto flex h-11 max-w-[44rem] items-center justify-between gap-3 px-3">
-        <Link to="/" className="truncate font-semibold text-text no-underline">
-          {APP_NAME}
-        </Link>
+        <div className="flex min-w-0 items-center gap-2">
+          <Link to="/" className="truncate font-semibold text-text no-underline">
+            {APP_NAME}
+          </Link>
+          <ConnectionDot />
+        </div>
         <div className="flex items-center gap-1">{right}</div>
       </div>
-      <RefreshBar />
     </header>
   )
 }
 
-// The only "something is loading" signal in the app: a 2px line on the bottom
-// edge of the header while any query is in flight. Content never disappears
-// behind a spinner.
-function RefreshBar() {
-  const fetching = useIsFetching()
+// True until a fetch fails, false again as soon as one succeeds. The lists poll
+// every 5 seconds, so a hub that comes back turns this green within one
+// interval. Losing the network is its own signal: the runtime pauses fetches
+// rather than failing them, so no error would ever arrive to notice.
+function useHubReachable(): boolean {
+  const client = useQueryClient()
+  const [lastFetchOk, setLastFetchOk] = useState(true)
+  const [online, setOnline] = useState(() => onlineManager.isOnline())
+
+  useEffect(() => {
+    const unsubscribeCache = client.getQueryCache().subscribe((event) => {
+      if (event.type !== 'updated') return
+      if (event.action.type === 'success') setLastFetchOk(true)
+      else if (event.action.type === 'error') setLastFetchOk(false)
+    })
+    const unsubscribeOnline = onlineManager.subscribe(setOnline)
+    return () => {
+      unsubscribeCache()
+      unsubscribeOnline()
+    }
+  }, [client])
+
+  return online && lastFetchOk
+}
+
+// The only "something is loading" signal used to be a bar on the header's
+// bottom edge, tied to "a request is in flight". Against a 5 second poll it
+// blinked almost continuously and taught the eye to skip it. This says the one
+// thing worth knowing instead - whether the hub is answering - and it changes
+// only when that changes. Filled green when it is, a hollow red ring when it
+// is not: shape as well as colour, so the state does not rest on telling red
+// from green (WCAG 1.4.1).
+function ConnectionDot() {
+  const reachable = useHubReachable()
+  const label = reachable ? 'Connected' : 'Not connected'
   return (
-    <div
-      aria-hidden
-      className={`pointer-events-none absolute right-0 -bottom-px left-0 h-0.5 overflow-hidden transition-opacity duration-150 ${
-        fetching > 0 ? 'opacity-100' : 'opacity-0'
-      }`}
-    >
-      <div className="refresh-bar h-0.5 bg-kind-question" />
-    </div>
+    <span role="status" className="flex shrink-0 items-center">
+      <span
+        aria-hidden
+        title={label}
+        className={`inline-block size-2 shrink-0 rounded-full ${
+          reachable ? 'bg-kind-done' : 'border-2 border-kind-error'
+        }`}
+      />
+      <span className="sr-only">{label}</span>
+    </span>
   )
 }
 
