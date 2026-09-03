@@ -111,7 +111,30 @@ curl -X POST "$HUB/api/v1/events" \
 - `priority`: `0` silent (shows in the app, no push), `1` push, `2` urgent
   (rings through quiet hours). Default `0`.
 - `kind`: `update` (default), `done` for a final success, `error` for a failure.
+- `idle_minutes`: how long silence still counts as working. Default `240`.
 - Keep the returned `id` if you plan to update the event in place.
+
+### Saying when a task is over
+
+The human's dashboard sorts a thread into Needs you, Active or Done. Only two
+things move a thread into Done, and neither of them is the human reading it:
+
+- You send `kind: "done"`. Send it on the last message of every task. An
+  `error` does **not** end a thread, because an agent that hit an error may
+  still retry - follow the error with a `done` when you finally stop.
+- Or the thread goes quiet for longer than `idle_minutes` (default `240`, four
+  hours). This is the safety net for an agent that crashes or is killed, not a
+  substitute for saying `done`.
+
+Set `idle_minutes` on any event when you are about to go quiet for longer than
+four hours; the latest value on the thread wins.
+
+```bash
+curl -X POST "$HUB/api/v1/events" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "task_id": "landing-redesign", "title": "Landing page shipped",
+        "kind": "done", "priority": 1 }'
+```
 
 When to notify: milestones, not every step. Good: "Scraped all sources",
 "Deploy succeeded", "Tests failing, see the log". Bad: narrating each file you
@@ -305,6 +328,9 @@ That is the whole API:
 ## Etiquette
 
 - Notify on milestones and completions. Ask only at real decision points.
+- End every task with `kind: "done"`. Without it the thread sits in Active
+  until the idle timeout runs out, and the human cannot tell you finished from
+  you stopping.
 - Use `priority: 2` only for something that should interrupt the human.
 - Reuse one `task_id` per task so the human sees a thread, not noise.
 - Always pass `timeout_minutes` on a question and handle `expired`.

@@ -20,6 +20,7 @@ const { values: flags, positionals } = parseArgs({
     'task-id': { type: 'string' },
     model: { type: 'string' },
     kind: { type: 'string' },
+    idle: { type: 'string' },
     tag: { type: 'string', multiple: true },
     markdown: { type: 'string' },
     button: { type: 'string', multiple: true },
@@ -130,6 +131,7 @@ async function notify() {
     agent: flags.agent || 'agent-notify-pwa',
     priority: flags.priority ? Number(flags.priority) : 0,
     kind: flags.kind || 'update',
+    idle_minutes: flags.idle ? Number(flags.idle) : undefined,
     project: flags.project,
     task: flags.task,
     task_id: flags['task-id'],
@@ -164,6 +166,7 @@ async function ask() {
     model: flags.model,
     tags: flags.tag,
     ack: flags.ack,
+    idle_minutes: flags.idle ? Number(flags.idle) : undefined,
   }
   await attachBlocks(body, blocks, conf)
   const { status, json } = await hub('POST', '/api/v1/questions', conf, body)
@@ -233,8 +236,12 @@ ${BIN} ${VERSION} - talk to your Agent Notifications hub
   ${BIN} notify "msg" [--priority 0|1|2] [--kind update|done|error]
                           [--project P] [--task T] [--task-id ID] [--model M]
                           [--markdown "..."] [--tag x] [--agent NAME]
+                          [--idle MINUTES]
+      --kind done is what ends a thread on the dashboard. --idle says how long
+      silence still counts as working (default 240).
 
   ${BIN} ask "question" --button A --button B [--markdown "..."] [--ack "..."]
+                          [--idle MINUTES]
       Post a question, wait, then print the answer JSON on stdout.
 
   ${BIN} status [--json]

@@ -14,7 +14,7 @@ const TOOLS = [
   {
     name: 'notify',
     description:
-      'Push an update to the human. Use for milestones, not every step. ALWAYS pass: project (what you are working on), model (which LLM you are), and task_id - generate ONE stable task_id when you start a task and reuse it on EVERY notify/ask for that task, so all its messages thread together in one conversation instead of scattering into separate cards. Set priority 2 for anything that should ring through quiet hours.',
+      'Push an update to the human. Use for milestones, not every step. ALWAYS pass: project (what you are working on), model (which LLM you are), and task_id - generate ONE stable task_id when you start a task and reuse it on EVERY notify/ask for that task, so all its messages thread together in one conversation instead of scattering into separate cards. Set priority 2 for anything that should ring through quiet hours. Send kind:"done" on the LAST message of a task - that is the only thing that moves the thread out of Active on the human\'s dashboard.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -27,6 +27,8 @@ const TOOLS = [
         priority: { type: 'number', description: '0 info, 1 notify, 2 urgent. Default 0.' },
         task_id: { type: 'string', description: 'Stable key to group updates into one thread / update in place.' },
         agent: { type: 'string', description: 'The tool/client you run in (e.g. "cursor", "zed").' },
+        kind: { type: 'string', description: 'update (default) | done | error. done finishes the thread; error does not.' },
+        idle_minutes: { type: 'number', description: 'How many minutes of silence still count as working. Once it passes with nothing new on the thread, the dashboard moves the thread out of Active. Default 240 (4h). Set it when you are about to go quiet for longer than that.' },
       },
       required: ['title'],
     },
@@ -41,7 +43,8 @@ const TOOLS = [
         event_id: { type: 'string', description: 'The id returned by notify.' },
         title: { type: 'string' },
         blocks: { type: 'array', description: 'New display blocks (replaces the old ones).' },
-        kind: { type: 'string', description: 'update | done | error' },
+        kind: { type: 'string', description: 'update | done | error. done finishes the thread; error does not.' },
+        idle_minutes: { type: 'number', description: 'How many minutes of silence still count as working. Once it passes with nothing new on the thread, the dashboard moves the thread out of Active. Default 240 (4h). Set it when you are about to go quiet for longer than that.' },
         priority: { type: 'number' },
         notify: { type: 'boolean', description: 'Send a push for this update. Default false - leave off for silent progress ticks.' },
       },
@@ -71,6 +74,7 @@ const TOOLS = [
             'Must include a buttons or form block. Notification answers require exactly one buttons block with 2-3 labels of at most 20 characters each. Put longer context in markdown; e.g. [{"type":"markdown","text":"The checks passed."},{"type":"buttons","id":"go","options":["Ship","Hold"]}]',
         },
         timeout_minutes: { type: 'number', description: 'How long to wait before the question expires. Default 1440 (24h).' },
+        idle_minutes: { type: 'number', description: 'How many minutes of silence still count as working. Once it passes with nothing new on the thread, the dashboard moves the thread out of Active. Default 240 (4h). Set it when you are about to go quiet for longer than that.' },
         task_id: { type: 'string' },
         agent: { type: 'string' },
       },
@@ -101,6 +105,10 @@ const TOOLS = [
   },
 ]
 
+// What `notify` may create. A question is a different tool, with its own
+// interactive blocks and its own poll.
+const NOTIFY_KINDS = new Set(['update', 'done', 'error'])
+
 // Adapt an existing API handler (which speaks Request/Response) to a tool call
 // by synthesizing a Request from the tool arguments.
 function fakeRequest(body: unknown): Request {
@@ -113,7 +121,11 @@ function fakeRequest(body: unknown): Request {
 
 async function callTool(name: string, args: Record<string, unknown>, env: Env, accountId: string): Promise<unknown> {
   if (name === 'notify') {
-    const res = await createEvent(fakeRequest({ ...args, kind: 'update' }), env, accountId)
+    // `kind` used to be forced to 'update' here, which meant an MCP agent had
+    // no way to finish a thread at all. createEvent validates it and rejects
+    // 'question', which has its own tool.
+    const kind = NOTIFY_KINDS.has(String(args.kind)) ? String(args.kind) : 'update'
+    const res = await createEvent(fakeRequest({ ...args, kind }), env, accountId)
     return res.json()
   }
   if (name === 'update') {

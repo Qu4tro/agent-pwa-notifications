@@ -119,7 +119,13 @@ interface Meta {
   task: string | null
   model: string | null
   tags: string // JSON array string
+  idleMinutes: number | null
 }
+
+// How long a thread stays "in progress" with nothing new on it. An agent that
+// crashes, or that simply stops, would otherwise leave its thread Active for
+// ever, so silence past this counts as finished. Four hours, decided 2026-09-04.
+export const DEFAULT_IDLE_MINUTES = 240
 
 // Pull the attribution fields out of a request body, sanitized.
 function extractMeta(body: Record<string, unknown>): Meta {
@@ -131,11 +137,19 @@ function extractMeta(body: Record<string, unknown>): Meta {
         .slice(0, 12)
         .map((t) => (t as string).trim().slice(0, 40))
     : []
+  // Same bounds as a question timeout: a minute to seven days. Anything the
+  // agent does not send stays null, which reads as the default.
+  const rawIdle = Number(body.idle_minutes)
+  const idleMinutes =
+    body.idle_minutes != null && Number.isFinite(rawIdle)
+      ? Math.max(1, Math.min(10_080, rawIdle | 0))
+      : null
   return {
     project: str(body.project, 120),
     task: str(body.task, 200),
     model: str(body.model, 80),
     tags: JSON.stringify(tags),
+    idleMinutes,
   }
 }
 
@@ -165,10 +179,10 @@ export async function createEvent(request: Request, env: Env, accountId: string)
   const id = ulid()
   const t = now()
   await env.DB.prepare(
-    `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+    `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc, idle_minutes)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
   )
-    .bind(id, accountId, agent, taskId, kind, title, norm.blocks, priority, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc)
+    .bind(id, accountId, agent, taskId, kind, title, norm.blocks, priority, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc, meta.idleMinutes)
     .run()
 
   const event: EventRow = {
@@ -228,6 +242,7 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
   const task = 'task' in body ? extractMeta(body).task : null
   const model = 'model' in body ? extractMeta(body).model : null
   const tags = 'tags' in body ? extractMeta(body).tags : null
+  const idleMinutes = 'idle_minutes' in body ? extractMeta(body).idleMinutes : null
 
   // COALESCE keeps the old value when we pass null. read_at resets so a fresh
   // update the human hasn't seen shows as unread again.
@@ -242,11 +257,12 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
        model = COALESCE(?7, model),
        tags = COALESCE(?8, tags),
        enc = COALESCE(?9, enc),
-       updated_at = ?10,
+       idle_minutes = COALESCE(?10, idle_minutes),
+       updated_at = ?11,
        read_at = NULL
-     WHERE id = ?11 AND account_id = ?12`,
+     WHERE id = ?12 AND account_id = ?13`,
   )
-    .bind(title, kind, priority, blocksJson, project, task, model, tags, encVal, now(), id, accountId)
+    .bind(title, kind, priority, blocksJson, project, task, model, tags, encVal, idleMinutes, now(), id, accountId)
     .run()
 
   if (body.notify === true) {
@@ -291,9 +307,9 @@ export async function createQuestion(request: Request, env: Env, accountId: stri
   const ack = typeof body.ack === 'string' && body.ack.trim() ? body.ack.trim().slice(0, 500) : null
   const batch = [
     env.DB.prepare(
-      `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc, ack)
-       VALUES (?1, ?2, ?3, ?4, 'question', ?5, ?6, 2, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
-    ).bind(id, accountId, agent, taskId, title, norm.blocks, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc, ack),
+      `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc, ack, idle_minutes)
+       VALUES (?1, ?2, ?3, ?4, 'question', ?5, ?6, 2, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+    ).bind(id, accountId, agent, taskId, title, norm.blocks, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc, ack, meta.idleMinutes),
     env.DB.prepare(
       `INSERT INTO questions (event_id, status, timeout_at) VALUES (?1, 'pending', ?2)`,
     ).bind(id, timeoutAt),
@@ -401,6 +417,20 @@ export async function getProjects(env: Env, accountId: string): Promise<Response
 // own id (a singleton thread). NEVER the human `task` label - labels collide.
 const THREAD_KEY_SQL = `COALESCE(NULLIF(e.task_id, ''), e.id)`
 
+// Which of the three sections of the project page a thread belongs in.
+//
+// This used to be worked out on the client from "is anything unread", which
+// made the state a fact about the human: a thread the agent was still working
+// on dropped into Done the moment its last update was read. Now the thread
+// says it itself - `pending` while a question waits on you, `done` once the
+// agent has sent a `done` or gone quiet past its idle timeout, `active`
+// otherwise.
+//
+// An `error` does not finish a thread. An update that went wrong is still an
+// update, and the agent may well retry, so the thread stays Active until it
+// says done or the silence runs out. Decided 2026-09-04.
+export type ThreadState = 'pending' | 'active' | 'done'
+
 // Task threads within a project. Groups events by thread key in JS (small,
 // single-user data), summarizing each thread for the project view.
 export async function getTasks(project: string, env: Env, accountId: string): Promise<Response> {
@@ -434,6 +464,8 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
         latest_title: '',
         latest_kind: 'update',
         last_activity: 0,
+        idle_minutes: null,
+        state: 'active' as ThreadState,
       }
       threads.set(key, t)
     }
@@ -445,6 +477,9 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
     // Latest event (rows are ASC, so keep overwriting).
     t.latest_title = row.title
     t.latest_kind = row.kind
+    // The latest value the agent set wins; an event that does not carry one
+    // leaves the thread's timeout where it was.
+    if (row.idle_minutes != null) t.idle_minutes = Number(row.idle_minutes)
     t.last_activity = Math.max(t.last_activity, Number(row.updated_at ?? row.created_at))
     if (row.q_status === 'pending') {
       t.pending = true
@@ -460,6 +495,15 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
         blocks: String(row.blocks ?? '[]'),
       }).map((a) => ({ label: a.title, answer: a.answer }))
     }
+  }
+
+  const t0 = now()
+  for (const t of threads.values()) {
+    const idleMs = (t.idle_minutes ?? DEFAULT_IDLE_MINUTES) * 60_000
+    const finished = t.latest_kind === 'done' || t.last_activity + idleMs < t0
+    // Something unread keeps a thread out of Done even once it is finished:
+    // the human has not seen how it ended yet.
+    t.state = t.pending ? 'pending' : !finished || t.unread > 0 ? 'active' : 'done'
   }
 
   const list = [...threads.values()].sort((a, b) => {

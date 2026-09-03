@@ -69,6 +69,16 @@ agent-notify-pwa notify "Tests failing" --kind error --priority 2 \
 `--kind`: `update`, `done` or `error`. Reuse one `--task-id` across a run so the
 messages thread together.
 
+`--kind done` is what moves the thread out of Active on the dashboard; `error`
+does not, because an agent that hit an error may still retry. If nothing says
+`done`, the thread finishes on its own after `--idle` minutes of silence
+(default 240). Raise it when you are about to go quiet for longer:
+
+```bash
+agent-notify-pwa notify "Running the full suite, back in a while" \
+  --task-id ci-run-4821 --idle 720
+```
+
 ### ask
 
 ```bash

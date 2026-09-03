@@ -36,6 +36,11 @@ export interface ProjectRow {
   models: string[]
 }
 
+// Which section of the project page a thread belongs in. The server decides
+// it, from what the agent said and how long it has been quiet - not from what
+// the human has read. See ThreadState in src/server/api.ts.
+export type ThreadState = 'pending' | 'active' | 'done'
+
 export interface TaskSummary {
   key: string
   project: string
@@ -53,6 +58,9 @@ export interface TaskSummary {
   latest_title: string
   latest_kind: 'update' | 'question' | 'done' | 'error'
   last_activity: number
+  state: ThreadState
+  // What the agent set, if it set anything. null means the hub's default.
+  idle_minutes: number | null
 }
 
 export interface ThreadData {

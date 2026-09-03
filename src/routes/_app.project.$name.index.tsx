@@ -65,10 +65,12 @@ function ProjectView() {
     )
   }
 
-  const waiting = data.filter((t) => t.pending)
-  const others = data.filter((t) => !t.pending)
-  const active = others.filter((t) => t.unread > 0)
-  const done = others.filter((t) => t.unread === 0)
+  // The server decides which of these a thread is in. It used to be worked
+  // out here, from "has the human read it", which is why a thread the agent
+  // was still working on could sit under Done.
+  const waiting = data.filter((t) => t.state === 'pending')
+  const active = data.filter((t) => t.state === 'active')
+  const done = data.filter((t) => t.state === 'done')
 
   return (
     <Container>
@@ -97,16 +99,16 @@ function ProjectView() {
             </Section>
           )}
           {active.length > 0 && (
-            <Section title="Active">
+            <Section title="Active" count={active.length}>
               {active.map((t) => (
-                <TaskLine key={t.key} t={t} unread />
+                <TaskLine key={t.key} t={t} unread={t.unread > 0} />
               ))}
             </Section>
           )}
           {done.length > 0 && (
             <Section title="Done" count={done.length}>
               {done.map((t) => (
-                <TaskLine key={t.key} t={t} />
+                <TaskLine key={t.key} t={t} unread={t.unread > 0} />
               ))}
             </Section>
           )}
