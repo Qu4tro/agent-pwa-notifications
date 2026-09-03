@@ -16,7 +16,16 @@ export function Section({
     <section className={`mb-6 ${className}`}>
       <h2 className="mb-1 px-3 text-[11px] font-semibold tracking-wider text-muted uppercase">
         {title}
-        {count != null ? <span className="ml-1.5 text-faint">{count}</span> : null}
+        {count != null ? (
+          <>
+            {/* The gap is a margin, which the accessible name cannot see: without
+                this the heading reads as one word, "Needs you3". The space is
+                out of flow, so it separates the two in the name and adds
+                nothing to the layout. */}
+            <span className="sr-only"> </span>
+            <span className="ml-1.5 text-faint">{count}</span>
+          </>
+        ) : null}
       </h2>
       <div className="border-t border-line">{children}</div>
     </section>
