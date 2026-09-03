@@ -9,7 +9,7 @@ import { ThreadSkeleton } from '../lib/skeleton'
 import { BlockRenderer, AnswerForm, Callout } from '../lib/blocks'
 import { projectLabel, fromParam, KIND_BORDER, STATE_TEXT } from '../lib/project'
 import { getEncKey, encryptValue, decryptValue } from '../lib/e2e'
-import { InlineError, KindLabel, ProjectDot } from '../lib/ui'
+import { InlineError, KindLabel, ProjectDot, Time } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/project/$name/task/$key')({
   ssr: false,
@@ -115,18 +115,31 @@ function ThreadView() {
   )
 }
 
-// One message. The 3px rail on the left is the kind colour; the rest of the
-// block has no border and no background, so a long thread reads as one column.
-// The padding lives on the summary and the body, not here, because a closed
-// message is only its summary.
-function MessageShell({ kind, children }: { kind: string; children: React.ReactNode }) {
+// One message. The 3px rail is the kind colour; the rest of the block has no
+// border and no background, so a long thread reads as one column. The padding
+// lives on the summary and the body, not here, because a closed message is
+// only its summary.
+//
+// The time sits in a 56px gutter to the left of the rail - the same column the
+// list rows use - and outside the <details>, so tapping it does not fold the
+// message and its tooltip is its own, not the summary's.
+function MessageShell({
+  kind,
+  at,
+  children,
+}: {
+  kind: string
+  at: number
+  children: React.ReactNode
+}) {
   return (
-    <article
-      className={`border-b border-b-line border-l-[3px] last:border-b-0 ${
-        KIND_BORDER[kind] ?? 'border-l-line'
-      }`}
-    >
-      {children}
+    <article className="flex border-b border-b-line last:border-b-0">
+      <div className="w-14 shrink-0 pt-3 pr-1.5 pl-4 text-right text-[13px] leading-[20px] whitespace-nowrap text-faint">
+        <Time at={at} />
+      </div>
+      <div className={`min-w-0 flex-1 border-l-[3px] ${KIND_BORDER[kind] ?? 'border-l-line'}`}>
+        {children}
+      </div>
     </article>
   )
 }
@@ -151,8 +164,8 @@ function Collapsible({
       open={open}
       onToggle={(ev) => onOpenChange(ev.currentTarget.open)}
     >
-      <summary className="px-4 py-3">{summary}</summary>
-      <div className="px-4 pb-3">{children}</div>
+      <summary className="py-3 pr-4 pl-2.5">{summary}</summary>
+      <div className="pr-4 pb-3 pl-2.5">{children}</div>
     </details>
   )
 }
@@ -167,13 +180,12 @@ function MessageHead({ e }: { e: EventItem }) {
           <Lock size={12} aria-hidden /> encrypted
         </span>
       ) : null}
-      <span className="ml-auto shrink-0 text-[13px] text-faint">{timeAgo(e.created_at)}</span>
       {/* The one thing that says this row opens. It points down when the
           message is shut and up when it is open. */}
       <ChevronDown
         size={16}
         aria-hidden
-        className="shrink-0 text-faint transition-transform group-open:rotate-180"
+        className="ml-auto shrink-0 text-faint transition-transform group-open:rotate-180"
       />
     </div>
   )
@@ -266,7 +278,7 @@ function Message({
 
   if (locked) {
     return (
-      <MessageShell kind={e.kind}>
+      <MessageShell kind={e.kind} at={e.created_at}>
         <Collapsible open={open} onOpenChange={setOpen} summary={head}>
           <p className="text-[15px] text-muted">
             Encrypted. Add your key under Encryption in <Link to="/settings">Settings</Link> to
@@ -278,7 +290,7 @@ function Message({
   }
 
   return (
-    <MessageShell kind={e.kind}>
+    <MessageShell kind={e.kind} at={e.created_at}>
       <Collapsible open={open} onOpenChange={setOpen} summary={head}>
         <BlockRenderer blocks={blocks} />
 

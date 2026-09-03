@@ -175,3 +175,14 @@ export function timeAgo(ts: number): string {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`
   return `${Math.floor(s / 86400)}d ago`
 }
+
+// The same interval in as few characters as a 56px gutter will hold. Every
+// list row and every message in a thread stands its time in this column, so it
+// has to fit at 13px next to a three-digit day count.
+export function timeAgoShort(ts: number): string {
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 60) return 'now'
+  if (s < 3600) return `${Math.floor(s / 60)}m`
+  if (s < 86400) return `${Math.floor(s / 3600)}h`
+  return `${Math.floor(s / 86400)}d`
+}

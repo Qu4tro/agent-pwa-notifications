@@ -7,17 +7,24 @@ import { Skeleton } from './ui'
 
 // `detail` is how many muted lines sit under the title. A project row has one
 // (the models); a task row lists what happened on its thread, so it has more.
+// The 56px time gutter is left empty and kept, so nothing shifts sideways when
+// the rows arrive.
 function RowLines({ count, detail = 1 }: { count: number; detail?: number }) {
   return (
     <div className="border-t border-edge">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="border-b border-l-[3px] border-line border-l-transparent px-4 py-3">
-          <Skeleton width="55%" height="17px" />
-          {Array.from({ length: detail }, (_, j) => (
-            <div key={j} className="mt-1">
-              <Skeleton width={j === 0 ? '35%' : '48%'} height="15px" />
-            </div>
-          ))}
+        <div key={i} className="flex border-b border-line">
+          <div className="w-14 shrink-0 py-3 pr-1.5 pl-4">
+            <Skeleton width="100%" height="13px" />
+          </div>
+          <div className="min-w-0 flex-1 border-l-[3px] border-l-transparent py-3 pr-4 pl-2.5">
+            <Skeleton width="55%" height="17px" />
+            {Array.from({ length: detail }, (_, j) => (
+              <div key={j} className="mt-1">
+                <Skeleton width={j === 0 ? '35%' : '48%'} height="15px" />
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
@@ -86,13 +93,15 @@ export function ThreadSkeleton() {
       </div>
       <div>
         {Array.from({ length: 5 }, (_, i) => (
-          <div
-            key={i}
-            className="border-b border-b-line border-l-[3px] border-l-line px-4 py-3"
-          >
-            <Skeleton width="7rem" height="13px" />
-            <div className="mt-1.5">
-              <Skeleton width="70%" height="17px" />
+          <div key={i} className="flex border-b border-b-line">
+            <div className="w-14 shrink-0 pt-3 pr-1.5 pl-4">
+              <Skeleton width="100%" height="13px" />
+            </div>
+            <div className="min-w-0 flex-1 border-l-[3px] border-l-line py-3 pr-4 pl-2.5">
+              <Skeleton width="7rem" height="13px" />
+              <div className="mt-1.5">
+                <Skeleton width="70%" height="17px" />
+              </div>
             </div>
           </div>
         ))}
