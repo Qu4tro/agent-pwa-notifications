@@ -61,6 +61,15 @@ export interface TaskSummary {
   state: ThreadState
   // What the agent set, if it set anything. null means the hub's default.
   idle_minutes: number | null
+  // The last three events on the thread, oldest first. `count` says how many
+  // there are in total, so `count - recent.length` is what is not shown.
+  recent: {
+    id: string
+    kind: 'update' | 'question' | 'done' | 'error'
+    title: string
+    created_at: number
+    read_at: number | null
+  }[]
 }
 
 export interface ThreadData {

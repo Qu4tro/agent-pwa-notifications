@@ -24,23 +24,28 @@ export function Row({
   )
 }
 
-// The middle of a row: title on top, one muted detail line under it. Both
-// truncate, so a long agent title can never push the row taller.
+// The middle of a row: title on top, muted detail under it. A list of nodes
+// becomes a line each, which is how a task row shows what happened on its
+// thread rather than only how many things did. Every line truncates, so a long
+// agent title can never push the row wider or taller than its own line.
 export function RowBody({
   title,
   detail,
   bold,
 }: {
   title: React.ReactNode
-  detail?: React.ReactNode
+  detail?: React.ReactNode | React.ReactNode[]
   bold?: boolean
 }) {
+  const lines = detail == null ? [] : Array.isArray(detail) ? detail : [detail]
   return (
     <div className="min-w-0 flex-1">
       <div className={`truncate leading-tight ${bold ? 'font-semibold' : ''}`}>{title}</div>
-      {detail ? (
-        <div className="truncate text-[15px] leading-[1.35] text-muted">{detail}</div>
-      ) : null}
+      {lines.map((line, i) => (
+        <div key={i} className="truncate text-[15px] leading-[1.35] text-muted">
+          {line}
+        </div>
+      ))}
     </div>
   )
 }

@@ -6,7 +6,7 @@ import { timeAgo, type TaskSummary } from '../lib/api'
 import { BackLink, Container, useHeaderActions, useHeaderBack } from '../lib/shell'
 import { ensure, tasksQuery, useAnswerFromList, useClear } from '../lib/queries'
 import { TasksSkeleton } from '../lib/skeleton'
-import { projectLabel, fromParam, STATE_TEXT } from '../lib/project'
+import { projectLabel, fromParam, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../lib/project'
 import {
   Button,
   ConfirmPanel,
@@ -122,6 +122,32 @@ function taskParams(t: TaskSummary) {
   return { name: t.project === '' ? '__none__' : t.project, key: t.key }
 }
 
+// What goes under the title of a task row. A pending question asks itself; any
+// other thread lists what actually happened on it, one line per event, newest
+// last - the count on the right used to be the only trace of the other two.
+//
+// The title of the row is the task label when the agent set one, and the
+// newest event's own title when it did not, so in that second case the newest
+// line is already the title and is left off rather than said twice.
+function detailLines(t: TaskSummary): React.ReactNode[] {
+  if (t.pending) return t.pending_question ? [t.pending_question] : []
+
+  const shown = t.task ? t.recent : t.recent.slice(0, -1)
+  const earlier = t.count - t.recent.length
+  const lines: React.ReactNode[] = []
+  if (earlier > 0 && shown.length > 0) lines.push(<span className="text-faint">+{earlier} earlier</span>)
+  for (const r of shown) {
+    lines.push(
+      // Unread keeps full-weight text, the same signal the row itself uses.
+      <span className={r.read_at == null ? 'text-text' : undefined}>
+        <span className={KIND_TEXT[r.kind] ?? 'text-muted'}>{KIND_LABEL[r.kind] ?? 'Event'}</span>{' '}
+        {r.title}
+      </span>,
+    )
+  }
+  return lines
+}
+
 function TaskLine({ t, unread, divider = true }: { t: TaskSummary; unread?: boolean; divider?: boolean }) {
   return (
     <Link
@@ -138,7 +164,7 @@ function TaskLine({ t, unread, divider = true }: { t: TaskSummary; unread?: bool
               <span className="truncate">{t.task || t.latest_title}</span>
             </span>
           }
-          detail={t.pending ? t.pending_question : t.task ? t.latest_title : null}
+          detail={detailLines(t)}
           bold={unread || t.pending}
         />
         <RowMeta>

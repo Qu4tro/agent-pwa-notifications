@@ -431,6 +431,11 @@ const THREAD_KEY_SQL = `COALESCE(NULLIF(e.task_id, ''), e.id)`
 // says done or the silence runs out. Decided 2026-09-04.
 export type ThreadState = 'pending' | 'active' | 'done'
 
+// How many of a thread's own event titles the project row shows. The count on
+// the row used to be the only trace of everything but the latest one, which
+// was note 3: the row said "3" where it could have said what the three were.
+const RECENT_ON_A_ROW = 3
+
 // Task threads within a project. Groups events by thread key in JS (small,
 // single-user data), summarizing each thread for the project view.
 export async function getTasks(project: string, env: Env, accountId: string): Promise<Response> {
@@ -466,6 +471,14 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
         last_activity: 0,
         idle_minutes: null,
         state: 'active' as ThreadState,
+        // Oldest first, newest last, at most RECENT_ON_A_ROW of them.
+        recent: [] as {
+          id: unknown
+          kind: unknown
+          title: unknown
+          created_at: unknown
+          read_at: unknown
+        }[],
       }
       threads.set(key, t)
     }
@@ -480,6 +493,16 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
     // The latest value the agent set wins; an event that does not carry one
     // leaves the thread's timeout where it was.
     if (row.idle_minutes != null) t.idle_minutes = Number(row.idle_minutes)
+    // A sliding window over rows that are already in order, so this costs one
+    // push and at most one shift per event.
+    t.recent.push({
+      id: row.id,
+      kind: row.kind,
+      title: row.title,
+      created_at: row.created_at,
+      read_at: row.read_at ?? null,
+    })
+    if (t.recent.length > RECENT_ON_A_ROW) t.recent.shift()
     t.last_activity = Math.max(t.last_activity, Number(row.updated_at ?? row.created_at))
     if (row.q_status === 'pending') {
       t.pending = true

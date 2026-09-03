@@ -33,6 +33,8 @@ async function tasks(cookie: string, project = 'p') {
     unread: number
     idle_minutes: number | null
     latest_kind: string
+    count: number
+    recent: { id: string; kind: string; title: string; read_at: number | null }[]
   }[]
 }
 
@@ -226,5 +228,55 @@ describe('GET /api/v1/tasks thread state', () => {
 
     const [task] = await tasks(cookie)
     expect(task.state).toBe('pending')
+  })
+})
+
+// Note 3: the row used to show the newest title and a count, so a thread of
+// three events said "3" where it could have said what the three were.
+describe('GET /api/v1/tasks recent', () => {
+  it('carries the events oldest first', async () => {
+    const account = await createAccount('recent-order@example.invalid')
+    const cookie = await sessionFor(account.id)
+    await notify(account, 'r1', { title: 'First' })
+    await notify(account, 'r1', { title: 'Second' })
+    await notify(account, 'r1', { title: 'Third' })
+
+    const [task] = await tasks(cookie, 'r1')
+    expect(task.recent.map((r) => r.title)).toEqual(['First', 'Second', 'Third'])
+    expect(task.count).toBe(3)
+  })
+
+  it('caps at three and keeps the newest three', async () => {
+    const account = await createAccount('recent-cap@example.invalid')
+    const cookie = await sessionFor(account.id)
+    for (const title of ['One', 'Two', 'Three', 'Four', 'Five'])
+      await notify(account, 'r2', { title })
+
+    const [task] = await tasks(cookie, 'r2')
+    expect(task.count).toBe(5)
+    expect(task.recent.map((r) => r.title)).toEqual(['Three', 'Four', 'Five'])
+  })
+
+  it('carries the kind and the read state of each one', async () => {
+    const account = await createAccount('recent-meta@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const first = await notify(account, 'r3', { title: 'Started' })
+    await notify(account, 'r3', { title: 'Broke', kind: 'error' })
+    await markRead(first, cookie)
+
+    const [task] = await tasks(cookie, 'r3')
+    expect(task.recent.map((r) => r.kind)).toEqual(['update', 'error'])
+    expect(task.recent[0].read_at).not.toBe(null)
+    expect(task.recent[1].read_at).toBe(null)
+  })
+
+  it('has one entry for a thread of one event', async () => {
+    const account = await createAccount('recent-single@example.invalid')
+    const cookie = await sessionFor(account.id)
+    await notify(account, 'r4', { title: 'Only' })
+
+    const [task] = await tasks(cookie, 'r4')
+    expect(task.recent).toHaveLength(1)
+    expect(task.recent[0].title).toBe('Only')
   })
 })

@@ -5,15 +5,19 @@
 import { Container } from './shell'
 import { Skeleton } from './ui'
 
-function RowLines({ count }: { count: number }) {
+// `detail` is how many muted lines sit under the title. A project row has one
+// (the models); a task row lists what happened on its thread, so it has more.
+function RowLines({ count, detail = 1 }: { count: number; detail?: number }) {
   return (
-    <div className="border-t border-line">
+    <div className="border-t border-edge">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="border-b border-l-[3px] border-line border-l-transparent px-4 py-3">
           <Skeleton width="55%" height="17px" />
-          <div className="mt-1">
-            <Skeleton width="35%" height="15px" />
-          </div>
+          {Array.from({ length: detail }, (_, j) => (
+            <div key={j} className="mt-1">
+              <Skeleton width={j === 0 ? '35%' : '48%'} height="15px" />
+            </div>
+          ))}
         </div>
       ))}
     </div>
@@ -28,11 +32,11 @@ function Heading() {
   )
 }
 
-function Group({ rows }: { rows: number }) {
+function Group({ rows, detail = 1 }: { rows: number; detail?: number }) {
   return (
     <section className="mb-8">
       <Heading />
-      <RowLines count={rows} />
+      <RowLines count={rows} detail={detail} />
     </section>
   )
 }
@@ -52,8 +56,8 @@ export function TasksSkeleton() {
       <div className="mb-4 px-4">
         <Skeleton width="10rem" height="22px" />
       </div>
-      <Group rows={3} />
-      <Group rows={3} />
+      <Group rows={3} detail={3} />
+      <Group rows={3} detail={3} />
     </Container>
   )
 }
