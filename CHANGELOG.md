@@ -10,6 +10,14 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Changed
+
+- The header shows a connection dot instead of the refresh bar. The bar tracked
+  "a request is in flight", and since the lists poll every 5 seconds it blinked
+  almost without pause. The dot answers the question the bar was standing in
+  for: filled green while the hub answers, a hollow red ring when it does not,
+  and it changes only when that changes.
+
 ## [1.0.0] - 2026-09-03
 
 ### Changed
