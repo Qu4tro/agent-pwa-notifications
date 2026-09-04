@@ -10,6 +10,8 @@ import { BlockRenderer } from '../lib/blocks'
 import {
   AnswerArea,
   AnswerStatus,
+  ChangeAnswer,
+  answerRowClass,
   LockedNote,
   shortAnswer,
   useQuestionContent,
@@ -230,6 +232,7 @@ function Message({
   // re-read on every render would fold a message shut while you were reading
   // it. After that the state is yours: a tap is remembered until you leave.
   const [open, setOpen] = useState(() => isPending || e.read_at == null || isNewest)
+  const [correcting, setCorrecting] = useState(false)
 
   const { blocks, answer, text, locked } = useQuestionContent(e)
   const current: AnswerDoc | null =
@@ -248,13 +251,24 @@ function Message({
 
   // The title, and for a settled question the answer you gave: enough to know
   // whether this one is worth opening.
+  //
+  // The way to change that answer sits on the end of the line it changes, and
+  // only while the message is open: a shut thread should read as a list of
+  // titles, not a column of buttons.
   const head = (
     <>
       <MessageHead e={e} />
       {e.title ? <div className="leading-snug font-semibold">{e.title}</div> : null}
       {q?.status === 'answered' ? (
-        <div className={`mt-0.5 truncate text-[15px] ${STATE_TEXT.answered}`}>
-          You answered: <span className="font-semibold">{shortAnswer(answer, text)}</span>
+        <div
+          className={`mt-1.5 ${answerRowClass} bg-surface text-[15px] ${STATE_TEXT.answered}`}
+        >
+          <span className="min-w-0 flex-1 truncate">
+            You answered: <span className="font-semibold">{shortAnswer(answer, text)}</span>
+          </span>
+          {open && !correcting ? (
+            <ChangeAnswer disabled={submitting} onClick={() => setCorrecting(true)} />
+          ) : null}
         </div>
       ) : null}
     </>
@@ -280,14 +294,17 @@ function Message({
             {q.status === 'expired' ? (
               <div className={`text-[15px] ${STATE_TEXT.expired}`}>Expired before you answered.</div>
             ) : (
-              // The controls stay live after an answer, because this is the
-              // place the answer is changed. What stands is under them.
+              // An answered question renders nothing here until you ask to
+              // change it. What stands is on the summary line above, with the
+              // control that opens this on the end of it.
               <div className="flex flex-col gap-3">
                 <AnswerArea
                   blocks={blocks}
                   current={current}
                   disabled={submitting}
                   error={error}
+                  correcting={correcting}
+                  onCorrecting={setCorrecting}
                   onSubmit={handleSubmit}
                 />
                 <AnswerStatus question={q} answer={answer} text={text} ack={e.ack} />

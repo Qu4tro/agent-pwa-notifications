@@ -9,6 +9,8 @@ import { BlockRenderer, Callout } from '../lib/blocks'
 import {
   AnswerArea,
   AnswerStatus,
+  ChangeAnswer,
+  answerRowClass,
   LockedNote,
   prepareAnswer,
   shortAnswer,
@@ -527,6 +529,16 @@ function LiveCard({
   const { blocks, answer, text, locked } = useQuestionContent(e)
   const q = e.question
   const settled = phase === 'acked' || phase === 'leaving'
+  // Per card, and the card is keyed by its id, so stepping along the strip
+  // never carries an open composer onto the next question.
+  const [correcting, setCorrecting] = useState(false)
+  // An answer given on this card, right now: `answered` is set on the tap and
+  // cleared by any navigation. While it stands the area keeps the composer it
+  // had, so the card does not shrink to a one-line summary under the
+  // acknowledgement rising over it - the whole point of the grid below is that
+  // nothing moves on the tap. A card walked back to has `answered` null and
+  // collapses like any other.
+  const acking = answered != null
   // A card looked at again stands on the answer it holds, so the controls open
   // on it and a second submit is a correction of what is there.
   const current: AnswerDoc | null =
@@ -571,11 +583,30 @@ function LiveCard({
               inert={settled}
             >
               <div className="flex flex-col gap-3">
+                {/* A card walked back to has no summary line above it the way
+                    a thread message does, so it says what stands itself - and
+                    the way to change it goes on the end of that line, as it
+                    does in a thread. */}
+                {current && !correcting && !acking ? (
+                  <div className={`${answerRowClass} bg-bg text-[15px] ${STATE_TEXT.answered}`}>
+                    <span className="min-w-0 flex-1">
+                      You answered:{' '}
+                      <span className="font-semibold">{shortAnswer(answer, text)}</span>
+                    </span>
+                    <ChangeAnswer
+                      disabled={sending || settled}
+                      onClick={() => setCorrecting(true)}
+                    />
+                  </div>
+                ) : null}
                 <AnswerArea
                   blocks={blocks}
                   current={current}
                   disabled={sending || settled}
                   error={error}
+                  correcting={correcting}
+                  onCorrecting={setCorrecting}
+                  holdOpen={acking}
                   onSubmit={onSubmit}
                 />
                 {q ? <AnswerStatus question={q} answer={answer} text={text} ack={null} /> : null}
