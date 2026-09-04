@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { AnswerDoc, EventItem, QuestionState } from './api'
 import { AnswerComposer, Callout } from './blocks'
+import { STATE_BG, STATE_TEXT, type QuestionTone } from './project'
 import { getEncKey, encryptValue, decryptValue } from './e2e'
 import { Button, Time } from './ui'
 
@@ -196,6 +197,52 @@ export function ChangeAnswer({ disabled, onClick }: { disabled?: boolean; onClic
     >
       Change answer
     </button>
+  )
+}
+
+// Where a question stands, in one word and the sentence behind it: waiting on
+// you, answered and waiting to be collected, changed since it was given,
+// collected, or timed out. AnswerStatus below says the same things in full, on
+// a question that is open.
+export function questionStanding(q: QuestionState): {
+  tone: QuestionTone
+  word: string
+  label: string
+} {
+  if (q.status === 'expired')
+    return { tone: 'expired', word: 'expired', label: 'Expired before you answered.' }
+  if (q.status === 'pending')
+    return { tone: 'pending', word: 'waiting', label: 'Waiting for your answer.' }
+  const changed = q.changes > 0
+  if (q.picked_up_at)
+    return {
+      tone: 'answered',
+      word: 'received',
+      label: changed ? 'Agent received the change.' : 'Agent received it.',
+    }
+  return changed
+    ? { tone: 'answered', word: 'changed', label: 'Changed. Waiting for the agent.' }
+    : { tone: 'answered', word: 'sent', label: 'Answered. Waiting for the agent.' }
+}
+
+// That standing on a shut row, beside the kind word: a dot in the state colour
+// and the word next to it.
+//
+// The colour alone cannot carry it. Three of the five states are `answered`
+// and share the done colour, so the word is what tells them apart - and a dot
+// says nothing at all to a screen reader, or to a reader who does not see the
+// difference between two of these colours. So the sentence is the dot's
+// accessible name and its title, and the word beside it is what the eye reads.
+export function QuestionDot({ question }: { question: QuestionState }) {
+  const { tone, word, label } = questionStanding(question)
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1" title={label}>
+      <span aria-hidden className={`size-1.5 rounded-full ${STATE_BG[tone]}`} />
+      <span className="sr-only">{label}</span>
+      <span aria-hidden className={`text-[13px] ${STATE_TEXT[tone]}`}>
+        {word}
+      </span>
+    </span>
   )
 }
 

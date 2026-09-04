@@ -13,6 +13,7 @@ import {
   ChangeAnswer,
   answerRowClass,
   LockedNote,
+  QuestionDot,
   shortAnswer,
   useQuestionContent,
   prepareAnswer,
@@ -189,14 +190,21 @@ function MessageShell({
   )
 }
 
-// The line above the title: what kind of thing this is, who said it, and
-// whether it is encrypted. Everything in here is phrasing content, because the
-// row it sits in is a <button>.
+// The line above the title: what kind of thing this is, where it stands, who
+// said it, and whether it is encrypted. Everything in here is phrasing
+// content, because the row it sits in is a <button>.
 function MessageHead({ e }: { e: EventItem }) {
   return (
     <span className="mb-1.5 flex items-center gap-2">
       <KindLabel kind={e.kind} />
-      {e.model ? <span className="truncate text-[13px] text-muted">{e.model}</span> : null}
+      {/* Beside the kind word, because it says the same sort of thing about
+          the same message. Only a question has a standing to say; an update,
+          a done or an error has none, and gets nothing rather than a dot that
+          would have to mean something. */}
+      {e.question ? <QuestionDot question={e.question} /> : null}
+      {e.model ? (
+        <span className="min-w-0 truncate text-[13px] text-muted">{e.model}</span>
+      ) : null}
       {e.enc ? (
         <span className="inline-flex items-center gap-1 text-[13px] text-kind-done">
           <Lock size={12} aria-hidden /> encrypted

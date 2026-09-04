@@ -62,6 +62,16 @@ export const STATE_TEXT = {
   expired: 'text-muted',
 } as const
 
+// The same three as a dot. Written out in full for the same reason as
+// KIND_BG: Tailwind has to see the class name in the source.
+export const STATE_BG = {
+  pending: 'bg-kind-question',
+  answered: 'bg-kind-done',
+  expired: 'bg-muted',
+} as const
+
+export type QuestionTone = keyof typeof STATE_TEXT
+
 // The "No project" bucket is project === ''. URLs can't carry an empty
 // segment, so map it to a reserved token both ways.
 const NONE = '__none__'
