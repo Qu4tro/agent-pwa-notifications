@@ -10,6 +10,27 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Changed
+
+- The app is called Agent PWA Notifications. The name it had, "Agent
+  Notifications", was neither the repository's nor the package's, and the
+  installed app on a phone showed a third one - "Agents" - under its icon. One
+  name now, on the header, the document title, the login page, the installed
+  app, the sign-in email, the CLI and the API docs. The home-screen label is
+  "Agent PWA": a launcher truncates at about a dozen characters, so the full
+  name would land there as "Agent PWA No...".
+
+### Fixed
+
+- Fenced code inside a `markdown` block renders as code. An agent asked for
+  markdown writes a fence into it, because that is what writing markdown means,
+  and the fence used to arrive as a paragraph of literal backticks with the
+  code under it as prose: no monospace, no highlighting, no copy button, and an
+  `{"ok": true}` on the way in that told the agent nothing had gone wrong. A
+  fence now renders as the `code` block it is, language and all, with the prose
+  around it still markdown. An unclosed fence runs to the end of the message
+  rather than dropping the code under it.
+
 ## [1.2.0] - 2026-09-04
 
 ### Added
