@@ -8,7 +8,7 @@ import {
   Info,
   TriangleAlert,
 } from 'lucide-react'
-import { answerStyle } from './answers'
+import { answerStyles } from './answers'
 import { CodeBlock } from './highlight'
 import { Button, fieldClass } from './ui'
 
@@ -363,7 +363,7 @@ export function AnswerForm({
           const options = (b.options as string[]) ?? []
           // Parallel to `options`, and short or absent: an option with no
           // entry falls back to its place in the palette.
-          const colors = (b.colors as string[] | undefined) ?? []
+          const styles = answerStyles(options.length, b.colors as string[] | undefined)
           const id = String(b.id)
           return (
             <div key={i} className="flex flex-wrap gap-2">
@@ -371,7 +371,7 @@ export function AnswerForm({
                 <Button
                   key={opt}
                   variant="answer"
-                  style={answerStyle(oi, colors[oi])}
+                  style={styles[oi]}
                   disabled={disabled}
                   onClick={() => onSubmit({ [id]: opt })}
                 >

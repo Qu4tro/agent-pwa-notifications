@@ -20,6 +20,58 @@ async function storedAnswer(id: string): Promise<{ status: string; answer: strin
   return row!
 }
 
+// Note 3: an agent may name the colour of an answer, so a particular choice
+// reads a particular way. Only a palette name or six hex digits resolves; the
+// value ends up in a style attribute, so nothing else may get through.
+describe('colors on a buttons block', () => {
+  const askWith = (account: TestAccount, colors: unknown) =>
+    call('POST', '/api/v1/questions', {
+      body: {
+        agent: 'tester',
+        title: 'Ship it?',
+        project: 'colors',
+        blocks: [{ type: 'buttons', id: 'choice', options: ['Yes', 'No'], colors }],
+      },
+      auth: { bearer: account.key },
+    })
+
+  it('takes palette names and hex, and carries them to the row', async () => {
+    const account = await createAccount('answer-colors-ok@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const posted = await askWith(account, ['mint', '#1e3a8a'])
+    expect(posted.status).toBe(200)
+
+    const tasks = await call('GET', '/api/v1/tasks?project=colors', { auth: { cookie } })
+    expect(tasks.status).toBe(200)
+    const [task] = tasks.body.tasks as {
+      pending_answers: { label: string; color?: string }[]
+    }[]
+    expect(task.pending_answers).toEqual([
+      { label: 'Yes', answer: { choice: 'Yes' }, color: 'mint' },
+      { label: 'No', answer: { choice: 'No' }, color: '#1e3a8a' },
+    ])
+  })
+
+  it('lets an option go without one, and takes its colour from its place', async () => {
+    const account = await createAccount('answer-colors-short@example.invalid')
+    const cookie = await sessionFor(account.id)
+    expect((await askWith(account, ['mint'])).status).toBe(200)
+
+    const tasks = await call('GET', '/api/v1/tasks?project=colors', { auth: { cookie } })
+    const [task] = tasks.body.tasks as { pending_answers: { color?: string }[] }[]
+    expect(task.pending_answers[0].color).toBe('mint')
+    expect(task.pending_answers[1].color).toBeUndefined()
+  })
+
+  it('refuses anything that is not a name or six hex digits', async () => {
+    const account = await createAccount('answer-colors-bad@example.invalid')
+    for (const bad of [['url(x)'], ['red'], ['#fff'], ['mint; color: red'], [12]]) {
+      const res = await askWith(account, bad)
+      expect(res.status, JSON.stringify(bad)).toBe(400)
+    }
+  })
+})
+
 describe('POST /api/v1/questions/:id/answer', () => {
   it('stores the answer and marks the event read', async () => {
     const account = await createAccount('answer-ok@example.invalid')

@@ -10,6 +10,10 @@ export interface QuickAnswerAction {
   action: string
   title: string
   answer: Record<string, string>
+  // What the agent asked for on this option, if it asked. Absent means the
+  // dashboard hands the option its place in the palette. A notification action
+  // has nowhere to put a colour; a list row does.
+  color?: string
 }
 
 // The subset of an event row that the quick-answer rules look at.
@@ -35,6 +39,7 @@ export function quickAnswerActions(event: QuickAnswerEvent): QuickAnswerAction[]
       action: `answer-${index}`,
       title: option,
       answer: { [button.id]: option },
+      ...(button.colors?.[index] ? { color: button.colors[index] } : {}),
     }))
   } catch {
     return []

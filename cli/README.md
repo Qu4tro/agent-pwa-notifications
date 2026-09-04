@@ -96,6 +96,19 @@ CHOICE=$(agent-notify-pwa ask "Ship it?" --button Ship --button Hold | jq -r .ch
 Two or three buttons of at most 20 characters, with a title of at most 80
 characters, make the question answerable straight from the notification.
 
+Every option already gets its own colour, so two choices side by side are told
+apart before they are read. `--color` pairs with `--button` by position when a
+particular choice should read a particular way; an option with no `--color` of
+its own takes its place in the palette:
+
+```bash
+agent-notify-pwa ask "Roll the flag?" --button "Roll it" --button Wait \
+  --color mint --color amber
+```
+
+The values are `blue`, `violet`, `mint`, `rose`, `amber`, `cyan`, `pink`,
+`lime`, or `#rrggbb`.
+
 ### status
 
 ```bash

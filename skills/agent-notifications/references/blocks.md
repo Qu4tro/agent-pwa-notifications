@@ -103,6 +103,17 @@ answerable straight from the notification.
 
 Answer shape: `{ "confirm": "Deploy" }`.
 
+Every option is already a different colour, so send nothing and the choices
+still read apart. `colors` is optional, parallel to `options`, and may be
+shorter than it; an option with no entry keeps its own colour. Each entry is
+`blue`, `violet`, `mint`, `rose`, `amber`, `cyan`, `pink`, `lime`, or
+`#rrggbb`. Red reads as an error in this app, so do not paint a safe choice
+with it.
+
+```json
+{ "type": "buttons", "id": "confirm", "options": ["Deploy", "Hold"], "colors": ["mint", "amber"] }
+```
+
 ### form
 
 Several fields at once, submitted together. Up to 20 fields. Each field has an

@@ -24,6 +24,7 @@ const { values: flags, positionals } = parseArgs({
     tag: { type: 'string', multiple: true },
     markdown: { type: 'string' },
     button: { type: 'string', multiple: true },
+    color: { type: 'string', multiple: true },
     ack: { type: 'string' },
     e2e: { type: 'boolean' },
     agent: { type: 'string' },
@@ -152,10 +153,13 @@ async function ask() {
     positionals.slice(1).join(' ') || die(`Usage: ${BIN} ask "question" --button A --button B`)
   const options = flags.button || []
   if (options.length < 1) die('Provide at least one --button option.')
+  // Paired with --button by position, and allowed to run short: an option with
+  // no --color of its own takes its place in the dashboard's palette.
+  const colors = flags.color || []
 
   const blocks = [
     ...(flags.markdown ? [{ type: 'markdown', text: flags.markdown }] : []),
-    { type: 'buttons', id: 'choice', options },
+    { type: 'buttons', id: 'choice', options, ...(colors.length ? { colors } : {}) },
   ]
   const body = {
     title,
@@ -240,9 +244,12 @@ ${BIN} ${VERSION} - talk to your Agent Notifications hub
       --kind done is what ends a thread on the dashboard. --idle says how long
       silence still counts as working (default 240).
 
-  ${BIN} ask "question" --button A --button B [--markdown "..."] [--ack "..."]
-                          [--idle MINUTES]
+  ${BIN} ask "question" --button A --button B [--color NAME|#rrggbb]
+                          [--markdown "..."] [--ack "..."] [--idle MINUTES]
       Post a question, wait, then print the answer JSON on stdout.
+      Every option is already a different colour. --color pairs with --button
+      by position when a particular choice should read a particular way:
+      blue, violet, mint, rose, amber, cyan, pink, lime, or #rrggbb.
 
   ${BIN} status [--json]
       Show the saved hub URL, the key prefix and whether E2E is on.

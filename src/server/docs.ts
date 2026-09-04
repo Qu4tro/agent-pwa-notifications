@@ -18,7 +18,13 @@ export function blockSchemaDoc(): Response {
         image: { type: 'image', url: 'string(url)', alt: 'string?' },
         code: { type: 'code', lang: 'string?', text: 'string' },
         callout: { type: 'callout', tone: 'info|success|warn|error', text: 'string' },
-        buttons: { type: 'buttons', id: 'string', options: 'string[] (the choices)' },
+        buttons: {
+          type: 'buttons',
+          id: 'string',
+          options: 'string[] (the choices)',
+          colors:
+            'string[]? (one per option, in the same order: blue|violet|mint|rose|amber|cyan|pink|lime, or #rrggbb. Leave it out and each option takes its own colour anyway.)',
+        },
         form: {
           type: 'form',
           id: 'string',
@@ -47,7 +53,7 @@ export function blockSchemaDoc(): Response {
         ],
         question_buttons: [
           { type: 'markdown', text: 'About to deploy to production. Go?' },
-          { type: 'buttons', id: 'confirm', options: ['Deploy', 'Cancel'] },
+          { type: 'buttons', id: 'confirm', options: ['Deploy', 'Cancel'], colors: ['mint', 'rose'] },
         ],
       },
     },

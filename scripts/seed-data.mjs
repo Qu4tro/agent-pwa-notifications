@@ -20,7 +20,14 @@ const link = (url, label) => ({ type: 'link', url, label })
 const image = (url, alt) => ({ type: 'image', url, alt })
 const callout = (tone, text) => ({ type: 'callout', tone, text })
 const progress = (label, value, max = 100) => ({ type: 'progress', label, value, max })
-const buttons = (id, options) => ({ type: 'buttons', id, options })
+// `colors` is optional and may run shorter than `options`: an option with no
+// entry of its own takes its place in the dashboard's palette.
+const buttons = (id, options, colors) => ({
+  type: 'buttons',
+  id,
+  options,
+  ...(colors ? { colors } : {}),
+})
 const form = (id, submitLabel, fields) => ({ type: 'form', id, submitLabel, fields })
 
 // A wide table: twelve columns is the schema maximum.
@@ -384,7 +391,7 @@ reconciliation job, which nobody has read in a year.`),
         ack: 'Understood - {answer}. I will report back either way.',
         blocks: [
           md('Staging is clean for nine days. Rolling means 96% of volume moves to the confirm flow; the frozen five stay where they are.'),
-          buttons('roll', ['Roll it', 'Wait', 'Roll at 5%']),
+          buttons('roll', ['Roll it', 'Wait', 'Roll at 5%'], ['mint', 'amber']),
         ],
       },
     ],

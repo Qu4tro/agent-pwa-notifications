@@ -532,7 +532,7 @@ function summarizeThreads(rows: Record<string, unknown>[]): any[] {
         enc: Number(row.enc ?? 0),
         title: String(row.title ?? ''),
         blocks: String(row.blocks ?? '[]'),
-      }).map((a) => ({ label: a.title, answer: a.answer }))
+      }).map((a) => ({ label: a.title, answer: a.answer, ...(a.color ? { color: a.color } : {}) }))
     }
   }
 

@@ -31,13 +31,16 @@ const HEX = /^#[0-9a-f]{6}$/i
 // What an agent is allowed to send: one of the eight names, or six hex digits.
 // Nothing else resolves, so nothing a style attribute could act on - `url(`,
 // an expression, a second declaration - can ever reach the DOM through here.
+export function overrideColor(value: string | undefined): string | null {
+  if (!value) return null
+  const name = value.toLowerCase() as AnswerColorName
+  if (name in ANSWER_PALETTE) return ANSWER_PALETTE[name]
+  return HEX.test(value) ? value.toLowerCase() : null
+}
+
+// An agent-set colour where there is one, and the palette where there is not.
 export function resolveAnswerColor(value: string | undefined, index: number): string {
-  if (value) {
-    const name = value.toLowerCase() as AnswerColorName
-    if (name in ANSWER_PALETTE) return ANSWER_PALETTE[name]
-    if (HEX.test(value)) return value.toLowerCase()
-  }
-  return ANSWER_PALETTE[ORDER[index % ORDER.length]]
+  return overrideColor(value) ?? ANSWER_PALETTE[ORDER[index % ORDER.length]]
 }
 
 // WCAG relative luminance.
@@ -68,10 +71,36 @@ export function answerTextColor(fill: string): string {
     : 'var(--color-text)'
 }
 
-// What an answer button wears. Two custom properties rather than a class,
-// because the value is per option and Tailwind can only see class names it can
-// read in the source.
-export function answerStyle(index: number, color?: string): React.CSSProperties {
-  const fill = resolveAnswerColor(color, index)
-  return { '--answer-bg': fill, '--answer-fg': answerTextColor(fill) } as React.CSSProperties
+// What the answer buttons on one question wear. Two custom properties rather
+// than a class, because the value is per option and Tailwind can only see
+// class names it can read in the source.
+//
+// Resolved for the whole question at once, not one option at a time, so the
+// palette can walk past anything an agent has already claimed. Colouring the
+// first of three options mint and leaving the rest alone would otherwise hand
+// the third one mint as well, which is the one thing this is here to prevent.
+export function answerStyles(count: number, colors?: (string | undefined)[]): React.CSSProperties[] {
+  const overrides = Array.from({ length: count }, (_, i) => overrideColor(colors?.[i]))
+  const taken = new Set(overrides.filter((fill): fill is string => fill != null))
+
+  let cursor = 0
+  const nextFree = (): string => {
+    for (let n = 0; n < ORDER.length; n++) {
+      const fill = ANSWER_PALETTE[ORDER[(cursor + n) % ORDER.length]]
+      if (!taken.has(fill)) {
+        cursor = (cursor + n + 1) % ORDER.length
+        return fill
+      }
+    }
+    // Every colour is spoken for: more than eight options, or an agent that
+    // named all eight. Walk the palette in order and let them repeat.
+    const fill = ANSWER_PALETTE[ORDER[cursor]]
+    cursor = (cursor + 1) % ORDER.length
+    return fill
+  }
+
+  return overrides.map((override) => {
+    const fill = override ?? nextFree()
+    return { '--answer-bg': fill, '--answer-fg': answerTextColor(fill) } as React.CSSProperties
+  })
 }

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   ANSWER_PALETTE,
-  answerStyle,
+  answerStyles,
   answerTextColor,
+  overrideColor,
   resolveAnswerColor,
 } from '../../src/lib/answers'
 
@@ -74,9 +75,41 @@ describe('the label colour', () => {
   })
 
   it('is carried on the two custom properties the button reads', () => {
-    expect(answerStyle(0, 'mint')).toEqual({
-      '--answer-bg': ANSWER_PALETTE.mint,
-      '--answer-fg': 'var(--color-bg)',
-    })
+    expect(answerStyles(1, ['mint'])).toEqual([
+      { '--answer-bg': ANSWER_PALETTE.mint, '--answer-fg': 'var(--color-bg)' },
+    ])
+  })
+})
+
+// One question's colours are worked out together, not one option at a time,
+// which is the only way the palette can avoid what the agent has taken.
+describe('a question with some colours set and some not', () => {
+  const fills = (count: number, colors?: (string | undefined)[]) =>
+    answerStyles(count, colors).map((style) => (style as Record<string, string>)['--answer-bg'])
+
+  it('walks the palette past anything the agent claimed', () => {
+    // "Roll it" mint, "Wait" amber, and the third left alone: index 2 of the
+    // palette is mint, which would have given the row two mint buttons.
+    const out = fills(3, ['mint', 'amber', undefined])
+    expect(out[0]).toBe(ANSWER_PALETTE.mint)
+    expect(out[1]).toBe(ANSWER_PALETTE.amber)
+    expect(new Set(out).size).toBe(3)
+  })
+
+  it('leaves the plain case exactly as it was', () => {
+    expect(fills(3)).toEqual([ANSWER_PALETTE.blue, ANSWER_PALETTE.violet, ANSWER_PALETTE.mint])
+  })
+
+  it('ignores a value it cannot resolve and colours that option from the palette', () => {
+    const out = fills(2, ['url(x)', undefined])
+    expect(out).toEqual([ANSWER_PALETTE.blue, ANSWER_PALETTE.violet])
+    expect(overrideColor('url(x)')).toBe(null)
+  })
+
+  it('repeats rather than running out when every colour is spoken for', () => {
+    const named = Object.keys(ANSWER_PALETTE)
+    const out = fills(9, [...named, undefined])
+    expect(out).toHaveLength(9)
+    expect(out[8]).toBe(ANSWER_PALETTE.blue)
   })
 })
