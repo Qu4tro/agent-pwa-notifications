@@ -10,6 +10,38 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Changed
+
+- A thread's messages all stand shut, the newest one and a waiting question
+  too, and a tap opens one over the thread: the blocks, and on a question the
+  controls, the answer that stands, "Change answer" and where that answer got
+  to. Which message is open is in the address (`?msg=`), so the phone's back
+  button closes it and a reload comes back to it. The row is a button: Tab
+  reaches it, Enter and Space open it.
+- A shut question row says where its question stands, beside the kind word: a
+  dot in the state colour and one word - waiting, sent, changed, received or
+  expired. The sentence behind the word is the dot's title and its accessible
+  name. An update, a done or an error has no standing and gets no dot.
+- On a task row's timeline the answer sits against the question it settled,
+  after a small arrow and in the title's weight, instead of out at the right
+  edge of the line in bold. The same goes for "needs answer" and "expired".
+- The eight answer colours are saturated, each a step under the kind colour of
+  its family, instead of pale tints; the owner said the tints did not fit the
+  theme. The eight names an agent can send are unchanged. Hover doubles the
+  outline rather than washing the button in its colour, which at this
+  saturation would have taken the label under 4.5:1.
+- Table rows in a message band even and odd by where they sit, so the bands
+  hold after a sort, and the hairline under every row goes: two ways of saying
+  where a row ends is one more than the eye needs.
+
+### Added
+
+- A bare http or https URL in a markdown block or a callout is a link. Trailing
+  punctuation and a closing bracket the URL never opened stay outside it; a
+  URL inside a code span or already inside a `[label](url)` is left alone. A
+  long link wraps instead of widening the page on a phone. Callout text now
+  reads the same inline markdown a paragraph does: bold, code and links.
+
 ## [1.2.1] - 2026-09-04
 
 ### Changed
