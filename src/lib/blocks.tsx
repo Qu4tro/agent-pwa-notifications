@@ -6,11 +6,13 @@ import {
   CircleX,
   ExternalLink,
   Info,
+  SendHorizontal,
   TriangleAlert,
 } from 'lucide-react'
 import { answerStyles } from './answers'
+import type { AnswerDoc } from './api'
 import { CodeBlock } from './highlight'
-import { Button, fieldClass } from './ui'
+import { Button, IconButton, fieldClass } from './ui'
 
 // -- Minimal, XSS-safe markdown to React -------------------------------------
 // We never dangerouslySetInnerHTML agent content. Text is escaped by React by
@@ -339,22 +341,47 @@ function One({ b }: { b: AnyBlock }) {
 }
 
 // -- Interactive: collect the answer and submit -------------------------------
-export function AnswerForm({
+
+// The answer area is one document, and any submit sends the whole of it: the
+// values of the controls the agent sent, and the line of the human's own words
+// under them, together. `current` is the document that stands, null while the
+// question is still waiting; the controls open on it, so a second submit is a
+// correction of what is there rather than a fresh start.
+export function AnswerComposer({
   blocks,
+  current,
   disabled,
   onSubmit,
 }: {
   blocks: unknown[]
+  current: AnswerDoc | null
   disabled?: boolean
-  onSubmit: (answer: Record<string, unknown>) => void
+  onSubmit: (doc: AnswerDoc) => void
 }) {
   const interactive = (blocks as AnyBlock[]).filter(
     (b) => b.type === 'buttons' || b.type === 'form',
   )
+  const standing = current?.answer ?? {}
   const [form, setForm] = useState<Record<string, Record<string, unknown>>>({})
+  const [draft, setDraft] = useState(current?.text ?? '')
 
   const setField = (formId: string, fieldId: string, value: unknown) =>
     setForm((f) => ({ ...f, [formId]: { ...(f[formId] ?? {}), [fieldId]: value } }))
+
+  const fieldValue = (formId: string, fieldId: string) => {
+    const typed = form[formId]
+    if (typed && fieldId in typed) return typed[fieldId]
+    const stood = standing[formId]
+    return stood && typeof stood === 'object' ? (stood as Record<string, unknown>)[fieldId] : undefined
+  }
+
+  const words = draft.trim()
+  // Send carries the line as it stands. On a waiting question there has to be
+  // something in it; on an answered one it has to differ from what stands,
+  // because sending the same words again would only count as a change.
+  const canSend = current ? words !== (current.text ?? '') : words.length > 0
+
+  const send = (values: Record<string, unknown>) => onSubmit({ answer: values, text: words || null })
 
   return (
     <div className="flex flex-col gap-4">
@@ -365,6 +392,7 @@ export function AnswerForm({
           // entry falls back to its place in the palette.
           const styles = answerStyles(options, b.colors as string[] | undefined)
           const id = String(b.id)
+          const chosen = standing[id]
           return (
             <div key={i} className="flex flex-wrap gap-2">
               {options.map((opt, oi) => (
@@ -372,8 +400,9 @@ export function AnswerForm({
                   key={opt}
                   variant="answer"
                   style={styles[oi]}
+                  aria-pressed={chosen === opt}
                   disabled={disabled}
-                  onClick={() => onSubmit({ [id]: opt })}
+                  onClick={() => send({ ...standing, [id]: opt })}
                 >
                   {opt}
                 </Button>
@@ -389,7 +418,9 @@ export function AnswerForm({
             key={i}
             onSubmit={(e) => {
               e.preventDefault()
-              onSubmit({ [id]: form[id] ?? {} })
+              const values: Record<string, unknown> = {}
+              for (const f of fields) values[String(f.id)] = fieldValue(id, String(f.id))
+              send({ ...standing, [id]: values })
             }}
             className="flex flex-col gap-3"
           >
@@ -397,7 +428,7 @@ export function AnswerForm({
               <FieldInput
                 key={fi}
                 field={f}
-                value={form[id]?.[String(f.id)]}
+                value={fieldValue(id, String(f.id))}
                 onChange={(v) => setField(id, String(f.id), v)}
               />
             ))}
@@ -407,6 +438,33 @@ export function AnswerForm({
           </form>
         )
       })}
+
+      {/* Every question takes words, whatever controls it carries. Enter
+          sends; Shift+Enter keeps writing. */}
+      <div className="flex items-end gap-2">
+        <textarea
+          rows={1}
+          value={draft}
+          disabled={disabled}
+          placeholder="Or in your own words"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              if (canSend && !disabled) send({ ...standing })
+            }
+          }}
+          className={`${fieldClass} field-sizing-content max-h-40 resize-none`}
+        />
+        <IconButton
+          aria-label="Send"
+          disabled={disabled || !canSend}
+          onClick={() => send({ ...standing })}
+          className="shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <SendHorizontal size={18} aria-hidden />
+        </IconButton>
+      </div>
     </div>
   )
 }

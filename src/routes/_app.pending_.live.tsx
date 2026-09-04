@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Lock } from 'lucide-react'
-import { api, type EventItem, type TaskSummary } from '../lib/api'
+import { api, type AnswerDoc, type EventItem, type TaskSummary } from '../lib/api'
 import { BackLink, useHeaderBack } from '../lib/shell'
 import { ensure, eventQuery, pendingQuery, LIVE_KEYS } from '../lib/queries'
 import { LiveSkeleton } from '../lib/skeleton'
@@ -195,15 +195,21 @@ function LivePage() {
 
   useEffect(() => setError(null), [current])
 
-  async function submit(answer: Record<string, unknown>) {
+  async function submit(doc: AnswerDoc) {
     if (!card || sending) return
-    const prepared = await prepareAnswer(card, answer)
+    // The live mode answers what is still waiting, so a card already settled
+    // elsewhere leaves rather than being overwritten from here.
+    const prepared = await prepareAnswer(card, doc, { ifPending: true })
     if (!prepared) return
     setError(null)
     setSending(true)
     try {
       const res = await api.answer(card.id, prepared.payload)
-      if (res.ok) dispatch({ type: 'answered', answer: shortAnswer(prepared.display) })
+      if (res.ok)
+        dispatch({
+          type: 'answered',
+          answer: shortAnswer(prepared.display.answer, prepared.display.text),
+        })
       // "Question already answered." is not a failure worth stopping on: it is
       // settled, so the card leaves the way it would have if the poll had
       // brought the news first.
@@ -278,7 +284,7 @@ function LiveCard({
   sending: boolean
   error: string | null
   waiting: number
-  onSubmit: (answer: Record<string, unknown>) => void
+  onSubmit: (doc: AnswerDoc) => void
 }) {
   const { blocks, locked } = useQuestionContent(e)
   const settled = phase === 'acked' || phase === 'leaving'
@@ -317,6 +323,7 @@ function LiveCard({
             >
               <AnswerArea
                 blocks={blocks}
+                current={null}
                 disabled={sending || settled}
                 error={error}
                 onSubmit={onSubmit}

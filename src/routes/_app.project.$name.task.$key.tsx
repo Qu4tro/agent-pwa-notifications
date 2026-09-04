@@ -2,12 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Lock } from 'lucide-react'
-import { timeAgo, type ThreadData, type EventItem } from '../lib/api'
+import { type AnswerDoc, type ThreadData, type EventItem } from '../lib/api'
 import { BackLink, Container, useHeaderBack } from '../lib/shell'
 import { ensure, threadQuery, useAnswer, useMarkRead } from '../lib/queries'
 import { ThreadSkeleton } from '../lib/skeleton'
-import { BlockRenderer, Callout } from '../lib/blocks'
-import { AnswerArea, LockedNote, shortAnswer, useQuestionContent, prepareAnswer } from '../lib/question'
+import { BlockRenderer } from '../lib/blocks'
+import {
+  AnswerArea,
+  AnswerStatus,
+  LockedNote,
+  shortAnswer,
+  useQuestionContent,
+  prepareAnswer,
+} from '../lib/question'
 import { projectLabel, fromParam, KIND_BORDER, STATE_TEXT } from '../lib/project'
 import { InlineError, KindLabel, ProjectDot, Time } from '../lib/ui'
 
@@ -70,11 +77,7 @@ function ThreadView() {
     }
   }, [thread, markMutate])
 
-  async function submit(
-    eventId: string,
-    payload: Record<string, unknown>,
-    display: Record<string, unknown>,
-  ) {
+  async function submit(eventId: string, payload: Record<string, unknown>, display: AnswerDoc) {
     setFailed(null)
     try {
       await answer.mutateAsync({ eventId, payload, display })
@@ -224,7 +227,7 @@ function Message({
   isNewest: boolean
   submitting: boolean
   error: string | null
-  onSubmit: (payload: Record<string, unknown>, display: Record<string, unknown>) => void
+  onSubmit: (payload: Record<string, unknown>, display: AnswerDoc) => void
 }) {
   const q = e.question
   const isPending = q?.status === 'pending'
@@ -240,10 +243,18 @@ function Message({
   // it. After that the state is yours: a tap is remembered until you leave.
   const [open, setOpen] = useState(() => isPending || e.read_at == null || isNewest)
 
-  const { blocks, answer, locked } = useQuestionContent(e)
+  const { blocks, answer, text, locked } = useQuestionContent(e)
+  const current: AnswerDoc | null =
+    q?.status === 'answered'
+      ? { answer: (answer && typeof answer === 'object' ? answer : {}) as Record<string, unknown>, text }
+      : null
 
-  async function handleSubmit(a: Record<string, unknown>) {
-    const prepared = await prepareAnswer(e, a)
+  // While the question is waiting, the submit asks the server to write only if
+  // it still is, so a tap here loses to an answer already given somewhere else
+  // rather than overwriting it. Once it is answered, this composer is the place
+  // that changes it, so the guard comes off.
+  async function handleSubmit(doc: AnswerDoc) {
+    const prepared = await prepareAnswer(e, doc, { ifPending: isPending })
     if (prepared) onSubmit(prepared.payload, prepared.display)
   }
 
@@ -255,7 +266,7 @@ function Message({
       {e.title ? <div className="leading-snug font-semibold">{e.title}</div> : null}
       {q?.status === 'answered' ? (
         <div className={`mt-0.5 truncate text-[15px] ${STATE_TEXT.answered}`}>
-          You answered: <span className="font-semibold">{shortAnswer(answer)}</span>
+          You answered: <span className="font-semibold">{shortAnswer(answer, text)}</span>
         </div>
       ) : null}
     </>
@@ -278,37 +289,21 @@ function Message({
 
         {q && (
           <div className="mt-3 border-t border-line pt-3">
-            {isPending ? (
-              <AnswerArea
-                blocks={blocks}
-                disabled={submitting}
-                error={error}
-                onSubmit={handleSubmit}
-              />
-            ) : q.status === 'answered' ? (
-              <div className="flex flex-col gap-1">
-                {q.picked_up_at ? (
-                  <>
-                    <div className="text-[15px] text-muted">
-                      Agent received it {timeAgo(q.picked_up_at)}
-                    </div>
-                    {/* The agent's word back to you. Same chip as a callout the
-                        agent sent in its blocks, so "a note in a tone" has one
-                        look wherever it comes from. */}
-                    {e.ack ? (
-                      <div className="mt-1">
-                        <Callout tone="success">
-                          {e.ack.replace(/\{answer\}/g, shortAnswer(answer))}
-                        </Callout>
-                      </div>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="text-[15px] text-muted">Waiting for the agent</div>
-                )}
-              </div>
-            ) : (
+            {q.status === 'expired' ? (
               <div className={`text-[15px] ${STATE_TEXT.expired}`}>Expired before you answered.</div>
+            ) : (
+              // The controls stay live after an answer, because this is the
+              // place the answer is changed. What stands is under them.
+              <div className="flex flex-col gap-3">
+                <AnswerArea
+                  blocks={blocks}
+                  current={current}
+                  disabled={submitting}
+                  error={error}
+                  onSubmit={handleSubmit}
+                />
+                <AnswerStatus question={q} answer={answer} text={text} ack={e.ack} />
+              </div>
             )}
           </div>
         )}

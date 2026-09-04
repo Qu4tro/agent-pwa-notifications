@@ -502,7 +502,8 @@ const RECENT_ON_A_ROW = 3
 // which is why it is a function and not a loop inside getTasks.
 const SELECT_THREAD_ROWS = `SELECT e.*, ${THREAD_KEY_SQL} AS thread_key,
        q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
-       q.timeout_at AS q_timeout, q.picked_up_at AS q_picked, q.changes AS q_changes
+       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
+       q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id`
 
 function summarizeThreads(rows: Record<string, unknown>[]): any[] {
@@ -665,7 +666,8 @@ export async function getPending(env: Env, accountId: string): Promise<Response>
 export async function getThread(project: string, key: string, env: Env, accountId: string): Promise<Response> {
   const { results } = await env.DB.prepare(
     `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
-       q.timeout_at AS q_timeout, q.picked_up_at AS q_picked, q.changes AS q_changes
+       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
+       q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
      WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
        AND ${THREAD_KEY_SQL} = ?3
@@ -692,7 +694,8 @@ export async function getFeed(url: URL, env: Env, accountId: string): Promise<Re
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? '100') | 0))
   const rows = await env.DB.prepare(
     `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
-       q.timeout_at AS q_timeout, q.picked_up_at AS q_picked, q.changes AS q_changes
+       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
+       q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
      WHERE e.account_id = ?1 AND e.archived_at IS NULL
        AND COALESCE(e.updated_at, e.created_at) > ?2
@@ -706,7 +709,8 @@ export async function getFeed(url: URL, env: Env, accountId: string): Promise<Re
 export async function getEvent(id: string, env: Env, accountId: string): Promise<Response> {
   const row = await env.DB.prepare(
     `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
-       q.timeout_at AS q_timeout, q.picked_up_at AS q_picked, q.changes AS q_changes
+       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
+       q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
      WHERE e.id = ?1 AND e.account_id = ?2 AND e.archived_at IS NULL`,
   )
@@ -749,6 +753,7 @@ function hydrate(row: Record<string, unknown>): Record<string, unknown> {
             status: row.q_status,
             answer,
             text: row.q_text ?? null,
+            answered_at: row.q_answered ?? null,
             timeout_at: row.q_timeout,
             picked_up_at: row.q_picked ?? null,
             changes: Number(row.q_changes ?? 0),

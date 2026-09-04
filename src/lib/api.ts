@@ -1,10 +1,23 @@
 // Thin client-side fetch helpers. Same-origin, cookie-authed.
 
+// An answer is one document in two parts: the values of the controls the agent
+// sent, keyed by block id, and the human's own words. Either part may be
+// empty, and at least one is filled.
+export interface AnswerDoc {
+  answer: Record<string, unknown>
+  text: string | null
+}
+
 export interface QuestionState {
   status: 'pending' | 'answered' | 'expired'
   answer: Record<string, unknown> | string | null // string = ciphertext when enc
+  text: string | null // the human's own words; ciphertext when enc
+  answered_at: number | null // when the document that stands was written
   timeout_at: number
   picked_up_at: number | null // set once the agent has received the answer
+  // How many times the answer was replaced after it was first given. A change
+  // clears picked_up_at, so the screen waits on the agent again.
+  changes: number
 }
 
 export interface EventItem {
@@ -74,8 +87,13 @@ export interface TaskSummary {
     created_at: number
     read_at: number | null
     // Set only on a question. `answer` is the ciphertext string when the event
-    // is encrypted, which is why the row says "answered" and not what.
-    question: { status: 'pending' | 'answered' | 'expired'; answer: unknown } | null
+    // is encrypted, which is why the row says "answered" and not what. `text`
+    // is the human's own words, and may be the whole of the answer.
+    question: {
+      status: 'pending' | 'answered' | 'expired'
+      answer: unknown
+      text: string | null
+    } | null
   }[]
 }
 
@@ -135,10 +153,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ project, keys }),
     }),
-  answer: (id: string, answer: Record<string, unknown>) =>
-    req<{ ok: boolean; error?: string }>(`/api/v1/questions/${id}/answer`, {
+  // The envelope: `answer` and `text` as siblings, both ciphertext when the
+  // event is encrypted. `if_pending` asks the server to write only while the
+  // question is still waiting.
+  answer: (id: string, body: Record<string, unknown>) =>
+    req<{ ok: boolean; error?: string; changes?: number }>(`/api/v1/questions/${id}/answer`, {
       method: 'POST',
-      body: JSON.stringify(answer),
+      body: JSON.stringify(body),
     }),
   settings: () => req<{ ok: boolean; quiet_hours: unknown }>('/api/v1/settings'),
   putSettings: (body: unknown) =>

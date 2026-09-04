@@ -56,7 +56,7 @@ function settled(
 ): TimelineItem['answer'] {
   if (!q || q.status === 'pending') return null
   if (q.status === 'expired') return { status: 'expired', text: 'expired' }
-  const text = typeof q.answer === 'string' ? 'answered' : shortAnswer(q.answer)
+  const text = typeof q.answer === 'string' ? 'answered' : shortAnswer(q.answer, q.text)
   return { status: 'answered', text: text || 'answered' }
 }
 

@@ -4,7 +4,14 @@
 
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient, QueryFunction, QueryKey } from '@tanstack/react-query'
-import { api, type EventItem, type ProjectRow, type TaskSummary, type ThreadData } from './api'
+import {
+  api,
+  type AnswerDoc,
+  type EventItem,
+  type ProjectRow,
+  type TaskSummary,
+  type ThreadData,
+} from './api'
 
 export const queryKeys = {
   config: () => ['config'] as const,
@@ -108,12 +115,13 @@ function invalidateLists(client: QueryClient) {
 
 // -- Mutations --------------------------------------------------------------
 
-// `display` is the plaintext answer for the optimistic cache write; `payload`
-// is what goes on the wire, which for an E2E question is ciphertext.
+// `display` is the plaintext document for the optimistic cache write; `payload`
+// is the envelope that goes on the wire, which for an E2E question carries
+// each part as ciphertext.
 export type AnswerInput = {
   eventId: string
   payload: Record<string, unknown>
-  display: Record<string, unknown>
+  display: AnswerDoc
 }
 
 export function useAnswer(project: string, key: string) {
@@ -124,8 +132,10 @@ export function useAnswer(project: string, key: string) {
       if (!res.ok) throw new Error(res.error ?? 'Could not submit.')
       return res
     },
-    // Settle the question in the cache before the round trip, so the buttons
-    // go away the moment they are tapped.
+    // Settle the question in the cache before the round trip, so the document
+    // on screen is the one just sent. A submit on an already answered question
+    // is a change: it counts, and it clears the receipt, so the line under the
+    // controls goes back to waiting on the agent.
     onMutate: async ({ eventId, display }: AnswerInput) => {
       const queryKey = queryKeys.thread(project, key)
       await client.cancelQueries({ queryKey })
@@ -136,7 +146,21 @@ export function useAnswer(project: string, key: string) {
               ...thread,
               events: thread.events.map((e) =>
                 e.id === eventId && e.question
-                  ? { ...e, question: { ...e.question, status: 'answered' as const, answer: display } }
+                  ? {
+                      ...e,
+                      question: {
+                        ...e.question,
+                        status: 'answered' as const,
+                        answer: display.answer,
+                        text: display.text,
+                        answered_at: Date.now(),
+                        changes:
+                          e.question.status === 'answered'
+                            ? e.question.changes + 1
+                            : e.question.changes,
+                        picked_up_at: null,
+                      },
+                    }
                   : e,
               ),
             }
@@ -161,6 +185,9 @@ export function useAnswer(project: string, key: string) {
 export function useAnswerFromList(queryKey: QueryKey) {
   const client = useQueryClient()
   return useMutation({
+    // A row is a quick tap, so it answers only a question that is still
+    // waiting: `if_pending` keeps a tap on a stale row from replacing an
+    // answer given somewhere else.
     mutationFn: async ({
       eventId,
       answer,
@@ -168,7 +195,7 @@ export function useAnswerFromList(queryKey: QueryKey) {
       eventId: string
       answer: Record<string, unknown>
     }) => {
-      const res = await api.answer(eventId, answer)
+      const res = await api.answer(eventId, { answer, if_pending: true })
       if (!res.ok) throw new Error(res.error ?? 'Could not submit.')
       return res
     },
