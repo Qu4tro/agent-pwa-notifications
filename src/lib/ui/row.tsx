@@ -98,20 +98,29 @@ export function RowBody({
 }
 
 // A sequence, drawn as one: a hairline down the left with a dot on it per
-// event, in that event's kind colour, and the event's own time at the right.
-// Three muted subtitles say the same words and read as three subtitles.
+// event, in that event's kind colour. Three muted subtitles say the same words
+// and read as three subtitles.
+//
+// The geometry is in whole pixels on purpose. Every line is 20px tall, so each
+// dot and both ends of the rail land on a pixel edge; a fractional line height
+// puts the lower dots on half pixels, and a browser that does not snap blurs
+// them. The dot is 7px, an odd size, so a 1px rail has a pixel column to sit
+// on dead centre; under a 6px dot it is half a pixel off whichever way it
+// goes. And the dot is positioned, so it paints over the rail: an absolutely
+// positioned rail paints after in-flow content, and would otherwise draw a
+// line straight through every dot.
 function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }) {
   if (items.length === 0) return null
   return (
     <>
       <ol className="relative mt-1 flex flex-col gap-1">
-        {/* First dot's centre to last dot's centre, and no further. */}
-        <span aria-hidden className="absolute top-[10px] bottom-[10px] left-[2.5px] w-px bg-line" />
+        {/* From under the first dot to under the last, and no further. */}
+        <span aria-hidden className="absolute top-[10px] bottom-[10px] left-[3px] w-px bg-line" />
         {items.map((it) => (
-          <li key={it.id} className="flex items-start gap-x-1.5 gap-y-0">
+          <li key={it.id} className="flex items-start gap-x-2 gap-y-0 leading-5">
             <span
               aria-hidden
-              className={`mt-[7px] mr-0.5 size-1.5 shrink-0 rounded-full ${KIND_BG[it.kind] ?? 'bg-muted'}`}
+              className={`relative mt-[7px] size-[7px] shrink-0 rounded-full ${KIND_BG[it.kind] ?? 'bg-muted'}`}
             />
             <span
               className={`shrink-0 text-[13px] font-semibold ${KIND_TEXT[it.kind] ?? 'text-muted'}`}
@@ -120,7 +129,7 @@ function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }
             </span>
             {/* Unread keeps full-weight text, the same signal the row uses. */}
             <span
-              className={`min-w-0 flex-1 truncate text-[15px] leading-[1.35] ${
+              className={`min-w-0 flex-1 truncate text-[15px] ${
                 it.unread ? 'text-text' : 'text-muted'
               }`}
             >
@@ -133,17 +142,17 @@ function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }
             {it.answer ? (
               it.answer.status === 'answered' ? (
                 <span
-                  className={`max-w-[55%] shrink-0 truncate text-[15px] leading-[1.35] font-semibold ${STATE_TEXT.answered}`}
+                  className={`max-w-[55%] shrink-0 truncate text-[15px] font-semibold ${STATE_TEXT.answered}`}
                 >
                   <span className="sr-only">answered </span>
                   {it.answer.text}
                 </span>
               ) : it.answer.status === 'pending' ? (
-                <span className={`shrink-0 text-[15px] italic leading-[1.35] ${STATE_TEXT.pending}`}>
+                <span className={`shrink-0 text-[15px] italic ${STATE_TEXT.pending}`}>
                   {it.answer.text}
                 </span>
               ) : (
-                <span className={`shrink-0 text-[15px] leading-[1.35] ${STATE_TEXT.expired}`}>
+                <span className={`shrink-0 text-[15px] ${STATE_TEXT.expired}`}>
                   expired
                 </span>
               )
@@ -152,7 +161,7 @@ function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }
         ))}
       </ol>
       {earlier > 0 ? (
-        <div className="mt-1 pl-[14px] text-[15px] leading-[1.35] text-faint">
+        <div className="mt-1 pl-[15px] text-[15px] leading-5 text-faint">
           +{earlier} earlier
         </div>
       ) : null}
