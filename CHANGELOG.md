@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-09-04
+
 ### Changed
 
 - The app is called Agent PWA Notifications. The name it had, "Agent
