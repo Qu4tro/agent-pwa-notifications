@@ -1,6 +1,6 @@
 // Four button roles and nothing else. Primary is the one accent colour in the
 // app; secondary is an outline; danger is an outline that has gone red; answer
-// is one option on a question, wearing the colour that tells it from its
+// is an outline in the colour that tells one option on a question from its
 // siblings. Every one is at least 44px tall, so it stays a comfortable touch
 // target.
 
@@ -11,9 +11,13 @@ const VARIANT: Record<Variant, string> = {
   primary: 'bg-kind-question text-bg font-semibold hover:opacity-90',
   secondary: 'border border-edge text-text hover:bg-surface',
   danger: 'border border-kind-error text-kind-error hover:bg-surface',
-  // Both values come from answerStyle in src/lib/answers.ts, which picks the
-  // label colour by luminance so a dark fill never gets a dark label.
-  answer: 'bg-[var(--answer-bg)] text-[var(--answer-fg)] font-semibold hover:opacity-90',
+  // Both values come from answerStyles in src/lib/answers.ts. The label is the
+  // outline colour when that can be read on the page, and the page's own text
+  // colour when an agent chose one that cannot. An outline and not a fill: the
+  // secondary weight, in colour, so a list of these does not outshout the rows
+  // it sits on. Hover tints the inside with the same colour.
+  answer:
+    'border border-[color:var(--answer-color)] text-[color:var(--answer-fg)] hover:bg-[color-mix(in_srgb,var(--answer-color)_15%,transparent)]',
 }
 
 const BASE =

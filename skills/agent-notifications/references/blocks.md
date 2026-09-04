@@ -111,7 +111,8 @@ An option's colour is decided by three rules, in this order:
    comes out green or red on its own. The whole label has to be the word, so
    "Yes, but hold" is not an affirmative and is not coloured as one.
 3. **Its position.** Everything else takes the next colour in the palette, which
-   says only that the choices are different, not which one is which.
+   says only that the choices are different, not which one is which. Green and
+   red are never handed out this way, so they only ever mean rule 2.
 
 So send nothing. A yes/no question is already green and red, and any other set
 of options already reads apart.

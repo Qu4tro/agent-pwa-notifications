@@ -107,8 +107,8 @@ export function TaskLine({
 // where it can be answered.
 //
 // The buttons cannot sit inside the row's link, so they are a slot on the row
-// beside it. They stay at the right while they fit and take a full line of
-// their own, in equal shares, when they do not.
+// beside it: a column of fixed width at the right, which they split in equal
+// shares, and a full line of their own when the column does not fit.
 //
 // `queryKey` is the list this row is part of, so the optimistic write lands on
 // the right cache entry: the project's tasks on one page, the pending list on
@@ -151,9 +151,9 @@ export function PendingLine({
               key={o.label}
               variant="answer"
               style={styles[i]}
-              // flex-1 splits a wrapped line into equal shares; min-w-fit
-              // stops that split from squeezing the longest label into two
-              // lines when the buttons are riding the row instead.
+              // flex-1 splits the column, or a wrapped line, into equal
+              // shares; min-w-fit stops that split from squeezing a long
+              // label into two lines, and lets the column widen for it.
               className="flex-1 min-w-fit whitespace-nowrap"
               disabled={answer.isPending}
               onClick={() => submit(o.answer)}

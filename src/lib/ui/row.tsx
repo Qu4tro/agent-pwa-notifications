@@ -9,12 +9,19 @@ import { Time } from './time'
 // title. A thread page's messages stand their times in a gutter of the same
 // width, so a row and the message it opens into line up down the same column.
 //
-// The whole row is one wrapping flex line: gutter, body, answers. The body
-// takes every scrap of slack (grow 9999 against the answers' 1), so when the
-// answers fit they sit at the right of the row at their own width. When they
-// do not, they wrap to a line of their own and their grow makes them span it,
-// which is what "full width if they do not fit" means here. Nothing measures
-// anything in JavaScript.
+// The whole row is one wrapping flex line: gutter, body, answers. The answers
+// are a column of one fixed width (18rem), so every row's buttons share one
+// left edge and every body truncates at the same point down the list; a group
+// that sizes to its own labels would leave a ragged edge that the eye has
+// nowhere to rest on. The body takes every scrap of slack (grow 9999 against
+// the answers' 1), and the buttons split the column between them in equal
+// shares. When the column does not fit beside the body, it wraps to a line of
+// its own and its grow makes it span that line, which is what "full width if
+// they do not fit" means here. Nothing measures anything in JavaScript.
+//
+// The column grows for a group of labels wider than it (min-w-fit), rather
+// than stacking them inside it; and fit-content caps that at the row, so a
+// wide group on a narrow screen wraps within the row instead of overflowing.
 
 // The row's body is a link to whatever the row is about. The padding is on the
 // link, not around it, so the whole body is the target.
@@ -45,7 +52,7 @@ export function Row({
         {children}
       </div>
       {answers ? (
-        <div className="flex grow basis-auto flex-wrap items-start gap-2 pt-3 pr-4 pb-3 pl-4">
+        <div className="flex min-w-fit grow basis-[18rem] flex-wrap items-start gap-2 pt-3 pr-4 pb-3 pl-4">
           {answers}
         </div>
       ) : null}

@@ -6,6 +6,12 @@
 // is "these are different choices" and nothing more. It is a register of its
 // own - eight pale tints, well away from the four saturated kind colours - so
 // an answer never reads as an event kind.
+//
+// The colour is worn as an outline and a label, never as a fill. The rows the
+// buttons sit on are muted text on a dark page, and a pale block on that page
+// is the loudest thing on it: a list of them outweighs the titles they belong
+// to. A pale line and pale text tell two choices apart just as well, at the
+// weight of the row.
 
 export const ANSWER_PALETTE = {
   blue: '#bcd4ff',
@@ -20,11 +26,18 @@ export const ANSWER_PALETTE = {
 
 export type AnswerColorName = keyof typeof ANSWER_PALETTE
 
-// The order the palette is walked in. Option i takes entry i % 8: by index,
-// not by hashing the label. Three options against eight colours collide on
-// about a third of questions under a hash, and siblings differing is the whole
-// point.
-const ORDER = Object.keys(ANSWER_PALETTE) as AnswerColorName[]
+// The colours handed out by position, in the order they are walked. Mint and
+// rose are not among them: they are what an affirmative and a denial wear
+// (AFFIRM and DENY, below), and a reader who has learnt down four rows that
+// green means yes must not find it on "A tenth" on the fifth. An agent can
+// still name either outright, and is then saying so on purpose.
+//
+// Lime and pink come last. They are the nearest neighbours of mint and rose,
+// and a question with two or three options should never reach them.
+//
+// By position, not by hashing the label: under a hash, siblings collide, and
+// siblings differing is the whole point.
+const WALK: AnswerColorName[] = ['blue', 'violet', 'amber', 'cyan', 'lime', 'pink']
 
 const HEX = /^#[0-9a-f]{6}$/i
 
@@ -81,9 +94,9 @@ export function overrideColor(value: string | undefined): string | null {
   return HEX.test(value) ? value.toLowerCase() : null
 }
 
-// An agent-set colour where there is one, and the palette where there is not.
+// An agent-set colour where there is one, and the walk where there is not.
 export function resolveAnswerColor(value: string | undefined, index: number): string {
-  return overrideColor(value) ?? ANSWER_PALETTE[ORDER[index % ORDER.length]]
+  return overrideColor(value) ?? ANSWER_PALETTE[WALK[index % WALK.length]]
 }
 
 // WCAG relative luminance.
@@ -101,62 +114,54 @@ function contrast(a: number, b: number): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-// Dark label or light one, whichever reads better on the fill. The eight names
-// are all pale enough that this always answers "dark", but an agent that sends
-// #1e3a8a would otherwise get dark text on navy.
+// The label colour for an answer colour: the colour itself when it can be read
+// on the page, and the page's own text colour when it cannot. The eight names
+// all clear 10:1 against the background, so this only ever matters for a hex
+// an agent chose - #1e3a8a is under 2:1 here and would be lost as a label. The
+// outline keeps the colour either way, since the agent asked for it; the label
+// is the part that has to be readable.
 const BG_LUMINANCE = luminance('#0f1115') // --color-bg
-const TEXT_LUMINANCE = luminance('#e6e8ee') // --color-text
+const READABLE = 4.5 // WCAG AA for text at this size
 
-export function answerTextColor(fill: string): string {
-  const l = luminance(fill)
-  return contrast(l, BG_LUMINANCE) >= contrast(l, TEXT_LUMINANCE)
-    ? 'var(--color-bg)'
-    : 'var(--color-text)'
+export function answerTextColor(color: string): string {
+  return contrast(luminance(color), BG_LUMINANCE) >= READABLE ? color : 'var(--color-text)'
 }
 
-// What the answer buttons on one question wear. Two custom properties rather
-// than a class, because the value is per option and Tailwind can only see
-// class names it can read in the source.
+// What the answer buttons on one question wear: the outline colour, and the
+// label colour. Two custom properties rather than a class, because the value is
+// per option and Tailwind can only see class names it can read in the source.
 //
-// Three rules, in this order, and the order is the contract:
-//
-//   1. What the agent asked for. A `colors` entry - which is what the CLI's
-//      --color sends - always wins, on "Yes" as much as on anything else. An
-//      agent that names a colour has said something the app does not overrule.
-//   2. What the label says it is. A plain affirmative or denial takes green or
-//      red, so the reader does not have to read it.
-//   3. The palette, by position, which says only "these are different".
-//
-// Resolved for the whole question at once, not one option at a time, so the
-// palette can walk past anything the first two rules have claimed. Colouring
-// the first of three options mint and leaving the rest alone would otherwise
-// hand the third one mint as well, which is the one thing this is here to
-// prevent.
+// Three rules, in order: what the agent asked for, what the label says it is,
+// then the walk. Resolved for the whole question at once, not one option at a
+// time, so the walk can step past anything the first two have claimed:
+// colouring the first of three options blue by name and leaving the rest alone
+// would otherwise hand the second one blue as well, which is the one thing
+// this is here to prevent.
 export function answerStyles(
   labels: string[],
   colors?: (string | undefined)[],
 ): React.CSSProperties[] {
   const fixed = labels.map((label, i) => overrideColor(colors?.[i]) ?? wordColor(label))
-  const taken = new Set(fixed.filter((fill): fill is string => fill != null))
+  const taken = new Set(fixed.filter((color): color is string => color != null))
 
   let cursor = 0
   const nextFree = (): string => {
-    for (let n = 0; n < ORDER.length; n++) {
-      const fill = ANSWER_PALETTE[ORDER[(cursor + n) % ORDER.length]]
-      if (!taken.has(fill)) {
-        cursor = (cursor + n + 1) % ORDER.length
-        return fill
+    for (let n = 0; n < WALK.length; n++) {
+      const color = ANSWER_PALETTE[WALK[(cursor + n) % WALK.length]]
+      if (!taken.has(color)) {
+        cursor = (cursor + n + 1) % WALK.length
+        return color
       }
     }
-    // Every colour is spoken for: more than eight options, or an agent that
-    // named all eight. Walk the palette in order and let them repeat.
-    const fill = ANSWER_PALETTE[ORDER[cursor]]
-    cursor = (cursor + 1) % ORDER.length
-    return fill
+    // Every colour is spoken for: more than six unnamed options, or an agent
+    // that named all six. Walk them in order and let them repeat.
+    const color = ANSWER_PALETTE[WALK[cursor]]
+    cursor = (cursor + 1) % WALK.length
+    return color
   }
 
   return fixed.map((known) => {
-    const fill = known ?? nextFree()
-    return { '--answer-bg': fill, '--answer-fg': answerTextColor(fill) } as React.CSSProperties
+    const color = known ?? nextFree()
+    return { '--answer-color': color, '--answer-fg': answerTextColor(color) } as React.CSSProperties
   })
 }
