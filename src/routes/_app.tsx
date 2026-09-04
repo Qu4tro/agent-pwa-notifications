@@ -39,13 +39,12 @@ function AppRoute() {
 }
 
 function AppLayout() {
-  const [left, setLeft] = useState<React.ReactNode>(null)
   const [right, setRight] = useState<React.ReactNode>(null)
   useLiveRefresh()
 
-  // The setters are stable, so the context value has to be too - a new object
+  // The setter is stable, so the context value has to be too - a new object
   // every render would re-run every page's slot effect.
-  const slots = useMemo(() => ({ setLeft, setRight }), [])
+  const slots = useMemo(() => ({ setRight }), [])
 
   useEffect(() => {
     markAppMounted() // hydration is over; a redirect may navigate from here on
@@ -54,7 +53,7 @@ function AppLayout() {
 
   return (
     <HeaderActionsContext.Provider value={slots}>
-      <Header left={left} right={right} />
+      <Header right={right} />
       <Outlet />
     </HeaderActionsContext.Provider>
   )

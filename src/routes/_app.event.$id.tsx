@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { Container } from '../lib/shell'
 import { ensure, eventQuery } from '../lib/queries'
 import { toParam } from '../lib/project'
@@ -30,8 +30,7 @@ function EventGone() {
   return (
     <Container>
       <div className="px-4 py-12 text-center">
-        <p className="mb-2 text-muted">This message no longer exists.</p>
-        <Link to="/">Back to projects</Link>
+        <p className="text-muted">This message no longer exists.</p>
       </div>
     </Container>
   )

@@ -1,9 +1,8 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { api, type AnswerDoc, type EventItem, type TaskSummary } from '../lib/api'
-import { BackLink, useHeaderBack } from '../lib/shell'
 import { ensure, eventQuery, pendingQuery, queryKeys, LIVE_KEYS } from '../lib/queries'
 import { LiveSkeleton } from '../lib/skeleton'
 import { BlockRenderer, Callout } from '../lib/blocks'
@@ -252,7 +251,6 @@ function phaseMs(phase: LivePhase, reduced: boolean, motion: LiveMotion): number
 // -- The page -----------------------------------------------------------------
 
 function LivePage() {
-  useHeaderBack(<BackLink to="/pending" label="Needs you" />, [])
   useWakeLock()
   const reduced = useReducedMotion()
   const client = useQueryClient()
@@ -627,9 +625,6 @@ function EmptyQueue({ leaving, footer }: { leaving: boolean; footer: React.React
         <p className="text-[32px] leading-tight font-semibold">You&apos;re all caught up.</p>
         <p className="mt-3 text-[17px] text-muted">
           Your agents are working. The next question will appear here.
-        </p>
-        <p className="mt-8 text-[15px]">
-          <Link to="/">Back to projects</Link>
         </p>
       </div>
       {footer}

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Focus } from 'lucide-react'
 import type { TaskSummary } from '../lib/api'
-import { BackLink, Container, useHeaderActions, useHeaderBack } from '../lib/shell'
+import { Container, useHeaderActions } from '../lib/shell'
 import { ensure, pendingQuery, queryKeys } from '../lib/queries'
 import { PendingSkeleton } from '../lib/skeleton'
 import { PendingLine } from '../lib/task-line'
@@ -25,7 +25,6 @@ export const Route = createFileRoute('/_app/pending')({
 
 function PendingPage() {
   const { data, isError, refetch } = useQuery(pendingQuery())
-  useHeaderBack(<BackLink to="/" label="Projects" />, [])
   // The same queue, one question at a time, for when the list is the part that
   // is in the way.
   useHeaderActions(
@@ -56,7 +55,6 @@ function PendingPage() {
               key={`${t.project}/${t.key}`}
               t={t}
               queryKey={queryKeys.pending()}
-              from="pending"
             />
           ))}
         </div>

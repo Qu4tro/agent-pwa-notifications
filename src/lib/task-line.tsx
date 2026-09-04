@@ -60,22 +60,17 @@ export function TaskLine({
   t,
   unread,
   answers,
-  from,
 }: {
   t: TaskSummary
   unread?: boolean
   // What can be done to this thread from the list, if anything.
   answers?: React.ReactNode
-  // Which list this row is in, when the thread's own URL cannot say it. The
-  // thread page reads it to know where its way out goes.
-  from?: 'pending'
 }) {
   return (
     <Row time={<Time at={t.last_activity} />} answers={answers}>
       <Link
         to="/project/$name/task/$key"
         params={taskParams(t)}
-        search={from ? { from } : {}}
         className={rowLinkClass}
       >
         <RowBody
@@ -112,11 +107,9 @@ export function TaskLine({
 export function PendingLine({
   t,
   queryKey,
-  from,
 }: {
   t: TaskSummary
   queryKey: QueryKey
-  from?: 'pending'
 }) {
   const answer = useAnswerFromList(queryKey)
   const [error, setError] = useState<string | null>(null)
@@ -129,7 +122,7 @@ export function PendingLine({
     answer.mutate({ eventId, answer: value }, { onError: (e) => setError((e as Error).message) })
   }
 
-  if (options.length === 0 || !eventId) return <TaskLine t={t} from={from} />
+  if (options.length === 0 || !eventId) return <TaskLine t={t} />
 
   const styles = answerStyles(
     options.map((o) => o.label),
@@ -139,7 +132,6 @@ export function PendingLine({
   return (
     <TaskLine
       t={t}
-      from={from}
       answers={
         <>
           {options.map((o, i) => (

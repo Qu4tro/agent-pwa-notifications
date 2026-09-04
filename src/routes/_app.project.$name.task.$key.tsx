@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Lock } from 'lucide-react'
 import { type AnswerDoc, type ThreadData, type EventItem } from '../lib/api'
-import { BackLink, Container, useHeaderBack } from '../lib/shell'
+import { Container } from '../lib/shell'
 import { ensure, threadQuery, useAnswer, useMarkRead } from '../lib/queries'
 import { ThreadSkeleton } from '../lib/skeleton'
 import { BlockRenderer } from '../lib/blocks'
@@ -20,14 +20,6 @@ import { InlineError, KindLabel, ProjectDot, Time } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/project/$name/task/$key')({
   ssr: false,
-  // Where the reader came from, when the URL cannot say it. The header's back
-  // control is an "up" link, not a history back, and this thread's parent in
-  // the URL is its project - so a question opened from "Needs you", which is
-  // not in that hierarchy, has to be told. One value, and anything else in the
-  // query string is dropped: it survives a reload and a shared link, and the
-  // label can be right, which `history.back()` could never be.
-  validateSearch: (search: Record<string, unknown>): { from?: 'pending' } =>
-    search.from === 'pending' ? { from: 'pending' } : {},
   loader: ({ context, params }) =>
     context.signedIn
       ? ensure<ThreadData | null>(
@@ -41,21 +33,11 @@ export const Route = createFileRoute('/_app/project/$name/task/$key')({
 
 function ThreadView() {
   const { name, key } = Route.useParams()
-  const { from } = Route.useSearch()
   const project = fromParam(name)
   const { data: thread, isError, isFetched, refetch } = useQuery(threadQuery(project, key))
   const answer = useAnswer(project, key)
   const markRead = useMarkRead()
   const [failed, setFailed] = useState<{ id: string; message: string } | null>(null)
-
-  useHeaderBack(
-    from === 'pending' ? (
-      <BackLink to="/pending" label="Needs you" />
-    ) : (
-      <BackLink to="/project/$name" params={{ name }} label={projectLabel(project)} />
-    ),
-    [name, project, from],
-  )
 
   // Ids already sent to /read, so a refresh that overlaps the round trip does
   // not POST the same event twice.
@@ -94,8 +76,7 @@ function ThreadView() {
           <InlineError message="Could not load this thread." onRetry={() => refetch()} />
         ) : (
           <div className="px-4 py-12 text-center">
-            <p className="mb-2 text-muted">This task no longer exists.</p>
-            <Link to="/">Back to projects</Link>
+            <p className="text-muted">This task no longer exists.</p>
           </div>
         )}
       </Container>
@@ -116,10 +97,17 @@ function ThreadView() {
   return (
     <Container>
       <div className="mb-4 px-4">
-        <div className="flex items-center gap-2 text-[15px] text-muted">
+        {/* The thread's parent, and the way up to it. The header's title goes
+            to the project list; this line is the step in between, and it was
+            already here saying which project this is. */}
+        <Link
+          to="/project/$name"
+          params={{ name }}
+          className="flex items-center gap-2 text-[15px] text-muted no-underline hover:text-text"
+        >
           <ProjectDot project={project} size={6} />
           <span className="truncate">{projectLabel(project)}</span>
-        </div>
+        </Link>
         <h1 className="text-[22px] leading-tight font-semibold">{title}</h1>
       </div>
 

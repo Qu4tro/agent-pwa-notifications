@@ -4,8 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, BellOff } from 'lucide-react'
 import { api } from '../lib/api'
 import { APP_NAME, REPO_URL, UPSTREAM_URL } from '../lib/brand'
-import { BackLink, Container } from '../lib/shell'
-import { useHeaderBack } from '../lib/shell'
+import { Container } from '../lib/shell'
 import { SettingsSkeleton } from '../lib/skeleton'
 import {
   accountQuery,
@@ -65,7 +64,6 @@ function SettingsPage() {
   const [pushBusy, setPushBusy] = useState(false)
   const [pushMsg, setPushMsg] = useState<string | null>(null)
 
-  useHeaderBack(<BackLink to="/" label="Projects" />, [])
 
   // Whether this device has a push subscription is a browser fact, not a
   // server one, so it stays out of the query cache.

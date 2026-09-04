@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import type { TaskSummary } from '../lib/api'
-import { BackLink, Container, useHeaderActions, useHeaderBack } from '../lib/shell'
+import { Container, useHeaderActions } from '../lib/shell'
 import { ensure, queryKeys, tasksQuery, useArchive, useClear } from '../lib/queries'
 import { TasksSkeleton } from '../lib/skeleton'
 import { PendingLine, TaskLine } from '../lib/task-line'
@@ -28,7 +28,6 @@ function ProjectView() {
   const archive = useArchive(project)
   const [clearOpen, setClearOpen] = useState(false)
 
-  useHeaderBack(<BackLink to="/" label="Projects" />, [])
   useHeaderActions(
     <button
       onClick={() => setClearOpen((v) => !v)}
