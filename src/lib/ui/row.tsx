@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import { KIND_BG, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../project'
 
 // One line in a list. Everything on a list page is made of these: a time
@@ -143,9 +144,12 @@ function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }
                 of its own reads as a second, unrelated thing, and the reader
                 has to cross the line to find which question it settled.
 
-                The arrow is the cue that is not colour, so the join holds for a
-                reader who does not see the green (WCAG 1.4.1), and it is ASCII
-                like every other string here. The answer takes the title's
+                The arrow is the cue that is not colour, so the join holds for
+                a reader who does not see the green (WCAG 1.4.1). It is drawn
+                rather than typed, like every other glyph here, so its shape is
+                the same one whichever face ends up painting the text around
+                it. Its 3px of top margin centres 14px in the 20px line, the
+                same sum the dot's 7px is set by. The answer takes the title's
                 weight - one clause in one voice - and keeps the state colour,
                 which is the only thing colour carries.
 
@@ -154,9 +158,7 @@ function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }
                 says what was decided and never what was asked. */}
             {it.answer ? (
               <>
-                <span aria-hidden className="shrink-0 text-[15px] text-faint">
-                  -&gt;
-                </span>
+                <ArrowRight size={14} aria-hidden className="mt-[3px] shrink-0 text-faint" />
                 {it.answer.status === 'answered' ? (
                   <span
                     className={`max-w-[55%] shrink-0 truncate text-[15px] ${STATE_TEXT.answered}`}
