@@ -230,22 +230,6 @@
     color: var(--color-kind-update);
   }
 
-  /* A message in a thread is a native <details>: the browser already gives it
-     a keyboard, a role and an expanded/collapsed announcement, and no state
-     library is involved. What it also gives it is a disclosure triangle, in
-     the one spot the kind label wants, so that goes and the chevron drawn in
-     the summary takes over.
-
-     The whole summary is the target, not just the marker: on a phone a 3mm
-     triangle is not a button. */
-  .message > summary {
-    list-style: none;
-    cursor: pointer;
-  }
-  .message > summary::-webkit-details-marker {
-    display: none;
-  }
-
   /* Loading placeholders in the content area. */
   @keyframes skeleton-pulse {
     0%,
