@@ -17,32 +17,100 @@ import { Button, IconButton, fieldClass } from './ui'
 // -- Minimal, XSS-safe markdown to React -------------------------------------
 // We never dangerouslySetInnerHTML agent content. Text is escaped by React by
 // default; here we only turn a small, known set of markdown into real elements.
-function inline(text: string, key: string): React.ReactNode[] {
-  // Split on **bold**, `code`, and [label](url); everything else is plain text.
-  const parts: React.ReactNode[] = []
-  const re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\))/g
+
+export type InlineToken =
+  | { kind: 'text'; text: string }
+  | { kind: 'bold'; text: string }
+  | { kind: 'code'; text: string }
+  | { kind: 'link'; label: string; url: string }
+
+// **bold**, `code`, [label](url), and a bare http(s) URL. A bare URL is last
+// on purpose, but what really keeps it out of the other three is that the
+// engine takes the leftmost match: the backtick of a code span and the `[` of
+// a link both start before the `http` inside them, so the span wins and the
+// URL under it is never linked twice.
+const INLINE_TOKEN = /\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/\S+/
+
+// A bare URL runs to the first space, so it swallows whatever ends the
+// sentence it sits in. These come back out.
+const SENTENCE_END = '.,;:!?'
+const CLOSERS: Record<string, string> = { ')': '(', ']': '[', '}': '{' }
+const countOf = (text: string, ch: string) => text.split(ch).length - 1
+
+// A closing bracket only leaves the URL when the URL has no opener to match
+// it, which is what keeps the tail of
+// https://en.wikipedia.org/wiki/Latte_(coffee) inside the link and the ")" of
+// "(see https://example.com)" outside it.
+function splitUrlTail(candidate: string): [string, string] {
+  let end = candidate.length
+  while (end > 0) {
+    const ch = candidate[end - 1]
+    if (SENTENCE_END.includes(ch)) {
+      end--
+      continue
+    }
+    const opener = CLOSERS[ch]
+    if (opener) {
+      const head = candidate.slice(0, end)
+      if (countOf(head, ch) > countOf(head, opener)) {
+        end--
+        continue
+      }
+    }
+    break
+  }
+  return [candidate.slice(0, end), candidate.slice(end)]
+}
+
+// Exported for its own test: the rules that decide where a bare URL stops are
+// the whole of note 6, and they are the part with the edge cases.
+export function splitInline(text: string): InlineToken[] {
+  const tokens: InlineToken[] = []
+  // A scanner of its own each call: the shared pattern keeps no lastIndex.
+  const re = new RegExp(INLINE_TOKEN, 'g')
   let last = 0
   let m: RegExpExecArray | null
-  let i = 0
   while ((m = re.exec(text))) {
-    if (m.index > last) parts.push(text.slice(last, m.index))
     const tok = m[0]
-    if (tok.startsWith('**')) parts.push(<strong key={`${key}-${i}`}>{tok.slice(2, -2)}</strong>)
-    else if (tok.startsWith('`')) parts.push(<code key={`${key}-${i}`}>{tok.slice(1, -1)}</code>)
-    else {
-      const lm = tok.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/)
-      if (lm)
-        parts.push(
-          <a key={`${key}-${i}`} href={lm[2]} target="_blank" rel="noopener noreferrer">
-            {lm[1]}
-          </a>,
-        )
+    let token: InlineToken
+    // What the token consumes, which is shorter than the match when a bare
+    // URL gives its trailing punctuation back to the prose.
+    let width = tok.length
+    if (tok.startsWith('**')) token = { kind: 'bold', text: tok.slice(2, -2) }
+    else if (tok.startsWith('`')) token = { kind: 'code', text: tok.slice(1, -1) }
+    else if (tok.startsWith('[')) {
+      const lm = /^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/.exec(tok)
+      if (!lm) continue
+      token = { kind: 'link', label: lm[1], url: lm[2] }
+    } else {
+      const [url] = splitUrlTail(tok)
+      token = { kind: 'link', label: url, url }
+      width = url.length
     }
-    last = m.index + tok.length
-    i++
+    if (m.index > last) tokens.push({ kind: 'text', text: text.slice(last, m.index) })
+    tokens.push(token)
+    last = m.index + width
+    re.lastIndex = last
   }
-  if (last < text.length) parts.push(text.slice(last))
-  return parts
+  if (last < text.length) tokens.push({ kind: 'text', text: text.slice(last) })
+  return tokens
+}
+
+function inline(text: string, key: string): React.ReactNode[] {
+  return splitInline(text).map((t, i) => {
+    const k = `${key}-${i}`
+    // Every href here came out of a pattern that starts with http:// or
+    // https://, so there is no scheme for an agent to smuggle in.
+    if (t.kind === 'link')
+      return (
+        <a key={k} href={t.url} target="_blank" rel="noopener noreferrer">
+          {t.label}
+        </a>
+      )
+    if (t.kind === 'bold') return <strong key={k}>{t.text}</strong>
+    if (t.kind === 'code') return <code key={k}>{t.text}</code>
+    return t.text
+  })
 }
 
 // -- Fenced code inside a markdown block --------------------------------------
@@ -208,7 +276,11 @@ export function Callout({ tone = 'info', children }: { tone?: string; children: 
   return (
     <div className={`flex items-start gap-2 rounded-ui border px-3 py-2 ${t.className}`}>
       <t.Icon size={18} className="mt-[3px] shrink-0" aria-hidden />
-      <div className="min-w-0 flex-1 text-text">
+      {/* .md, because the body is the same inline markdown a paragraph is:
+          the wrap rule that keeps a long URL inside a 390px column, and the
+          look of a `code` span, then hold here too. There are no block
+          elements under it, so none of .md's block rules apply. */}
+      <div className="md min-w-0 flex-1 text-text">
         <span className="sr-only">{t.label}: </span>
         {children}
       </div>
@@ -319,10 +391,19 @@ function TableBlock({ columns, rows }: { columns: string[]; rows: string[][] }) 
           </tr>
         </thead>
         <tbody>
-          {ordered.map(({ row, index }) => (
-            <tr key={index}>
+          {/* Banding replaces the hairline that used to sit under every row:
+              two ways of saying "the row ends here" is one more than the eye
+              needs, and the shaded band is the one that also keeps a wide row
+              on its own line across a scroll. The step is --color-surface over
+              --color-bg, a surface and not a colour, because in this app a
+              colour would claim to mean something. */}
+          {ordered.map(({ row, index }, pos) => (
+            // Striped on where the row sits now, not on where it arrived, so
+            // the bands stay alternating after a sort. `index` stays the key,
+            // so React moves the row it already has.
+            <tr key={index} className={pos % 2 ? 'bg-surface' : undefined}>
               {row.map((cell, ci) => (
-                <td key={ci} className="border-b border-line px-2 py-1.5 last:border-b-0">
+                <td key={ci} className="px-2 py-1.5">
                   {cell}
                 </td>
               ))}
@@ -349,7 +430,9 @@ function One({ b }: { b: AnyBlock }) {
     case 'markdown':
       return <MiniMarkdown text={String(b.text ?? '')} />
     case 'callout':
-      return <Callout tone={String(b.tone ?? 'info')}>{String(b.text ?? '')}</Callout>
+      // A callout is one line of prose, so it reads the same inline markdown a
+      // paragraph does - the URL in it is a link for the same reason.
+      return <Callout tone={String(b.tone ?? 'info')}>{inline(String(b.text ?? ''), 'callout')}</Callout>
     case 'progress': {
       const value = Number(b.value ?? 0)
       const max = Number(b.max ?? 100) || 100
