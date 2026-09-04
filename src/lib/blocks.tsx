@@ -276,7 +276,11 @@ export function Callout({ tone = 'info', children }: { tone?: string; children: 
   return (
     <div className={`flex items-start gap-2 rounded-ui border px-3 py-2 ${t.className}`}>
       <t.Icon size={18} className="mt-[3px] shrink-0" aria-hidden />
-      <div className="min-w-0 flex-1 text-text">
+      {/* .md, because the body is the same inline markdown a paragraph is:
+          the wrap rule that keeps a long URL inside a 390px column, and the
+          look of a `code` span, then hold here too. There are no block
+          elements under it, so none of .md's block rules apply. */}
+      <div className="md min-w-0 flex-1 text-text">
         <span className="sr-only">{t.label}: </span>
         {children}
       </div>

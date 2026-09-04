@@ -617,6 +617,9 @@ pub struct Config {
         priority: 2,
         blocks: [
           callout('error', 'DNS-01 challenge timed out three times. The certificate expires in six days. The run log is at https://ci.internal/acme/run/4471.'),
+          // A bare URL with no hyphen and no space in it: one unbroken token,
+          // and the widest thing a phone-width column is ever asked to hold.
+          md('The challenge trace is at https://ci.internal/artifacts/9f2c41ab8e7d0c53b6a1f48d2e90c7b53aa1d6f409e2b8c7/acme.log'),
           kv(['domain', 'hub.internal'], ['expires', '2026-09-10T04:12:00Z'], ['issuer', "Let's Encrypt R11"], ['attempts', '3']),
         ],
       },

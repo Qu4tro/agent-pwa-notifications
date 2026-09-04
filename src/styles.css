@@ -190,6 +190,21 @@
     color: #fff;
   }
 
+  /* A URL is the one run of text in a block with no space anywhere in it, and
+     now that a bare one is a link it arrives whole: a single hyphenless path
+     is wider than a 390px column and takes the whole page with it. A callout
+     body carries .md for this reason as well.
+
+     On the link and not on .md, for two reasons. `anywhere` splits a word at
+     any character, which is what a URL wants - nobody reads it as a word - and
+     not what prose wants, where a long word is better left to hang than cut
+     mid-syllable. And `anywhere` counts towards min-content, unlike
+     `break-word`, so on .md it would change how the whole block negotiates its
+     width inside the flex column and not only how one link wraps. */
+  .md a {
+    overflow-wrap: anywhere;
+  }
+
   /* Syntax highlighting, and the one deliberate exception to "colour carries
      meaning and nothing else". Inside a code block the meaning colour carries
      is which part of the language a word belongs to, which is a different axis
