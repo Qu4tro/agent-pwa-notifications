@@ -38,26 +38,35 @@ export function Header({ left, right }: { left?: React.ReactNode; right?: React.
 // worth carrying on every page, and the app already knows it: the pending query
 // polls with the lists, so the badge is as live as the rows behind it.
 //
-// Nothing at all when nothing is waiting. A bell that is always there, always
-// at zero, is a bell nobody looks at.
+// The bell stays even at zero, muted, so the eye knows where to look when
+// something arrives. The count badge appears only when there is something.
 function PendingButton() {
   const { data } = useQuery(pendingQuery())
   const waiting = data?.length ?? 0
-  if (waiting === 0) return null
   return (
     <Link
       to="/pending"
       title="Needs you"
-      aria-label={`Needs you: ${waiting} question${waiting === 1 ? '' : 's'}`}
-      className={`${iconButtonClass} relative text-kind-question hover:text-kind-question`}
+      aria-label={
+        waiting === 0
+          ? 'Needs you'
+          : `Needs you: ${waiting} question${waiting === 1 ? '' : 's'}`
+      }
+      className={`${iconButtonClass} relative ${
+        waiting > 0
+          ? 'text-kind-question hover:text-kind-question'
+          : 'text-muted hover:text-text'
+      }`}
     >
       <Bell size={18} aria-hidden />
-      <span
-        aria-hidden
-        className="absolute top-1 right-0.5 min-w-[1.1rem] rounded-full bg-kind-question px-1 text-center text-[12px] leading-[1.1rem] font-semibold text-bg"
-      >
-        {waiting}
-      </span>
+      {waiting > 0 ? (
+        <span
+          aria-hidden
+          className="absolute top-1 right-0.5 min-w-[1.1rem] rounded-full bg-kind-question px-1 text-center text-[12px] leading-[1.1rem] font-semibold text-bg"
+        >
+          {waiting}
+        </span>
+      ) : null}
     </Link>
   )
 }
