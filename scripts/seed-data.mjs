@@ -1249,6 +1249,122 @@ pub struct Config {
       },
     ],
   },
+
+  // -- The answer document, in every shape it comes in -------------------------
+  // Words alone, words beside a choice, a form with a note, and an answer the
+  // human replaced: one waiting on the agent, one the agent has collected.
+  {
+    project: 'release-notes',
+    task: 'Write the 1.2 release notes',
+    agent: 'claude-code',
+    model: 'claude-opus-5',
+    taskId: 'rn-write',
+    tags: ['docs', 'release'],
+    events: [
+      {
+        min: 2 * D + 4 * H,
+        kind: 'question',
+        title: 'Ship the notes with the release, or hold them?',
+        status: 'answered',
+        answer: {},
+        text: "Hold it until QA signs off",
+        answeredMin: 2 * D + 3 * H,
+        pickedMin: 2 * D + 2 * H,
+        timeoutMin: 24 * H,
+        blocks: [
+          md('The notes are written. Shipping them now means the blog post lands before the build does.'),
+          buttons('timing', ['Ship', 'Hold']),
+        ],
+      },
+      {
+        min: 2 * D,
+        kind: 'question',
+        title: 'Which section leads?',
+        status: 'answered',
+        answer: { lead: 'Free text' },
+        text: 'and put the live mode second, it demos better',
+        answeredMin: 2 * D - 40,
+        pickedMin: 2 * D - 35,
+        timeoutMin: 24 * H,
+        ack: 'Got it - leading with {answer}.',
+        blocks: [
+          md('Three things landed. Only one can be the headline.'),
+          buttons('lead', ['Free text', 'Live mode', 'Changed answers']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'release-notes',
+    task: 'Draft the launch post',
+    agent: 'claude-code',
+    model: 'claude-opus-5',
+    taskId: 'rn-post',
+    tags: ['docs', 'release'],
+    events: [
+      {
+        min: 6 * H,
+        kind: 'question',
+        title: 'How long should the post run?',
+        status: 'answered',
+        answer: { length: 'Short' },
+        text: 'one screen, no screenshots',
+        answeredMin: 20,
+        // Replaced and not yet collected: the screen waits on the agent again.
+        changes: 1,
+        timeoutMin: 24 * H,
+        blocks: [
+          md('The last one ran to four screens and nobody reached the end of it.'),
+          buttons('length', ['Short', 'Long']),
+        ],
+      },
+      {
+        min: 5 * H,
+        kind: 'question',
+        title: 'Name the post',
+        status: 'answered',
+        answer: { post: { headline: 'Answers, in your own words', subhead: 'And you can change your mind' } },
+        text: "the subhead is the part I'd keep",
+        answeredMin: 90,
+        pickedMin: 80,
+        changes: 2,
+        timeoutMin: 24 * H,
+        blocks: [
+          md('A headline and a line under it. Both go on the card in the app store listing.'),
+          form('post', 'Use these', [
+            { id: 'headline', kind: 'text', label: 'Headline' },
+            { id: 'subhead', kind: 'text', label: 'Subhead' },
+          ]),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'release-notes',
+    task: 'Cut the changelog',
+    agent: 'claude-code',
+    model: 'claude-opus-5',
+    taskId: 'rn-changelog',
+    tags: ['docs', 'release'],
+    events: [
+      {
+        min: 3 * H,
+        kind: 'question',
+        title: 'Group the changelog by feature or by file?',
+        status: 'answered',
+        answer: { grouping: 'By feature' },
+        text: 'a reader does not know what a file is',
+        answeredMin: 45,
+        pickedMin: 30,
+        changes: 1,
+        timeoutMin: 24 * H,
+        blocks: [
+          md('Eleven entries. By file they read as a diff; by feature they read as a release.'),
+          buttons('grouping', ['By feature', 'By file']),
+        ],
+      },
+    ],
+  },
 ]
 
 // -- Encrypted thread ---------------------------------------------------------

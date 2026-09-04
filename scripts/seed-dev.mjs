@@ -76,9 +76,9 @@ async function encryptValue(value) {
   return Buffer.from(out).toString('base64url')
 }
 
-// One wrangler call per SQL file. The generated SQL holds ids, numbers and
-// small JSON answers only - no free text - so nothing in it can confuse the
-// statement splitter.
+// One wrangler call per SQL file. The generated SQL holds ids, numbers, small
+// JSON answers and one-line answer text, none of it with a semicolon or a
+// newline, so nothing in it can confuse the statement splitter.
 function runSql(sql) {
   const file = join(mkdtempSync(join(tmpdir(), 'seed-')), 'seed.sql')
   writeFileSync(file, sql)
@@ -173,9 +173,13 @@ for (const { t, e, at } of posts) {
       readAt: status === 'pending' ? null : (answeredAt ?? at),
       question: {
         status,
+        // An answer of words alone still carries the values, as an empty
+        // object: the two parts of the document are always both written.
         answer: e.answer ? (enc ? await encryptValue(e.answer) : JSON.stringify(e.answer)) : null,
+        text: e.text ? (enc ? await encryptValue(e.text) : e.text) : null,
         answeredAt,
         pickedUpAt: e.pickedMin != null ? NOW - e.pickedMin * 60_000 : null,
+        changes: e.changes ?? 0,
         timeoutAt: at + timeoutMin * 60_000,
       },
     })
@@ -215,8 +219,9 @@ for (const r of rows) {
     const q = r.question
     stmts.push(
       `UPDATE questions SET status = ${sqlStr(q.status)}, answer = ${q.answer ? sqlStr(q.answer) : 'NULL'}, ` +
+        `text = ${q.text ? sqlStr(q.text) : 'NULL'}, ` +
         `answered_at = ${q.answeredAt ?? 'NULL'}, picked_up_at = ${q.pickedUpAt ?? 'NULL'}, ` +
-        `timeout_at = ${q.timeoutAt} WHERE event_id = ${sqlStr(r.id)};`,
+        `changes = ${q.changes ?? 0}, timeout_at = ${q.timeoutAt} WHERE event_id = ${sqlStr(r.id)};`,
     )
   }
 }
