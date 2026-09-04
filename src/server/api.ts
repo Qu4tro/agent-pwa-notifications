@@ -192,7 +192,8 @@ export async function createEvent(request: Request, env: Env, accountId: string)
   }
   await maybePush(env, accountId, event)
   await pokeHub(env, accountId)
-  return json({ ok: true, id })
+  const changed = await changedAnswers(env, accountId, taskId)
+  return json({ ok: true, id, ...(changed.length ? { changed_answers: changed } : {}) })
 }
 
 // Patch an existing event in place - the primitive behind live progress. The
@@ -276,7 +277,8 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
     })
   }
   await pokeHub(env, accountId)
-  return json({ ok: true, id })
+  const changed = await changedAnswers(env, accountId, existing.task_id || existing.id)
+  return json({ ok: true, id, ...(changed.length ? { changed_answers: changed } : {}) })
 }
 
 export async function createQuestion(request: Request, env: Env, accountId: string): Promise<Response> {
@@ -323,7 +325,14 @@ export async function createQuestion(request: Request, env: Env, accountId: stri
   }
   await maybePush(env, accountId, event)
   await pokeHub(env, accountId)
-  return json({ ok: true, id, poll_url: `/api/v1/questions/${id}`, timeout_at: timeoutAt })
+  const changed = await changedAnswers(env, accountId, taskId)
+  return json({
+    ok: true,
+    id,
+    poll_url: `/api/v1/questions/${id}`,
+    timeout_at: timeoutAt,
+    ...(changed.length ? { changed_answers: changed } : {}),
+  })
 }
 
 // Agent polls this. Also lazily expires the question if its deadline passed, so
@@ -428,6 +437,45 @@ export async function getProjects(env: Env, accountId: string): Promise<Response
 // The thread key: a stable task_id when the agent sent one, else the event's
 // own id (a singleton thread). NEVER the human `task` label - labels collide.
 const THREAD_KEY_SQL = `COALESCE(NULLIF(e.task_id, ''), e.id)`
+
+// An agent that moved on has no poll running, so a changed answer rides on the
+// next call it makes on the thread. Every answer here is one the human replaced
+// after giving it and that no poll has collected since, so the agent is holding
+// something older than what stands. Polling the id is the acknowledgement:
+// `getQuestion` stamps `picked_up_at` and the item stops appearing.
+async function changedAnswers(
+  env: Env,
+  accountId: string,
+  threadKey: string | null,
+): Promise<Record<string, unknown>[]> {
+  if (!threadKey) return []
+  const { results } = await env.DB.prepare(
+    `SELECT q.event_id AS id, e.title, e.enc, q.answer, q.text, q.answered_at, q.changes
+       FROM questions q JOIN events e ON e.id = q.event_id
+      WHERE e.account_id = ?1 AND ${THREAD_KEY_SQL} = ?2
+        AND q.status = 'answered' AND q.changes > 0 AND q.picked_up_at IS NULL
+      ORDER BY q.answered_at`,
+  )
+    .bind(accountId, threadKey)
+    .all<{
+      id: string
+      title: string
+      enc: number
+      answer: string | null
+      text: string | null
+      answered_at: number | null
+      changes: number
+    }>()
+
+  return (results ?? []).map((r) => ({
+    id: r.id,
+    title: r.title,
+    answer: r.answer ? (r.enc === 1 ? r.answer : JSON.parse(r.answer)) : null,
+    text: r.text ?? null,
+    answered_at: r.answered_at,
+    changes: r.changes,
+  }))
+}
 
 // Which of the three sections of the project page a thread belongs in.
 //

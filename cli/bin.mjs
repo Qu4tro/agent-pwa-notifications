@@ -142,7 +142,21 @@ async function notify() {
   await attachBlocks(body, blocks, conf)
   const { status, json } = await hub('POST', '/api/v1/events', conf, body)
   if (status !== 200 || !json.ok) die(`Failed (${status}): ${json.error || 'unknown error'}`)
+  await reportChangedAnswers(json, conf)
   console.log(`Sent (${json.id})`)
+}
+
+// The human can replace an answer after giving it. A change rides on the next
+// call on the thread, so it lands here: one line per answer on stderr, which
+// leaves stdout to the caller's pipeline.
+async function reportChangedAnswers(json, conf) {
+  for (const item of json.changed_answers || []) {
+    let answer = item.answer
+    let text = item.text
+    if (conf.encKey && typeof answer === 'string') answer = await decrypt(conf.encKey, answer)
+    if (conf.encKey && typeof text === 'string') text = await decrypt(conf.encKey, text)
+    process.stderr.write(`changed answer ${item.id} "${item.title}": ${JSON.stringify({ answer, text })}\n`)
+  }
 }
 
 // -- ask: post a question, wait for the answer, print it ----------------------

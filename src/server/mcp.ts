@@ -14,7 +14,7 @@ const TOOLS = [
   {
     name: 'notify',
     description:
-      'Push an update to the human. Use for milestones, not every step. ALWAYS pass: project (what you are working on), model (which LLM you are), and task_id - generate ONE stable task_id when you start a task and reuse it on EVERY notify/ask for that task, so all its messages thread together in one conversation instead of scattering into separate cards. Set priority 2 for anything that should ring through quiet hours. Send kind:"done" on the LAST message of a task - that is the only thing that moves the thread out of Active on the human\'s dashboard.',
+      'Push an update to the human. Use for milestones, not every step. ALWAYS pass: project (what you are working on), model (which LLM you are), and task_id - generate ONE stable task_id when you start a task and reuse it on EVERY notify/ask for that task, so all its messages thread together in one conversation instead of scattering into separate cards. Set priority 2 for anything that should ring through quiet hours. Send kind:"done" on the LAST message of a task - that is the only thing that moves the thread out of Active on the human\'s dashboard. If the result carries `changed_answers`, the human changed an answer after giving it: read each item before going on, and call `wait_for_answer` on its id to confirm you have it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -36,7 +36,7 @@ const TOOLS = [
   {
     name: 'update',
     description:
-      'Update an existing event in place - the way to send LIVE progress. First call notify to create the event and keep its returned id; then call update repeatedly with new blocks (e.g. a progress block going 0->50->100) to move the same card without spamming new rows. Set notify:true on the final call to push a "done" notification.',
+      'Update an existing event in place - the way to send LIVE progress. First call notify to create the event and keep its returned id; then call update repeatedly with new blocks (e.g. a progress block going 0->50->100) to move the same card without spamming new rows. Set notify:true on the final call to push a "done" notification. If the result carries `changed_answers`, the human changed an answer after giving it: read each item before going on, and call `wait_for_answer` on its id to confirm you have it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -54,7 +54,7 @@ const TOOLS = [
   {
     name: 'ask',
     description:
-      'Ask the human a question and get an id to poll. For answers directly on supported notifications, make it a micro-question: title at most 80 characters, exactly one buttons block, 2 options preferred (3 max), and each option at most 20 characters. Put any context in a markdown block; the notification or More action opens the full thread. Longer choices and forms remain tap-to-open. ALWAYS pass project, model, task, and the SAME task_id used for this task\'s other calls. Returns { id }; then call wait_for_answer.',
+      'Ask the human a question and get an id to poll. For answers directly on supported notifications, make it a micro-question: title at most 80 characters, exactly one buttons block, 2 options preferred (3 max), and each option at most 20 characters. Put any context in a markdown block; the notification or More action opens the full thread. Longer choices and forms remain tap-to-open. ALWAYS pass project, model, task, and the SAME task_id used for this task\'s other calls. Returns { id }; then call wait_for_answer. If the result carries `changed_answers`, the human changed an answer after giving it: read each item before going on, and call `wait_for_answer` on its id to confirm you have it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -96,7 +96,7 @@ const TOOLS = [
   {
     name: 'wait_for_answer',
     description:
-      'Check whether the human answered a question. Returns { status: "pending" | "answered" | "expired", answer }. While status is "pending", wait ~10 seconds and call again. When "answered", answer holds the values keyed by each block id. When "expired", proceed with a sensible default.',
+      'Check whether the human answered a question. Returns { status: "pending" | "answered" | "expired", answer, text, changes }. While status is "pending", wait ~10 seconds and call again. When "answered", answer holds the values keyed by each block id, and text holds what the human wrote in their own words; it may be the whole answer, with answer empty. changes counts how many times the human replaced the answer after first giving it; a higher number than you last saw means the answer is new. When "expired", proceed with a sensible default.',
     inputSchema: {
       type: 'object',
       properties: { question_id: { type: 'string' } },
