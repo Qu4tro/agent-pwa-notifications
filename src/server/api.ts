@@ -65,6 +65,9 @@ async function maybePush(env: Env, accountId: string, event: EventRow): Promise<
     eventId: event.id,
     kind: event.kind,
     priority: event.priority,
+    // The service worker holds no encryption key, so an encrypted question
+    // gets no options and no Reply: it can only open the app.
+    encrypted: event.enc === 1,
     quickAnswers: quickAnswerActions(event),
   })
 }
