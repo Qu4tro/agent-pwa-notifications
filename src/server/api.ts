@@ -1,6 +1,6 @@
 import type { Env } from './env'
 import { json, ulid, now } from './util'
-import { BlocksSchema, hasInteractive, answerTargets, type Block } from './blocks'
+import { AnswerEnvelope, BlocksSchema, hasInteractive, answerTargets, TEXT_LIMIT, type Block } from './blocks'
 import { pushToAll, type PushSubscription } from './push'
 import { pokeHub } from './hub'
 import { quickAnswerActions, previewText } from './quick-answers'
@@ -65,6 +65,9 @@ async function maybePush(env: Env, accountId: string, event: EventRow): Promise<
     eventId: event.id,
     kind: event.kind,
     priority: event.priority,
+    // The service worker holds no encryption key, so an encrypted question
+    // gets no options and no Reply: it can only open the app.
+    encrypted: event.enc === 1,
     quickAnswers: quickAnswerActions(event),
   })
 }
@@ -119,7 +122,13 @@ interface Meta {
   task: string | null
   model: string | null
   tags: string // JSON array string
+  idleMinutes: number | null
 }
+
+// How long a thread stays "in progress" with nothing new on it. An agent that
+// crashes, or that simply stops, would otherwise leave its thread Active for
+// ever, so silence past this counts as finished. Four hours, decided 2026-09-04.
+export const DEFAULT_IDLE_MINUTES = 240
 
 // Pull the attribution fields out of a request body, sanitized.
 function extractMeta(body: Record<string, unknown>): Meta {
@@ -131,11 +140,19 @@ function extractMeta(body: Record<string, unknown>): Meta {
         .slice(0, 12)
         .map((t) => (t as string).trim().slice(0, 40))
     : []
+  // Same bounds as a question timeout: a minute to seven days. Anything the
+  // agent does not send stays null, which reads as the default.
+  const rawIdle = Number(body.idle_minutes)
+  const idleMinutes =
+    body.idle_minutes != null && Number.isFinite(rawIdle)
+      ? Math.max(1, Math.min(10_080, rawIdle | 0))
+      : null
   return {
     project: str(body.project, 120),
     task: str(body.task, 200),
     model: str(body.model, 80),
     tags: JSON.stringify(tags),
+    idleMinutes,
   }
 }
 
@@ -165,10 +182,10 @@ export async function createEvent(request: Request, env: Env, accountId: string)
   const id = ulid()
   const t = now()
   await env.DB.prepare(
-    `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+    `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc, idle_minutes)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
   )
-    .bind(id, accountId, agent, taskId, kind, title, norm.blocks, priority, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc)
+    .bind(id, accountId, agent, taskId, kind, title, norm.blocks, priority, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc, meta.idleMinutes)
     .run()
 
   const event: EventRow = {
@@ -178,7 +195,8 @@ export async function createEvent(request: Request, env: Env, accountId: string)
   }
   await maybePush(env, accountId, event)
   await pokeHub(env, accountId)
-  return json({ ok: true, id })
+  const changed = await changedAnswers(env, accountId, taskId)
+  return json({ ok: true, id, ...(changed.length ? { changed_answers: changed } : {}) })
 }
 
 // Patch an existing event in place - the primitive behind live progress. The
@@ -228,6 +246,7 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
   const task = 'task' in body ? extractMeta(body).task : null
   const model = 'model' in body ? extractMeta(body).model : null
   const tags = 'tags' in body ? extractMeta(body).tags : null
+  const idleMinutes = 'idle_minutes' in body ? extractMeta(body).idleMinutes : null
 
   // COALESCE keeps the old value when we pass null. read_at resets so a fresh
   // update the human hasn't seen shows as unread again.
@@ -242,11 +261,12 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
        model = COALESCE(?7, model),
        tags = COALESCE(?8, tags),
        enc = COALESCE(?9, enc),
-       updated_at = ?10,
+       idle_minutes = COALESCE(?10, idle_minutes),
+       updated_at = ?11,
        read_at = NULL
-     WHERE id = ?11 AND account_id = ?12`,
+     WHERE id = ?12 AND account_id = ?13`,
   )
-    .bind(title, kind, priority, blocksJson, project, task, model, tags, encVal, now(), id, accountId)
+    .bind(title, kind, priority, blocksJson, project, task, model, tags, encVal, idleMinutes, now(), id, accountId)
     .run()
 
   if (body.notify === true) {
@@ -260,7 +280,8 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
     })
   }
   await pokeHub(env, accountId)
-  return json({ ok: true, id })
+  const changed = await changedAnswers(env, accountId, existing.task_id || existing.id)
+  return json({ ok: true, id, ...(changed.length ? { changed_answers: changed } : {}) })
 }
 
 export async function createQuestion(request: Request, env: Env, accountId: string): Promise<Response> {
@@ -291,9 +312,9 @@ export async function createQuestion(request: Request, env: Env, accountId: stri
   const ack = typeof body.ack === 'string' && body.ack.trim() ? body.ack.trim().slice(0, 500) : null
   const batch = [
     env.DB.prepare(
-      `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc, ack)
-       VALUES (?1, ?2, ?3, ?4, 'question', ?5, ?6, 2, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
-    ).bind(id, accountId, agent, taskId, title, norm.blocks, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc, ack),
+      `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc, ack, idle_minutes)
+       VALUES (?1, ?2, ?3, ?4, 'question', ?5, ?6, 2, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+    ).bind(id, accountId, agent, taskId, title, norm.blocks, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc, ack, meta.idleMinutes),
     env.DB.prepare(
       `INSERT INTO questions (event_id, status, timeout_at) VALUES (?1, 'pending', ?2)`,
     ).bind(id, timeoutAt),
@@ -307,14 +328,21 @@ export async function createQuestion(request: Request, env: Env, accountId: stri
   }
   await maybePush(env, accountId, event)
   await pokeHub(env, accountId)
-  return json({ ok: true, id, poll_url: `/api/v1/questions/${id}`, timeout_at: timeoutAt })
+  const changed = await changedAnswers(env, accountId, taskId)
+  return json({
+    ok: true,
+    id,
+    poll_url: `/api/v1/questions/${id}`,
+    timeout_at: timeoutAt,
+    ...(changed.length ? { changed_answers: changed } : {}),
+  })
 }
 
 // Agent polls this. Also lazily expires the question if its deadline passed, so
 // a waiting agent gets a definitive answer instead of hanging forever.
 export async function getQuestion(id: string, env: Env, accountId: string): Promise<Response> {
   const q = await env.DB.prepare(
-    `SELECT q.status, q.answer, q.answered_at, q.timeout_at, q.picked_up_at, e.enc
+    `SELECT q.status, q.answer, q.text, q.answered_at, q.timeout_at, q.picked_up_at, q.changes, e.enc
      FROM questions q JOIN events e ON e.id = q.event_id
      WHERE q.event_id = ?1 AND e.account_id = ?2`,
   )
@@ -322,9 +350,11 @@ export async function getQuestion(id: string, env: Env, accountId: string): Prom
     .first<{
       status: string
       answer: string | null
+      text: string | null
       answered_at: number | null
       timeout_at: number
       picked_up_at: number | null
+      changes: number
       enc: number
     }>()
 
@@ -346,9 +376,19 @@ export async function getQuestion(id: string, env: Env, accountId: string): Prom
   }
 
   // Encrypted answers are ciphertext strings - pass through for the agent to
-  // decrypt; plaintext answers are JSON.
+  // decrypt; plaintext answers are JSON. `text` is the human's own words, a
+  // ciphertext string when the event is encrypted, and null when the whole
+  // answer was made of controls. `changes` counts the replacements: a number
+  // higher than the agent last saw means the answer is new.
   const answer = q.answer ? (q.enc === 1 ? q.answer : JSON.parse(q.answer)) : null
-  return json({ ok: true, status: q.status, answer, answered_at: q.answered_at })
+  return json({
+    ok: true,
+    status: q.status,
+    answer,
+    text: q.text ?? null,
+    answered_at: q.answered_at,
+    changes: q.changes,
+  })
 }
 
 // Agent reads its recent events (dedupe / resume after a crash).
@@ -358,11 +398,11 @@ export async function getInbox(url: URL, env: Env, accountId: string): Promise<R
   const q = agent
     ? env.DB.prepare(
         `SELECT id, agent, task_id, kind, title, priority, created_at, project, task, model FROM events
-         WHERE account_id = ?1 AND agent = ?2 ORDER BY created_at DESC LIMIT ?3`,
+         WHERE account_id = ?1 AND agent = ?2 AND archived_at IS NULL ORDER BY created_at DESC LIMIT ?3`,
       ).bind(accountId, agent, limit)
     : env.DB.prepare(
         `SELECT id, agent, task_id, kind, title, priority, created_at, project, task, model FROM events
-         WHERE account_id = ?1 ORDER BY created_at DESC LIMIT ?2`,
+         WHERE account_id = ?1 AND archived_at IS NULL ORDER BY created_at DESC LIMIT ?2`,
       ).bind(accountId, limit)
   const { results } = await q.all()
   return json({ ok: true, events: results ?? [] })
@@ -380,7 +420,7 @@ export async function getProjects(env: Env, accountId: string): Promise<Response
        MAX(e.created_at) AS last_activity,
        GROUP_CONCAT(DISTINCT e.model) AS models
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL
      GROUP BY COALESCE(e.project, '')
      ORDER BY pending DESC, last_activity DESC`,
   )
@@ -401,23 +441,81 @@ export async function getProjects(env: Env, accountId: string): Promise<Response
 // own id (a singleton thread). NEVER the human `task` label - labels collide.
 const THREAD_KEY_SQL = `COALESCE(NULLIF(e.task_id, ''), e.id)`
 
-// Task threads within a project. Groups events by thread key in JS (small,
-// single-user data), summarizing each thread for the project view.
-export async function getTasks(project: string, env: Env, accountId: string): Promise<Response> {
+// An agent that moved on has no poll running, so a changed answer rides on the
+// next call it makes on the thread. Every answer here is one the human replaced
+// after giving it and that no poll has collected since, so the agent is holding
+// something older than what stands. Polling the id is the acknowledgement:
+// `getQuestion` stamps `picked_up_at` and the item stops appearing.
+async function changedAnswers(
+  env: Env,
+  accountId: string,
+  threadKey: string | null,
+): Promise<Record<string, unknown>[]> {
+  if (!threadKey) return []
   const { results } = await env.DB.prepare(
-    `SELECT e.*, ${THREAD_KEY_SQL} AS thread_key,
-       q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
-     FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1 AND COALESCE(e.project, '') = ?2
-     ORDER BY e.created_at ASC`,
+    `SELECT q.event_id AS id, e.title, e.enc, q.answer, q.text, q.answered_at, q.changes
+       FROM questions q JOIN events e ON e.id = q.event_id
+      WHERE e.account_id = ?1 AND ${THREAD_KEY_SQL} = ?2
+        AND q.status = 'answered' AND q.changes > 0 AND q.picked_up_at IS NULL
+      ORDER BY q.answered_at`,
   )
-    .bind(accountId, project)
-    .all<Record<string, unknown>>()
+    .bind(accountId, threadKey)
+    .all<{
+      id: string
+      title: string
+      enc: number
+      answer: string | null
+      text: string | null
+      answered_at: number | null
+      changes: number
+    }>()
 
+  return (results ?? []).map((r) => ({
+    id: r.id,
+    title: r.title,
+    answer: r.answer ? (r.enc === 1 ? r.answer : JSON.parse(r.answer)) : null,
+    text: r.text ?? null,
+    answered_at: r.answered_at,
+    changes: r.changes,
+  }))
+}
+
+// Which of the three sections of the project page a thread belongs in.
+//
+// This used to be worked out on the client from "is anything unread", which
+// made the state a fact about the human: a thread the agent was still working
+// on dropped into Done the moment its last update was read. Now the thread
+// says it itself - `pending` while a question waits on you, `done` once the
+// agent has sent a `done` or gone quiet past its idle timeout, `active`
+// otherwise.
+//
+// An `error` does not finish a thread. An update that went wrong is still an
+// update, and the agent may well retry, so the thread stays Active until it
+// says done or the silence runs out. Decided 2026-09-04.
+export type ThreadState = 'pending' | 'active' | 'done'
+
+// How many of a thread's own event titles the project row shows. The count on
+// the row used to be the only trace of everything but the latest one, which
+// was note 3: the row said "3" where it could have said what the three were.
+const RECENT_ON_A_ROW = 3
+
+// Group rows into one summary per thread. The rows must arrive oldest first
+// and may span projects: two projects are allowed to use the same task_id, so
+// the map is keyed by both. Shared by the project list and the pending page,
+// which is why it is a function and not a loop inside getTasks.
+const SELECT_THREAD_ROWS = `SELECT e.*, ${THREAD_KEY_SQL} AS thread_key,
+       q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
+       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
+       q.changes AS q_changes
+     FROM events e LEFT JOIN questions q ON q.event_id = e.id`
+
+function summarizeThreads(rows: Record<string, unknown>[]): any[] {
   const threads = new Map<string, any>()
-  for (const row of results ?? []) {
+  for (const row of rows) {
     const key = String(row.thread_key)
-    let t = threads.get(key)
+    const project = String(row.project ?? '')
+    const id = `${project}\u0000${key}`
+    let t = threads.get(id)
     if (!t) {
       t = {
         key,
@@ -430,12 +528,24 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
         pending: false,
         pending_event_id: null,
         pending_question: null,
+        pending_since: null,
         pending_answers: [],
         latest_title: '',
         latest_kind: 'update',
         last_activity: 0,
+        idle_minutes: null,
+        state: 'active' as ThreadState,
+        // Oldest first, newest last, at most RECENT_ON_A_ROW of them.
+        recent: [] as {
+          id: unknown
+          kind: unknown
+          title: unknown
+          created_at: unknown
+          read_at: unknown
+          question: { status: unknown; answer: unknown; text: unknown } | null
+        }[],
       }
-      threads.set(key, t)
+      threads.set(id, t)
     }
     t.count++
     if (row.task) t.task = row.task
@@ -445,11 +555,42 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
     // Latest event (rows are ASC, so keep overwriting).
     t.latest_title = row.title
     t.latest_kind = row.kind
+    // The latest value the agent set wins; an event that does not carry one
+    // leaves the thread's timeout where it was.
+    if (row.idle_minutes != null) t.idle_minutes = Number(row.idle_minutes)
+    // A sliding window over rows that are already in order, so this costs one
+    // push and at most one shift per event.
+    t.recent.push({
+      id: row.id,
+      kind: row.kind,
+      title: row.title,
+      created_at: row.created_at,
+      read_at: row.read_at ?? null,
+      // What was decided, so a row can say it. The SELECT already joins
+      // questions for the pending check below; these are the same columns,
+      // parsed by the same rule as `hydrate` - ciphertext straight through
+      // when the event is encrypted, JSON otherwise. `text` rides along
+      // because a row's answer may be words alone.
+      question:
+        row.q_status != null
+          ? {
+              status: row.q_status,
+              answer: row.q_answer
+                ? Number(row.enc ?? 0) === 1
+                  ? (row.q_answer as string)
+                  : JSON.parse(row.q_answer as string)
+                : null,
+              text: row.q_text ?? null,
+            }
+          : null,
+    })
+    if (t.recent.length > RECENT_ON_A_ROW) t.recent.shift()
     t.last_activity = Math.max(t.last_activity, Number(row.updated_at ?? row.created_at))
     if (row.q_status === 'pending') {
       t.pending = true
       t.pending_event_id = row.id
       t.pending_question = row.title // what is being asked, shown on the row
+      t.pending_since = Number(row.created_at) // how the queue is ordered
       // A micro-question (one buttons block, 2 or 3 short options, not
       // encrypted) can be answered from the list without opening the thread.
       // Same rule, and the same helper, as the notification quick answers.
@@ -458,24 +599,81 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
         enc: Number(row.enc ?? 0),
         title: String(row.title ?? ''),
         blocks: String(row.blocks ?? '[]'),
-      }).map((a) => ({ label: a.title, answer: a.answer }))
+      }).map((a) => ({ label: a.title, answer: a.answer, ...(a.color ? { color: a.color } : {}) }))
     }
   }
 
-  const list = [...threads.values()].sort((a, b) => {
+  const t0 = now()
+  for (const t of threads.values()) {
+    const idleMs = (t.idle_minutes ?? DEFAULT_IDLE_MINUTES) * 60_000
+    const finished = t.latest_kind === 'done' || t.last_activity + idleMs < t0
+    // Something unread keeps a thread out of Done even once it is finished:
+    // the human has not seen how it ended yet.
+    t.state = t.pending ? 'pending' : !finished || t.unread > 0 ? 'active' : 'done'
+  }
+  return [...threads.values()]
+}
+
+// Task threads within a project, summarized for the project view.
+export async function getTasks(project: string, env: Env, accountId: string): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    `${SELECT_THREAD_ROWS}
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
+     ORDER BY e.created_at ASC`,
+  )
+    .bind(accountId, project)
+    .all<Record<string, unknown>>()
+
+  const list = summarizeThreads(results ?? []).sort((a, b) => {
     if (a.pending !== b.pending) return a.pending ? -1 : 1
     return b.last_activity - a.last_activity
   })
   return json({ ok: true, tasks: list })
 }
 
-// All events in one thread, oldest-first, so the thread view renders the
-// conversation with the active question (if any) at the bottom.
+// Note 6: everything waiting on the human, across every project, in one list.
+// getStats has the count and getProjects has it per project, but neither can
+// say what is being asked; getFeed stops at the 100 most recent events, so a
+// question older than that would simply not be there.
+//
+// Same shape as getTasks, so the pending page renders the same rows as the
+// project page. Oldest question first: the one that has been waiting longest
+// is the one to answer.
+export async function getPending(env: Env, accountId: string): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    `${SELECT_THREAD_ROWS}
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL
+       AND ${THREAD_KEY_SQL} IN (
+         SELECT COALESCE(NULLIF(p.task_id, ''), p.id) FROM events p
+         JOIN questions pq ON pq.event_id = p.id
+         WHERE p.account_id = ?1 AND p.archived_at IS NULL AND pq.status = 'pending'
+       )
+     ORDER BY e.created_at ASC`,
+  )
+    .bind(accountId)
+    .all<Record<string, unknown>>()
+
+  // The subquery matches on the thread key alone, so a thread in another
+  // project that happens to share a task_id comes back too. The filter drops
+  // it: only a thread with a question of its own belongs here.
+  const list = summarizeThreads(results ?? [])
+    .filter((t) => t.pending)
+    .sort((a, b) => a.pending_since - b.pending_since)
+  return json({ ok: true, pending: list })
+}
+
+// All events in one thread, oldest-first. The order here is the order they
+// happened in: the thread title is the first event's, `hydrate` and the tests
+// read the array by position, and the client reverses it for painting, so the
+// question waiting on you is at the top where the reader lands.
 export async function getThread(project: string, key: string, env: Env, accountId: string): Promise<Response> {
   const { results } = await env.DB.prepare(
-    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
+    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
+       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
+       q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1 AND COALESCE(e.project, '') = ?2 AND ${THREAD_KEY_SQL} = ?3
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
+       AND ${THREAD_KEY_SQL} = ?3
      ORDER BY e.created_at ASC`,
   )
     .bind(accountId, project, key)
@@ -498,9 +696,12 @@ export async function getFeed(url: URL, env: Env, accountId: string): Promise<Re
   const sinceTs = Number(url.searchParams.get('since_ts') ?? '0') || 0
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? '100') | 0))
   const rows = await env.DB.prepare(
-    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
+    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
+       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
+       q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1 AND COALESCE(e.updated_at, e.created_at) > ?2
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL
+       AND COALESCE(e.updated_at, e.created_at) > ?2
      ORDER BY e.created_at DESC LIMIT ?3`,
   )
     .bind(accountId, sinceTs, limit)
@@ -510,9 +711,11 @@ export async function getFeed(url: URL, env: Env, accountId: string): Promise<Re
 
 export async function getEvent(id: string, env: Env, accountId: string): Promise<Response> {
   const row = await env.DB.prepare(
-    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
+    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
+       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
+       q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.id = ?1 AND e.account_id = ?2`,
+     WHERE e.id = ?1 AND e.account_id = ?2 AND e.archived_at IS NULL`,
   )
     .bind(id, accountId)
     .first()
@@ -549,7 +752,15 @@ function hydrate(row: Record<string, unknown>): Record<string, unknown> {
     read_at: row.read_at,
     question:
       row.q_status != null
-        ? { status: row.q_status, answer, timeout_at: row.q_timeout, picked_up_at: row.q_picked ?? null }
+        ? {
+            status: row.q_status,
+            answer,
+            text: row.q_text ?? null,
+            answered_at: row.q_answered ?? null,
+            timeout_at: row.q_timeout,
+            picked_up_at: row.q_picked ?? null,
+            changes: Number(row.q_changes ?? 0),
+          }
         : null,
   }
 }
@@ -588,8 +799,10 @@ export async function clearEvents(
   scope: 'read' | 'all',
   project?: string | null,
 ): Promise<Response> {
-  // account_id is always ?1; project (when present) is ?2.
-  const clauses = ['account_id = ?1']
+  // account_id is always ?1; project (when present) is ?2. Archived rows are
+  // out of the app already and are the one copy that is left, so no clear -
+  // not even scope 'all' - touches them.
+  const clauses = ['account_id = ?1', 'archived_at IS NULL']
   const bind: unknown[] = [accountId]
   if (project != null) {
     clauses.push(`COALESCE(project, '') = ?2`)
@@ -627,8 +840,82 @@ export async function clearEvents(
   return json({ ok: true, cleared: ids.length })
 }
 
-// You answer a question in the UI. Validate the answer against the question's
-// own interactive blocks so a stale/garbage submit can't land.
+// -- Archive (session) --------------------------------------------------------
+// Note 4: take finished threads out of the app without taking them out of the
+// database. An archived event is invisible to every dashboard read and to the
+// agent inbox, and no clear - not even scope 'all' - will delete it afterwards.
+// Nothing in the app ever lists it again; it is there for whoever goes looking
+// in the database.
+//
+// The client sends the thread keys it is showing under Done, so what you see
+// is what goes. A thread with a question still waiting on you is refused, as a
+// whole thread: half-archiving one would leave a question in the app with no
+// conversation behind it.
+const ARCHIVE_CHUNK = 50
+
+export async function archiveThreads(
+  request: Request,
+  env: Env,
+  accountId: string,
+): Promise<Response> {
+  let body: { project?: unknown; keys?: unknown }
+  try {
+    body = (await request.json()) as { project?: unknown; keys?: unknown }
+  } catch {
+    return json({ ok: false, error: 'Invalid JSON.' }, 400)
+  }
+  const project = typeof body.project === 'string' ? body.project : ''
+  const keys = Array.isArray(body.keys)
+    ? [...new Set(body.keys.filter((k): k is string => typeof k === 'string' && k.trim() !== ''))]
+    : []
+  if (keys.length === 0) return json({ ok: true, archived: 0 })
+
+  const t = now()
+  let archived = 0
+  for (let i = 0; i < keys.length; i += ARCHIVE_CHUNK) {
+    const chunk = keys.slice(i, i + ARCHIVE_CHUNK)
+    const marks = chunk.map((_, n) => `?${n + 3}`).join(', ')
+    // Which of the asked-for threads may actually go. Resolved first, so the
+    // response counts threads the human recognises rather than rows.
+    const { results } = await env.DB.prepare(
+      `SELECT DISTINCT ${THREAD_KEY_SQL} AS thread_key
+       FROM events e
+       WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
+         AND ${THREAD_KEY_SQL} IN (${marks})
+         AND ${THREAD_KEY_SQL} NOT IN (
+           SELECT COALESCE(NULLIF(p.task_id, ''), p.id) FROM events p
+           JOIN questions q ON q.event_id = p.id
+           WHERE p.account_id = ?1 AND q.status = 'pending'
+         )`,
+    )
+      .bind(accountId, project, ...chunk)
+      .all<{ thread_key: string }>()
+    const allowed = (results ?? []).map((r) => r.thread_key)
+    if (allowed.length === 0) continue
+
+    const stampMarks = allowed.map((_, n) => `?${n + 4}`).join(', ')
+    await env.DB.prepare(
+      `UPDATE events SET archived_at = ?1
+       WHERE account_id = ?2 AND archived_at IS NULL AND COALESCE(project, '') = ?3
+         AND COALESCE(NULLIF(task_id, ''), id) IN (${stampMarks})`,
+    )
+      .bind(t, accountId, project, ...allowed)
+      .run()
+    archived += allowed.length
+  }
+
+  await pokeHub(env, accountId)
+  return json({ ok: true, archived })
+}
+
+// You answer a question in the UI. The body is one document in two parts - the
+// values of the question's own controls, and the human's own words - and the
+// latest answer is the answer: a submit on an answered question replaces the
+// whole document and counts as a change. `if_pending` asks for the older rule
+// instead, write only while the question is still waiting; a notification tap
+// carries it, so words typed on the lock screen land only on a live question.
+// The values are validated against the question's own interactive blocks, so a
+// stale or garbage submit can't land.
 export async function answerQuestion(id: string, request: Request, env: Env, accountId: string): Promise<Response> {
   const event = await env.DB.prepare('SELECT blocks, enc FROM events WHERE id = ?1 AND account_id = ?2 AND kind = ?3')
     .bind(id, accountId, 'question')
@@ -639,33 +926,52 @@ export async function answerQuestion(id: string, request: Request, env: Env, acc
     .bind(id)
     .first<{ status: string }>()
   if (!q) return json({ ok: false, error: 'Unknown question.' }, 404)
-  if (q.status !== 'pending') return json({ ok: false, error: `Question already ${q.status}.` }, 409)
+  if (q.status === 'expired') return json({ ok: false, error: 'Question already expired.' }, 409)
 
-  let submitted: Record<string, unknown>
+  let body: unknown
   try {
-    submitted = (await request.json()) as Record<string, unknown>
+    body = await request.json()
   } catch {
     return json({ ok: false, error: 'Invalid JSON.' }, 400)
   }
 
-  // Encrypted question: the answer arrives as a ciphertext string the server
-  // can't (and shouldn't) validate. Store it opaquely for the agent to decrypt.
+  const parsed = AnswerEnvelope.safeParse(body)
+  if (!parsed.success) return json({ ok: false, error: 'Answer did not match any of the question fields.' }, 400)
+  const submitted = parsed.data
+  const ifPending = submitted.if_pending === true
+
+  // Encrypted question: both parts arrive as ciphertext strings the server
+  // can't (and shouldn't) look inside. The client always sends the values,
+  // encrypted as `{}` when no control was used, so a non-empty `answer` string
+  // is the whole rule the server can hold; the client keeps the document from
+  // being empty. Store both as given for the agent to decrypt.
   if (event.enc === 1) {
     if (submitted.enc !== true || typeof submitted.answer !== 'string' || !submitted.answer) {
       return json({ ok: false, error: 'Encrypted questions need an encrypted answer.' }, 400)
     }
-    return settleAnswer(env, accountId, id, submitted.answer)
+    const encText = typeof submitted.text === 'string' && submitted.text ? submitted.text : null
+    return settleAnswer(env, accountId, id, submitted.answer, encText, ifPending)
+  }
+
+  if (typeof submitted.answer === 'string') {
+    return json({ ok: false, error: 'Answer did not match any of the question fields.' }, 400)
+  }
+
+  const text = typeof submitted.text === 'string' ? submitted.text.trim() : null
+  if (text != null && text.length > TEXT_LIMIT) {
+    return json({ ok: false, error: `Text is too long (${TEXT_LIMIT} characters at most).` }, 400)
   }
 
   const blocks = JSON.parse(event.blocks) as Block[]
   const targets = answerTargets(blocks)
+  const values = submitted.answer ?? {}
   const answer: Record<string, unknown> = {}
 
   for (const bId of targets.buttons) {
-    if (typeof submitted[bId] === 'string') answer[bId] = submitted[bId]
+    if (typeof values[bId] === 'string') answer[bId] = values[bId]
   }
   for (const form of targets.forms) {
-    const raw = submitted[form.id]
+    const raw = values[form.id]
     if (raw && typeof raw === 'object') {
       const clean: Record<string, unknown> = {}
       for (const fId of form.fieldIds) {
@@ -675,31 +981,49 @@ export async function answerQuestion(id: string, request: Request, env: Env, acc
     }
   }
 
-  if (Object.keys(answer).length === 0) {
+  // Every key the client sent has to be a target of this question, so a submit
+  // built against a different question is refused instead of half-stored.
+  if (Object.keys(values).length !== Object.keys(answer).length) {
     return json({ ok: false, error: 'Answer did not match any of the question fields.' }, 400)
   }
 
-  return settleAnswer(env, accountId, id, JSON.stringify(answer))
+  if (Object.keys(answer).length === 0 && (text == null || text === '')) {
+    return json({ ok: false, error: 'An answer needs a choice, a form, or some words.' }, 400)
+  }
+
+  return settleAnswer(env, accountId, id, JSON.stringify(answer), text === '' ? null : text, ifPending)
 }
 
-// First answer wins. Two taps can land at once (the phone and a notification
-// action), so the write is conditional on the question still being pending and
-// the changed-row count decides the winner. The loser gets a 409 and the stored
-// answer is never a mix of the two bodies.
+// The latest answer is the answer. One statement writes the whole document and
+// counts the replacement in the same breath: SQLite reads the right-hand sides
+// against the row as it stands, so the CASE sees the status before the update.
+// Two taps can land at once (the phone and a notification action) and each one
+// writes a whole body, so the stored document is one of them, never a mix. A
+// change clears the delivery receipt, which sends the human's screen back to
+// "waiting for the agent" until the next poll stamps pickup again. An expired
+// question stays closed: it told the agent to go on without an answer, so an
+// answer to it would land nowhere.
 async function settleAnswer(
   env: Env,
   accountId: string,
   id: string,
   answer: string,
+  text: string | null,
+  ifPending: boolean,
 ): Promise<Response> {
-  const result = await env.DB.prepare(
-    `UPDATE questions SET status = 'answered', answer = ?1, answered_at = ?2
-     WHERE event_id = ?3 AND status = 'pending'`,
+  const guard = ifPending ? `status = 'pending'` : `status IN ('pending', 'answered')`
+  const row = await env.DB.prepare(
+    `UPDATE questions
+        SET status = 'answered', answer = ?1, text = ?2, answered_at = ?3,
+            changes = changes + CASE WHEN status = 'answered' THEN 1 ELSE 0 END,
+            picked_up_at = NULL
+      WHERE event_id = ?4 AND ${guard}
+      RETURNING changes`,
   )
-    .bind(answer, now(), id)
-    .run()
+    .bind(answer, text, now(), id)
+    .first<{ changes: number }>()
 
-  if (result.meta.changes === 0) {
+  if (!row) {
     const current = await env.DB.prepare('SELECT status FROM questions WHERE event_id = ?1')
       .bind(id)
       .first<{ status: string }>()
@@ -711,7 +1035,7 @@ async function settleAnswer(
     .bind(now(), id)
     .run()
   await pokeHub(env, accountId)
-  return json({ ok: true })
+  return json({ ok: true, status: 'answered', changes: row.changes })
 }
 
 // -- Push subscription management (session) -----------------------------------
@@ -771,12 +1095,12 @@ export async function putSettings(request: Request, env: Env, accountId: string)
 }
 
 export async function getStats(env: Env, accountId: string): Promise<Response> {
-  const unread = await env.DB.prepare('SELECT COUNT(*) AS n FROM events WHERE account_id = ?1 AND read_at IS NULL')
+  const unread = await env.DB.prepare('SELECT COUNT(*) AS n FROM events WHERE account_id = ?1 AND read_at IS NULL AND archived_at IS NULL')
     .bind(accountId)
     .first<{ n: number }>()
   const pending = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM questions q JOIN events e ON e.id = q.event_id
-     WHERE e.account_id = ?1 AND q.status = 'pending'`,
+     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND q.status = 'pending'`,
   )
     .bind(accountId)
     .first<{ n: number }>()

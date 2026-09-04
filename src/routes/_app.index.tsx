@@ -1,12 +1,21 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Settings2 } from 'lucide-react'
-import { timeAgo, type ProjectRow } from '../lib/api'
+import type { ProjectRow } from '../lib/api'
 import { Container, useHeaderActions } from '../lib/shell'
 import { ensure, projectsQuery } from '../lib/queries'
 import { ProjectsSkeleton } from '../lib/skeleton'
 import { projectLabel, toParam, STATE_TEXT } from '../lib/project'
-import { InlineError, ProjectDot, Row, RowBody, RowMeta, Section, iconButtonClass } from '../lib/ui'
+import {
+  InlineError,
+  ProjectDot,
+  Row,
+  RowBody,
+  Section,
+  Time,
+  iconButtonClass,
+  rowLinkClass,
+} from '../lib/ui'
 
 export const Route = createFileRoute('/_app/')({
   ssr: false,
@@ -21,7 +30,7 @@ function Projects() {
   const { data, isError, refetch } = useQuery(projectsQuery())
   useHeaderActions(
     <Link to="/settings" title="Settings" aria-label="Settings" className={iconButtonClass}>
-      <Settings2 size={16} />
+      <Settings2 size={18} />
     </Link>,
     [],
   )
@@ -56,7 +65,7 @@ function Projects() {
           <ProjectLine key={p.project || '__none__'} p={p} />
         ))}
         {rest.length === 0 ? (
-          <p className="px-3 py-2 text-[13px] text-muted">Everything else is up to date.</p>
+          <p className="px-4 py-3 text-[15px] text-muted">Everything else is up to date.</p>
         ) : null}
       </Section>
     </Container>
@@ -65,43 +74,42 @@ function Projects() {
 
 function ProjectLine({ p }: { p: ProjectRow }) {
   return (
-    <Link
-      to="/project/$name"
-      params={{ name: toParam(p.project) }}
-      className="block text-text no-underline hover:bg-surface"
-    >
-      <Row>
-        <ProjectDot project={p.project} />
+    <Row time={<Time at={p.last_activity} />}>
+      <Link to="/project/$name" params={{ name: toParam(p.project) }} className={rowLinkClass}>
+        {/* Nudged down to sit on the title's optical centre, now that the row
+            hangs its content from the top rather than centring it. */}
+        <span className="mt-[7px] flex shrink-0">
+          <ProjectDot project={p.project} />
+        </span>
         <RowBody
           title={
             <span className="flex items-baseline gap-2">
               <span className="truncate">{projectLabel(p.project)}</span>
               {p.pending > 0 ? (
                 <span
-                  className={`shrink-0 text-[11px] font-semibold tracking-wider uppercase ${STATE_TEXT.pending}`}
+                  className={`shrink-0 text-[13px] font-semibold ${STATE_TEXT.pending}`}
                 >
                   {p.pending} pending
                 </span>
               ) : null}
               {p.unread > 0 ? (
-                <span className="shrink-0 text-[12px] text-muted">{p.unread} unread</span>
+                <span className="shrink-0 text-[13px] text-muted">{p.unread} unread</span>
               ) : null}
             </span>
           }
           detail={p.models.length > 0 ? p.models.join(', ') : null}
           bold={p.unread > 0}
         />
-        <RowMeta>{timeAgo(p.last_activity)}</RowMeta>
-      </Row>
-    </Link>
+      </Link>
+    </Row>
   )
 }
 
 function EmptyState() {
   return (
-    <div className="px-3 py-10 text-center text-muted">
+    <div className="px-4 py-12 text-center text-muted">
       <p className="mb-1">No projects yet.</p>
-      <p className="text-[13px]">
+      <p className="text-[15px]">
         An agent's first update with a <code>project</code> starts one. The connection snippet is
         in <Link to="/settings">Settings</Link>.
       </p>

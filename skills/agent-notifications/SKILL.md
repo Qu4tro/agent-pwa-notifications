@@ -11,8 +11,9 @@ Workers. You talk to it over plain HTTP with a bearer token. You can send an
 update, change an update in place, and ask a question and wait for the answer.
 
 Everything in this document is an endpoint the hub really implements. There is
-no paid tier, no negotiation step before you send, no file upload and no
-free-text reply channel. If you need the machine-readable contract, fetch
+no paid tier, no negotiation step before you send, and no file upload. Every
+question also takes the human's own words, which arrive as `text` beside the
+values they chose. If you need the machine-readable contract, fetch
 `GET <hub>/api/v1/schema.json` (blocks) or `GET <hub>/api/v1/openapi.json`
 (endpoints). Neither needs auth.
 
@@ -111,7 +112,30 @@ curl -X POST "$HUB/api/v1/events" \
 - `priority`: `0` silent (shows in the app, no push), `1` push, `2` urgent
   (rings through quiet hours). Default `0`.
 - `kind`: `update` (default), `done` for a final success, `error` for a failure.
+- `idle_minutes`: how long silence still counts as working. Default `240`.
 - Keep the returned `id` if you plan to update the event in place.
+
+### Saying when a task is over
+
+The human's dashboard sorts a thread into Needs you, Active or Done. Only two
+things move a thread into Done, and neither of them is the human reading it:
+
+- You send `kind: "done"`. Send it on the last message of every task. An
+  `error` does **not** end a thread, because an agent that hit an error may
+  still retry - follow the error with a `done` when you finally stop.
+- Or the thread goes quiet for longer than `idle_minutes` (default `240`, four
+  hours). This is the safety net for an agent that crashes or is killed, not a
+  substitute for saying `done`.
+
+Set `idle_minutes` on any event when you are about to go quiet for longer than
+four hours; the latest value on the thread wins.
+
+```bash
+curl -X POST "$HUB/api/v1/events" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "task_id": "landing-redesign", "title": "Landing page shipped",
+        "kind": "done", "priority": 1 }'
+```
 
 When to notify: milestones, not every step. Good: "Scraped all sources",
 "Deploy succeeded", "Tests failing, see the log". Bad: narrating each file you
@@ -180,8 +204,9 @@ Then poll:
 
 ```bash
 curl "$HUB/api/v1/questions/01J..." -H "Authorization: Bearer $KEY"
-# pending:  { "ok": true, "status": "pending",  "answer": null }
-# answered: { "ok": true, "status": "answered", "answer": { "confirm": "Deploy" }, "answered_at": 1699... }
+# pending:  { "ok": true, "status": "pending",  "answer": null, "text": null }
+# answered: { "ok": true, "status": "answered", "answer": { "confirm": "Deploy" }, "text": null, "answered_at": 1699..., "changes": 0 }
+# words:    { "ok": true, "status": "answered", "answer": {}, "text": "wait for QA to sign off", "answered_at": 1699..., "changes": 0 }
 # expired:  { "ok": true, "status": "expired" }
 ```
 
@@ -189,9 +214,11 @@ The polling loop, exactly:
 
 1. Poll the id.
 2. `pending`: wait about 10 seconds and poll again.
-3. `answered`: read `answer`, keyed by each block id, and carry on with those
-   values. A `buttons` block answers with the chosen string; a `form` block
-   answers with an object of `{ fieldId: value }`.
+3. `answered`: read both parts and carry on with them. `answer` holds the
+   values, keyed by each block id - a `buttons` block answers with the chosen
+   string, a `form` block with an object of `{ fieldId: value }` - and is `{}`
+   when the human only wrote words. `text` holds the human's own words, and is
+   `null` when they only used the controls.
 4. `expired`: the human did not answer in time. Proceed with a sensible default
    and say that you did.
 
@@ -200,7 +227,41 @@ question you abandon simply expires at `timeout_at`.
 
 The first poll that returns `answered` also flips the human's screen from
 "waiting for the agent" to "agent received it". So keep polling promptly after
-they might have answered; the poll is what confirms receipt to them.
+they might have answered; the poll is what confirms receipt to them. A change
+resets that screen, and the next poll flips it again.
+
+## When the human changes an answer
+
+The latest answer is the answer. The human can replace one after giving it, and
+`changes` counts the replacements: a number higher than the one you last saw
+means what you are holding is out of date. A change also clears the delivery
+receipt, so their screen waits on you again until you poll.
+
+An agent that has moved on has no poll running, so a change rides on the next
+call you make on the same thread. `POST /api/v1/events`,
+`POST /api/v1/events/{id}` and `POST /api/v1/questions` answer with
+`changed_answers` when there is one, and leave the field out when there is not:
+
+```json
+{
+  "ok": true,
+  "id": "01J...",
+  "changed_answers": [
+    {
+      "id": "01J...",
+      "title": "Ready to deploy?",
+      "answer": { "confirm": "Hold" },
+      "text": "wait for QA to sign off",
+      "answered_at": 1699,
+      "changes": 1
+    }
+  ]
+}
+```
+
+What to do: read each item before going on, then poll its id. The poll is the
+acknowledgement, and the item stops appearing. Scoping is by `task_id`, so a
+call without one carries nothing.
 
 ## Micro-questions: answerable from the notification itself
 
@@ -221,8 +282,12 @@ full.
 How many buttons actually appear depends on the browser. Firefox on the desktop
 shows several, Chrome on Android shows two, and Safari on iOS shows none. When
 the answers do not all fit, the notification shows as many as fit beside a
-"More" button that opens the thread. Write the question so that opening the
-thread is never a failure.
+Reply action, which takes the human's own words.
+
+Reply takes a slot whenever one is free, so a yes/no question on Android shows
+the two options and nothing else, while a form question or a long one shows
+Reply on its own. Write the question so that opening the thread is never a
+failure.
 
 ## 4. Keep the inbox tidy
 
@@ -305,11 +370,22 @@ That is the whole API:
 ## Etiquette
 
 - Notify on milestones and completions. Ask only at real decision points.
+- End every task with `kind: "done"`. Without it the thread sits in Active
+  until the idle timeout runs out, and the human cannot tell you finished from
+  you stopping.
 - Use `priority: 2` only for something that should interrupt the human.
 - Reuse one `task_id` per task so the human sees a thread, not noise.
 - Always pass `timeout_minutes` on a question and handle `expired`.
 - Prefer a micro-question: two short buttons the human can tap from the
   notification beats a form they have to open the app for.
+- Read `text` even when a control was used. It may qualify the choice, and it
+  is where the human says the thing your options had no room for.
+- Do not colour the answers. The options already come out in different
+  colours, and a plain "Yes"/"No" - or "Correct"/"Wrong", "Approve"/"Reject",
+  "Go ahead"/"Not now" - comes out green/red on its own. Write the plain word
+  and let it. `colors` on a buttons block overrules that, and is for the rare
+  case where one choice should read a particular way; never use it to paint an
+  affirmative red.
 - Do not block forever. If you stop waiting, say so in a follow-up update on
   the same thread, so the human knows the question no longer matters.
 

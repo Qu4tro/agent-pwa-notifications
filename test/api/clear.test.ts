@@ -50,7 +50,7 @@ describe('POST /api/v1/clear with scope read', () => {
     const id = await ask(account, 'Ship it?')
 
     const answered = await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { choice: 'Yes' },
+      body: { answer: { choice: 'Yes' } },
       auth: { cookie },
     })
     expect(answered.status).toBe(200)
@@ -71,7 +71,7 @@ describe('POST /api/v1/clear with scope read', () => {
     const updateId = await post(account, 'Still building')
 
     await call('POST', `/api/v1/questions/${questionId}/answer`, {
-      body: { choice: 'Yes' },
+      body: { answer: { choice: 'Yes' } },
       auth: { cookie },
     })
 
@@ -91,7 +91,7 @@ describe('POST /api/v1/clear with scope read', () => {
 
     for (const id of [alphaId, betaId]) {
       await call('POST', `/api/v1/questions/${id}/answer`, {
-        body: { choice: 'Yes' },
+        body: { answer: { choice: 'Yes' } },
         auth: { cookie },
       })
     }
@@ -124,7 +124,7 @@ describe('POST /api/v1/clear with scope read', () => {
     const id = await ask(account, 'Ship it?')
 
     await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { choice: 'Yes' },
+      body: { answer: { choice: 'Yes' } },
       auth: { cookie },
     })
     await call('POST', `/api/v1/event/${id}/unread`, { auth: { cookie } })

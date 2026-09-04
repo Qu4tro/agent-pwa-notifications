@@ -149,7 +149,7 @@ Vars, in `wrangler.jsonc`:
 
 | Var | Default | What |
 |---|---|---|
-| `EVENT_RETENTION_DAYS` | `90` | The hourly cron deletes events older than this. |
+| `EVENT_RETENTION_DAYS` | `90` | The hourly cron archives events older than this. They leave the app; the rows stay. |
 | `SESSION_TTL_DAYS` | `365` | How long a signed-in browser stays signed in. |
 | `INSTANT` | `0` | `1` swaps polling for a WebSocket to a hibernating Durable Object. |
 | `EMAIL_FROM` | unset | Sender for one-time codes. Needs `RESEND_API_KEY`. |

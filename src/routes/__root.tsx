@@ -49,6 +49,23 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}`,
           }}
         />
+        {/* Dev only: the uxnote-fork annotation bar, so the UI can be marked up
+            in place. It loads from the reference server in ../uxnote-fork:
+
+              python3 server/server.py --port 8123 --root . --api-key review-key
+
+            The notes live on that server (one set per origin), so they survive
+            a reload and a second browser sees the same ones. With the server
+            down the widget just does not appear. Never in a production build:
+            `import.meta.env.DEV` is replaced with `false` and the whole element
+            is dropped. */}
+        {import.meta.env.DEV ? (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){var b='http://localhost:8123';function add(p,a,n){var s=document.createElement('script');s.src=b+p;if(a)for(var k in a)s.setAttribute(k,a[k]);s.onload=n||null;s.onerror=function(){console.info('[uxnote] no annotation server at '+b+' - run it from ../uxnote-fork to annotate this page')};document.body.appendChild(s)}add('/uxnote-tool/snapdom.min.js',null,function(){add('/uxnote-tool/uxnote.js',{'data-server-url':b,'data-server-api-key':'review-key','data-theme':'auto','data-json-export':'false','data-json-import':'false'})})})()`,
+            }}
+          />
+        ) : null}
       </body>
     </html>
   )

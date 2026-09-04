@@ -33,45 +33,57 @@ app. That happens when all of these hold:
 - every option is at most 20 characters, with no leading or trailing space;
 - the question is not end-to-end encrypted.
 
-Anything else is tap-to-open: the notification opens the thread, and you answer
-there. A form is always tap-to-open.
+Anything else has no buttons of its own: a form question, or one with more
+options than a notification can hold. It still takes an answer here, in words,
+through **Reply**.
 
 These rules live in `src/server/quick-answers.ts` and are covered by
 `test/unit/quick-answers.test.ts`.
+
+### Reply
+
+**Reply** is a text action: on a browser that types into a notification you
+write your answer in the shade and send it, and the question is answered
+without the app ever opening. On a browser that does not, it is a plain button
+that opens the thread.
+
+An encrypted question never gets one. The service worker holds no encryption
+key, so it can neither show the options nor send the words.
 
 ### How many buttons show
 
 The browser decides, through `Notification.maxActions`. The service worker reads
 it and picks:
 
-- every answer fits: show the answers, and nothing else. Tapping the
-  notification body opens the thread anyway, so a spare slot stays empty.
-- the answers do not all fit: show as many as fit beside a **More** button that
-  opens the thread.
+- a slot is free after the answers: the answers, then **Reply**.
+- the answers fill the slots exactly: the answers alone. They are the question,
+  and tapping the notification body already leads to words.
+- the answers do not all fit: as many as fit, then **Reply**.
 - no slots at all: no buttons; the whole notification is tap-to-open.
 
-So a two-option question on a browser with two slots shows both answers and no
-More. A three-option question on the same browser shows one answer and More.
+So a two-option question on a browser with two slots shows both answers and
+nothing else. A three-option question on the same browser shows one answer and
+Reply. A form question shows Reply on its own.
 
 The rule lives in `public/sw.js` and is covered by
 `test/unit/sw-actions.test.ts`.
 
 ### Per-browser results
 
-| Platform | Browser | `maxActions` | Result |
-|---|---|---|---|
-| Linux desktop | Firefox 154 | 2 | measured: 2 answers both show and no More; 3 answers give the first answer plus More |
-| Android | Firefox | to be measured | to be measured |
-| Android | Chrome | 2 (documented) | 2 answers both show; 3 answers give 1 answer plus More |
-| iOS | Safari | 0 (documented) | no buttons; tap opens the thread |
+| Platform | Browser | `maxActions` | Result | Reply |
+|---|---|---|---|---|
+| Linux desktop | Firefox 154 | 2 | measured: 2 answers both show; 3 answers give the first answer plus Reply | a plain button that opens the thread |
+| Android | Firefox | to be measured | to be measured | to be measured |
+| Android | Chrome | 2 (documented) | 2 answers both show; 3 answers give 1 answer plus Reply | types into the notification |
+| iOS | Safari | 0 (documented) | no buttons; tap opens the thread | none |
 
 The desktop row was measured on the device: `Notification.maxActions` read in
 the browser, then a two-option and a three-option question posted from the CLI.
-The two-option notification showed both answers and no More; clicking one
-answered the question and the waiting agent received the choice. The
-three-option notification showed one answer and More; More opened the thread in
-the app and left the question pending, and answering there reached the agent
-just the same.
+The two-option notification showed both answers; clicking one answered the
+question and the waiting agent received the choice. The three-option
+notification showed one answer beside a second action; that action opened the
+thread in the app and left the question pending, and answering there reached
+the agent just the same.
 
 The Android row is measured on the phone the same way. The Chrome and Safari
 rows come from the platform documentation; there is no device here to test them
@@ -84,23 +96,30 @@ all.
 - **An answer button**: posts the answer straight from the service worker, with
   no window opened. If it succeeds, nothing else happens; the app shows the
   answer next time you open it.
-- **More**: opens the thread.
+- **Reply, with words typed in**: posts them the same way, and opens nothing.
+- **Reply, on a browser that shows it as a plain button**: opens the thread,
+  where the answer line takes the words.
 
 If the answer POST comes back 401, the session on that device is gone (expired,
 or signed out). The notification then opens `/login?next=/event/<id>`, so
 signing in lands you back on the question instead of on the inbox. Sessions
 default to 365 days, so this should be rare.
 
-Any other failure opens the thread, so the answer is never lost silently.
+Any other failure opens the thread, so the answer is never lost silently. Words
+typed into a Reply that arrives too late are not carried into the thread it
+opens; you type them again.
 
-## First answer wins
+## Which answer counts
 
-Two answers to one question can be in flight at once: a tap on the phone and a
-tap on the desktop notification. The write is conditional on the question still
-being pending, so exactly one lands. The other gets `409` with
-`Question already answered.` and the stored answer is the winner's, never a mix.
+The latest answer is the answer. In the app you can change one after giving it:
+tap a different option, or edit the words and send. The agent learns that it
+moved, and the newest document is what it reads.
 
-The agent polling `GET /api/v1/questions/:id` sees one answer, once.
+An answer from a notification is different: it lands only on a question that is
+still waiting. Two of them can be in flight at once - a tap on the phone and a
+tap on the desktop notification - and exactly one lands; the other gets `409`
+with `Question already answered.` and opens the thread, where the answer can be
+changed deliberately. A stored answer is never a mix of two bodies.
 
 ## End-to-end encryption
 

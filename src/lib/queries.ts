@@ -4,12 +4,20 @@
 
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient, QueryFunction, QueryKey } from '@tanstack/react-query'
-import { api, type EventItem, type ProjectRow, type TaskSummary, type ThreadData } from './api'
+import {
+  api,
+  type AnswerDoc,
+  type EventItem,
+  type ProjectRow,
+  type TaskSummary,
+  type ThreadData,
+} from './api'
 
 export const queryKeys = {
   config: () => ['config'] as const,
   account: () => ['account'] as const,
   projects: () => ['projects'] as const,
+  pending: () => ['pending'] as const,
   tasks: (project: string) => ['tasks', project] as const,
   thread: (project: string, key: string) => ['thread', project, key] as const,
   settings: () => ['settings'] as const,
@@ -19,7 +27,12 @@ export const queryKeys = {
 // The queries that follow the agents: they poll while the tab is visible and
 // they are what a mutation or a live message invalidates. Prefixes, so
 // ['tasks'] covers every project.
-export const LIVE_KEYS: ReadonlyArray<readonly string[]> = [['projects'], ['tasks'], ['thread']]
+export const LIVE_KEYS: ReadonlyArray<readonly string[]> = [
+  ['projects'],
+  ['tasks'],
+  ['thread'],
+  ['pending'],
+]
 
 // Never changes for the life of a deploy, so it is fetched once and kept.
 export const configQuery = () =>
@@ -46,6 +59,15 @@ export const tasksQuery = (project: string) =>
   queryOptions({
     queryKey: queryKeys.tasks(project),
     queryFn: async (): Promise<TaskSummary[]> => (await api.tasks(project)).tasks,
+  })
+
+// Everything waiting on the human, across every project. The header reads it
+// for the badge and the pending page reads it for the rows, so it is fetched
+// once and shared - not once per consumer.
+export const pendingQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.pending(),
+    queryFn: async (): Promise<TaskSummary[]> => (await api.pending()).pending,
   })
 
 export const threadQuery = (project: string, key: string) =>
@@ -93,12 +115,13 @@ function invalidateLists(client: QueryClient) {
 
 // -- Mutations --------------------------------------------------------------
 
-// `display` is the plaintext answer for the optimistic cache write; `payload`
-// is what goes on the wire, which for an E2E question is ciphertext.
+// `display` is the plaintext document for the optimistic cache write; `payload`
+// is the envelope that goes on the wire, which for an E2E question carries
+// each part as ciphertext.
 export type AnswerInput = {
   eventId: string
   payload: Record<string, unknown>
-  display: Record<string, unknown>
+  display: AnswerDoc
 }
 
 export function useAnswer(project: string, key: string) {
@@ -109,8 +132,10 @@ export function useAnswer(project: string, key: string) {
       if (!res.ok) throw new Error(res.error ?? 'Could not submit.')
       return res
     },
-    // Settle the question in the cache before the round trip, so the buttons
-    // go away the moment they are tapped.
+    // Settle the question in the cache before the round trip, so the document
+    // on screen is the one just sent. A submit on an already answered question
+    // is a change: it counts, and it clears the receipt, so the line under the
+    // controls goes back to waiting on the agent.
     onMutate: async ({ eventId, display }: AnswerInput) => {
       const queryKey = queryKeys.thread(project, key)
       await client.cancelQueries({ queryKey })
@@ -121,7 +146,21 @@ export function useAnswer(project: string, key: string) {
               ...thread,
               events: thread.events.map((e) =>
                 e.id === eventId && e.question
-                  ? { ...e, question: { ...e.question, status: 'answered' as const, answer: display } }
+                  ? {
+                      ...e,
+                      question: {
+                        ...e.question,
+                        status: 'answered' as const,
+                        answer: display.answer,
+                        text: display.text,
+                        answered_at: Date.now(),
+                        changes:
+                          e.question.status === 'answered'
+                            ? e.question.changes + 1
+                            : e.question.changes,
+                        picked_up_at: null,
+                      },
+                    }
                   : e,
               ),
             }
@@ -136,12 +175,19 @@ export function useAnswer(project: string, key: string) {
   })
 }
 
-// Answering a micro-question straight from the project list. Same endpoint as
-// the thread form; the optimistic write drops the row out of "Needs you" the
-// moment a button is tapped.
-export function useAnswerFromList(project: string) {
+// Answering a micro-question straight from a list. Same endpoint as the thread
+// form; the optimistic write drops the row out of "Needs you" the moment a
+// button is tapped.
+//
+// The key says which list, because there are two now: a project's tasks, and
+// the pending page. Both hold TaskSummary rows, so the write is the same
+// either way.
+export function useAnswerFromList(queryKey: QueryKey) {
   const client = useQueryClient()
   return useMutation({
+    // A row is a quick tap, so it answers only a question that is still
+    // waiting: `if_pending` keeps a tap on a stale row from replacing an
+    // answer given somewhere else.
     mutationFn: async ({
       eventId,
       answer,
@@ -149,12 +195,11 @@ export function useAnswerFromList(project: string) {
       eventId: string
       answer: Record<string, unknown>
     }) => {
-      const res = await api.answer(eventId, answer)
+      const res = await api.answer(eventId, { answer, if_pending: true })
       if (!res.ok) throw new Error(res.error ?? 'Could not submit.')
       return res
     },
     onMutate: async ({ eventId }) => {
-      const queryKey = queryKeys.tasks(project)
       await client.cancelQueries({ queryKey })
       const previous = client.getQueryData<TaskSummary[]>(queryKey)
       client.setQueryData<TaskSummary[]>(queryKey, (tasks) =>
@@ -163,6 +208,30 @@ export function useAnswerFromList(project: string) {
             ? { ...t, pending: false, pending_event_id: null, pending_question: null, pending_answers: [] }
             : t,
         ),
+      )
+      return { previous, queryKey }
+    },
+    onError: (_error, _input, context) => {
+      if (context) client.setQueryData(context.queryKey, context.previous)
+    },
+    onSettled: () => invalidateLists(client),
+  })
+}
+
+// Note 4's Clear: the Done rows leave the list on the tap, before the round
+// trip, because there is nothing to undo on the server if it fails - the write
+// is idempotent and the next poll puts anything back that did not go.
+export function useArchive(project: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ keys }: { keys: string[] }) => api.archive(project, keys),
+    onMutate: async ({ keys }) => {
+      const queryKey = queryKeys.tasks(project)
+      await client.cancelQueries({ queryKey })
+      const previous = client.getQueryData<TaskSummary[]>(queryKey)
+      const going = new Set(keys)
+      client.setQueryData<TaskSummary[]>(queryKey, (tasks) =>
+        tasks?.filter((t) => !going.has(t.key)),
       )
       return { previous, queryKey }
     },

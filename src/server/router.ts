@@ -39,6 +39,7 @@ import {
   markAllRead,
   markUnread,
   clearEvents,
+  archiveThreads,
   answerQuestion,
   subscribePush,
   unsubscribePush,
@@ -48,6 +49,7 @@ import {
   getProjects,
   getTasks,
   getThread,
+  getPending,
 } from './api'
 import { EmailCapError } from './email'
 import { handleMcp } from './mcp'
@@ -248,10 +250,13 @@ export async function handleApi(
       return getTasks(url.searchParams.get('project') ?? '', env, acct)
     if (path === '/api/v1/thread' && method === 'GET')
       return getThread(url.searchParams.get('project') ?? '', url.searchParams.get('key') ?? '', env, acct)
+    if (path === '/api/v1/pending' && method === 'GET') return getPending(env, acct)
     if (path === '/api/v1/stats' && method === 'GET') return getStats(env, acct)
     if (path === '/api/v1/settings' && method === 'GET') return getSettings(env, acct)
     if (path === '/api/v1/settings' && method === 'POST') return putSettings(request, env, acct)
     if (path === '/api/v1/read-all' && method === 'POST') return markAllRead(env, acct)
+    // Session only. Archiving is a human action - no agent-facing equivalent.
+    if (path === '/api/v1/archive' && method === 'POST') return archiveThreads(request, env, acct)
     if (path === '/api/v1/push/subscribe' && method === 'POST') return subscribePush(request, env, acct)
     if (path === '/api/v1/push/unsubscribe' && method === 'POST') return unsubscribePush(request, env, acct)
 

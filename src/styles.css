@@ -33,7 +33,46 @@
      11.3 / 10.5 on the two surfaces. */
   --color-warn: #fbbf24;
 
-  --radius-ui: 4px;
+  /* One web font, self-hosted, with a metric-matched fallback under it. The
+     stack is only reached for a glyph Atkinson's Latin subset does not have. */
+  --font-sans:
+    'Atkinson Hyperlegible Next', 'Atkinson fallback', -apple-system, 'Segoe UI', Roboto,
+    'Noto Sans', Ubuntu, Cantarell, ui-sans-serif, system-ui, Helvetica, Arial, sans-serif;
+
+  /* Named faces first, for the same reason as the sans stack: left to the
+     generic `monospace` keyword, Linux picks a face that is a size and a
+     colour apart from the body text. */
+  --font-mono:
+    ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+
+  --radius-ui: 8px;
+}
+
+/* Atkinson Hyperlegible Next: humanist, drawn by the Braille Institute for
+   low-vision readers, which is the same work a "big letters, lots of space"
+   interface is asking for. Latin subset, one variable file, weights 400-700.
+   Self-hosted on purpose - a third-party font request on every cold load is a
+   dependency a PWA should not have. */
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/atkinson-hyperlegible-next-latin.woff2') format('woff2');
+}
+
+/* The face the first paint uses while the woff2 arrives. Metrics are scaled to
+   Atkinson's (avg char width 0.533em against DejaVu Sans' 0.507em, ascent
+   0.984em, descent 0.316em), so the swap changes the shapes and nothing else -
+   no line ever moves. */
+@font-face {
+  font-family: 'Atkinson fallback';
+  src: local('DejaVu Sans'), local('Roboto'), local('Segoe UI'), local('Helvetica Neue'),
+    local('Arial');
+  size-adjust: 105.2%;
+  ascent-override: 93.6%;
+  descent-override: 30%;
+  line-gap-override: 0%;
 }
 
 /* Question state invents no colour of its own: pending is the question
@@ -58,12 +97,25 @@
     margin: 0;
     background: var(--color-bg);
     color: var(--color-text);
-    font-family:
-      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-size: 15px;
-    line-height: 1.4;
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     min-height: 100svh;
+  }
+
+  /* Code is set in the mono stack everywhere, not in whatever the browser
+     defaults to. 14px is a step down from the 17px body and no further: the
+     note that started this said the font was too small to read. */
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+    font-size: 14px;
+  }
+  pre {
+    line-height: 1.6;
   }
 
   /* One visible focus ring for everything keyboard-reachable. The accent is
@@ -130,11 +182,68 @@
     border: 1px solid var(--color-line);
     padding: 0.05em 0.3em;
     border-radius: var(--radius-ui);
-    font-size: 0.85em;
+    /* Relative, so inline code tracks whatever it sits in. */
+    font-size: 0.9em;
   }
   .md strong {
     font-weight: 600;
     color: #fff;
+  }
+
+  /* Syntax highlighting, and the one deliberate exception to "colour carries
+     meaning and nothing else". Inside a code block the meaning colour carries
+     is which part of the language a word belongs to, which is a different axis
+     from kind, project and question state - and it never leaves .hl.
+
+     No theme file: five rules on the tokens that are worth telling apart, in
+     colours the app already has. Everything else stays --color-text, which is
+     15.4:1, so the block is readable with the colours ignored entirely. */
+  .hl .token.comment,
+  .hl .token.prolog,
+  .hl .token.doctype,
+  .hl .token.cdata {
+    color: var(--color-muted);
+  }
+  .hl .token.string,
+  .hl .token.char,
+  .hl .token.attr-value,
+  .hl .token.inserted {
+    color: var(--color-kind-done);
+  }
+  .hl .token.keyword,
+  .hl .token.tag,
+  .hl .token.selector,
+  .hl .token.atrule,
+  .hl .token.operator {
+    color: var(--color-kind-question);
+  }
+  .hl .token.number,
+  .hl .token.boolean,
+  .hl .token.constant,
+  .hl .token.deleted {
+    color: var(--color-warn);
+  }
+  .hl .token.function,
+  .hl .token.class-name,
+  .hl .token.attr-name,
+  .hl .token.property {
+    color: var(--color-kind-update);
+  }
+
+  /* A message in a thread is a native <details>: the browser already gives it
+     a keyboard, a role and an expanded/collapsed announcement, and no state
+     library is involved. What it also gives it is a disclosure triangle, in
+     the one spot the kind label wants, so that goes and the chevron drawn in
+     the summary takes over.
+
+     The whole summary is the target, not just the marker: on a phone a 3mm
+     triangle is not a button. */
+  .message > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .message > summary::-webkit-details-marker {
+    display: none;
   }
 
   /* Loading placeholders in the content area. */
@@ -155,6 +264,125 @@
   @media (prefers-reduced-motion: reduce) {
     .skeleton {
       animation: none;
+    }
+  }
+
+  /* The live mode: one question at a time, and the movements that carry it.
+     A card rises in and fades out; --live-rise is how far it travels, and
+     the `translate` property is used rather than `transform` so the distance
+     can be a variable the reduced-motion rule sets to zero. On a tap the
+     answer area fades in place, with no travel, under the acknowledgement.
+
+     The 1600ms the acknowledgement holds and the 300ms breath between two
+     questions are not here, because they are time rather than motion: they
+     stay whatever the reader has asked for. */
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      translate: 0 var(--live-rise, 8px);
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+      translate: 0 0;
+    }
+    to {
+      opacity: 0;
+      translate: 0 calc(-1 * var(--live-rise, 8px));
+    }
+  }
+  .live-in {
+    animation: rise-in 400ms ease-out both;
+  }
+  .live-out {
+    animation: fade-out 300ms ease-in both;
+  }
+  .live-calm {
+    animation: rise-in 600ms ease-out both;
+  }
+  .live-note {
+    animation: rise-in 200ms ease-out both;
+  }
+  .live-fade {
+    --live-rise: 0px;
+    animation: fade-out 200ms ease-out both;
+  }
+
+  /* A step along the strip. Going back, the card on screen slides out to the
+     right and the older one slides in from the left; going forward, the
+     reverse. --live-slide is how far they travel, so the reduced-motion rule
+     can take the travel out and leave the fade. */
+  @keyframes slide-out-back {
+    from {
+      opacity: 1;
+      translate: 0;
+    }
+    to {
+      opacity: 0;
+      translate: var(--live-slide, 16px);
+    }
+  }
+  @keyframes slide-in-back {
+    from {
+      opacity: 0;
+      translate: calc(-1 * var(--live-slide, 16px));
+    }
+    to {
+      opacity: 1;
+      translate: 0;
+    }
+  }
+  @keyframes slide-out-forward {
+    from {
+      opacity: 1;
+      translate: 0;
+    }
+    to {
+      opacity: 0;
+      translate: calc(-1 * var(--live-slide, 16px));
+    }
+  }
+  @keyframes slide-in-forward {
+    from {
+      opacity: 0;
+      translate: var(--live-slide, 16px);
+    }
+    to {
+      opacity: 1;
+      translate: 0;
+    }
+  }
+  .live-out-back {
+    animation: slide-out-back 150ms ease-in both;
+  }
+  .live-out-forward {
+    animation: slide-out-forward 150ms ease-in both;
+  }
+  .live-in-back {
+    animation: slide-in-back 250ms ease-out both;
+  }
+  .live-in-forward {
+    animation: slide-in-forward 250ms ease-out both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-in,
+    .live-out,
+    .live-calm,
+    .live-note,
+    .live-fade,
+    .live-out-back,
+    .live-out-forward,
+    .live-in-back,
+    .live-in-forward {
+      --live-rise: 0px;
+      --live-slide: 0px;
+      animation-duration: 150ms;
     }
   }
 }

@@ -5,7 +5,7 @@ import { Bell, BellOff } from 'lucide-react'
 import { api } from '../lib/api'
 import { APP_NAME, REPO_URL, UPSTREAM_URL } from '../lib/brand'
 import { BackLink, Container } from '../lib/shell'
-import { useHeaderActions } from '../lib/shell'
+import { useHeaderBack } from '../lib/shell'
 import { SettingsSkeleton } from '../lib/skeleton'
 import {
   accountQuery,
@@ -19,7 +19,7 @@ import {
 } from '../lib/queries'
 import { clearPersistedCache } from '../lib/query'
 import { getEncKey, setEncKey, clearEncKey, generateEncKey } from '../lib/e2e'
-import { Button, InlineError, Snippet, fieldClass } from '../lib/ui'
+import { Button, ConfirmPanel, InlineError, Snippet, fieldClass, sectionHeadingClass } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/settings')({
   ssr: false,
@@ -45,17 +45,15 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 // an agent, then the housekeeping.
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-6 px-3">
-      <h2 className="mb-2 border-b border-line pb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">
-        {title}
-      </h2>
+    <section className="mb-8 px-4">
+      <h2 className={`mb-3 border-b border-edge pb-1.5 ${sectionHeadingClass}`}>{title}</h2>
       {children}
     </section>
   )
 }
 
 function Note({ children }: { children: React.ReactNode }) {
-  return <p className="mb-2 text-[13px] text-muted">{children}</p>
+  return <p className="mb-3 text-[15px] text-muted">{children}</p>
 }
 
 function SettingsPage() {
@@ -67,7 +65,7 @@ function SettingsPage() {
   const [pushBusy, setPushBusy] = useState(false)
   const [pushMsg, setPushMsg] = useState<string | null>(null)
 
-  useHeaderActions(<BackLink to="/" label="Projects" />, [])
+  useHeaderBack(<BackLink to="/" label="Projects" />, [])
 
   // Whether this device has a push subscription is a browser fact, not a
   // server one, so it stays out of the query cache.
@@ -140,7 +138,7 @@ function SettingsPage() {
 
   return (
     <Container>
-      <h1 className="mb-4 px-3 text-[17px] font-semibold">Settings</h1>
+      <h1 className="mb-5 px-4 text-[22px] font-semibold">Settings</h1>
 
       {isError && quiet === undefined ? (
         <div className="mb-4">
@@ -161,14 +159,14 @@ function SettingsPage() {
             <Bell size={16} aria-hidden /> Enable notifications
           </Button>
         )}
-        {pushMsg ? <p className="mt-2 text-[13px] text-muted">{pushMsg}</p> : null}
+        {pushMsg ? <p className="mt-2 text-[15px] text-muted">{pushMsg}</p> : null}
       </Group>
 
       <Group title="Quiet hours">
         <Note>
           Silence non-urgent pings during these hours. Urgent (priority 2) always rings through.
         </Note>
-        <label className="mb-2 flex min-h-9 items-center gap-2 text-[14px]">
+        <label className="mb-2 flex min-h-11 items-center gap-2 text-[16px]">
           <input
             type="checkbox"
             checked={!!quiet}
@@ -201,7 +199,7 @@ function SettingsPage() {
       <Group title="Connect an agent">
         <Note>Install the skill, then paste your key when the agent asks for it:</Note>
         <Snippet text="npx skills add Qu4tro/agent-pwa-notifications" />
-        <p className="mt-3 mb-2 text-[13px] text-muted">
+        <p className="mt-3 mb-2 text-[15px] text-muted">
           Any agent can also push an update with one curl:
         </p>
         <Snippet
@@ -210,7 +208,7 @@ function SettingsPage() {
   -H "Content-Type: application/json" \\
   -d '{"agent":"claude","title":"Build finished","priority":1}'`}
         />
-        <p className="mt-2 text-[13px]">
+        <p className="mt-2 text-[15px]">
           <a href="/api/v1/schema.json" target="_blank" rel="noreferrer">
             Block schema
           </a>
@@ -237,10 +235,10 @@ function SettingsPage() {
       </Group>
 
       <Group title="About">
-        <p className="text-[13px] text-muted">
+        <p className="text-[15px] text-muted">
           {APP_NAME} {__APP_VERSION__}
         </p>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-[15px] text-muted">
           <a href={REPO_URL} target="_blank" rel="noreferrer">
             Source
           </a>
@@ -267,7 +265,7 @@ function TimeField({
   const hh = String(Math.floor(minutes / 60)).padStart(2, '0')
   const mm = String(minutes % 60).padStart(2, '0')
   return (
-    <label className="flex flex-col gap-1 text-[13px] text-muted">
+    <label className="flex flex-col gap-1 text-[15px] text-muted">
       {label}
       <input
         type="time"
@@ -276,7 +274,7 @@ function TimeField({
           const [h, m] = e.target.value.split(':').map(Number)
           onChange(h * 60 + m)
         }}
-        className={`${fieldClass} min-h-9 w-auto`}
+        className={`${fieldClass} min-h-11 w-auto`}
       />
     </label>
   )
@@ -332,8 +330,8 @@ function EncryptionSection() {
       </Note>
       {saved ? (
         <div>
-          <p className="mb-1 text-[13px] text-kind-done">Encryption is on for this device.</p>
-          <pre className="overflow-x-auto rounded-ui bg-surface p-2 text-[12px] text-muted">
+          <p className="mb-1 text-[15px] text-kind-done">Encryption is on for this device.</p>
+          <pre className="overflow-x-auto rounded-ui bg-surface p-3 text-[13px] text-muted">
             <code>{saved}</code>
           </pre>
           <Button
@@ -354,7 +352,7 @@ function EncryptionSection() {
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="Paste your encryption key"
-            className={`${fieldClass} min-h-9 font-mono`}
+            className={`${fieldClass} min-h-11 font-mono`}
           />
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" onClick={() => save(key)}>
@@ -364,7 +362,7 @@ function EncryptionSection() {
           </div>
         </div>
       )}
-      {msg ? <p className="mt-2 text-[13px] text-muted">{msg}</p> : null}
+      {msg ? <p className="mt-2 text-[15px] text-muted">{msg}</p> : null}
     </div>
   )
 }
@@ -389,21 +387,23 @@ function ClearButtons() {
         </Button>
       </div>
       {confirming ? (
-        <div className="mt-2 border-l-[3px] border-l-kind-error pl-2">
-          <p className="mb-2 text-[13px]">
-            {confirming === 'all'
-              ? 'Delete every message, including unanswered questions? This cannot be undone.'
-              : 'Delete everything you have already read or answered?'}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="danger" onClick={() => run(confirming)}>
-              Yes, clear
-            </Button>
-            <Button onClick={() => setConfirming(null)}>Cancel</Button>
-          </div>
-        </div>
+        <ConfirmPanel
+          className="mt-3"
+          actions={
+            <>
+              <Button variant="danger" onClick={() => run(confirming)}>
+                Yes, clear
+              </Button>
+              <Button onClick={() => setConfirming(null)}>Cancel</Button>
+            </>
+          }
+        >
+          {confirming === 'all'
+            ? 'Delete every message, including unanswered questions? This cannot be undone.'
+            : 'Delete everything you have already read or answered?'}
+        </ConfirmPanel>
       ) : null}
-      {msg ? <p className="mt-2 text-[13px] text-muted">{msg}</p> : null}
+      {msg ? <p className="mt-2 text-[15px] text-muted">{msg}</p> : null}
     </div>
   )
 }
@@ -446,30 +446,31 @@ function AgentKeySection() {
 
       {rotated ? (
         <div className="mb-2">
-          <p className="mb-1 text-[13px] text-kind-done">
+          <p className="mb-1 text-[15px] text-kind-done">
             New key. Copy it now, it will not be shown again:
           </p>
           <Snippet text={rotated} />
         </div>
       ) : (
-        <p className="mb-2 font-mono text-[13px] text-muted">
+        <p className="mb-2 font-mono text-[15px] text-muted">
           {prefix ? `${prefix}...` : 'Loading'}
         </p>
       )}
 
       {confirming ? (
-        <div className="border-l-[3px] border-l-kind-error pl-2">
-          <p className="mb-2 text-[13px]">
-            Rotate the key? The current key stops working at once, and every connected agent has
-            to be updated with the new one.
-          </p>
-          <div className="flex gap-2">
-            <Button variant="danger" onClick={rotate} disabled={busy}>
-              Yes, rotate
-            </Button>
-            <Button onClick={() => setConfirming(false)}>Cancel</Button>
-          </div>
-        </div>
+        <ConfirmPanel
+          actions={
+            <>
+              <Button variant="danger" onClick={rotate} disabled={busy}>
+                Yes, rotate
+              </Button>
+              <Button onClick={() => setConfirming(false)}>Cancel</Button>
+            </>
+          }
+        >
+          Rotate the key? The current key stops working at once, and every connected agent has to
+          be updated with the new one.
+        </ConfirmPanel>
       ) : (
         <Button onClick={() => setConfirming(true)}>Rotate key</Button>
       )}

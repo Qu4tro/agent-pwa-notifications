@@ -12,8 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppPendingRouteImport } from './routes/_app.pending'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppEventIdRouteImport } from './routes/_app.event.$id'
+import { Route as AppPendingLiveRouteImport } from './routes/_app.pending_.live'
 import { Route as AppProjectNameIndexRouteImport } from './routes/_app.project.$name.index'
 import { Route as AppProjectNameTaskKeyRouteImport } from './routes/_app.project.$name.task.$key'
 
@@ -31,6 +33,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPendingRoute = AppPendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -39,6 +46,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
 const AppEventIdRoute = AppEventIdRouteImport.update({
   id: '/event/$id',
   path: '/event/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPendingLiveRoute = AppPendingLiveRouteImport.update({
+  id: '/pending_/live',
+  path: '/pending/live',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProjectNameIndexRoute = AppProjectNameIndexRouteImport.update({
@@ -55,16 +67,20 @@ const AppProjectNameTaskKeyRoute = AppProjectNameTaskKeyRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
+  '/pending': typeof AppPendingRoute
   '/settings': typeof AppSettingsRoute
   '/event/$id': typeof AppEventIdRoute
+  '/pending/live': typeof AppPendingLiveRoute
   '/project/$name/': typeof AppProjectNameIndexRoute
   '/project/$name/task/$key': typeof AppProjectNameTaskKeyRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/pending': typeof AppPendingRoute
   '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
   '/event/$id': typeof AppEventIdRoute
+  '/pending/live': typeof AppPendingLiveRoute
   '/project/$name': typeof AppProjectNameIndexRoute
   '/project/$name/task/$key': typeof AppProjectNameTaskKeyRoute
 }
@@ -72,9 +88,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/pending': typeof AppPendingRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/event/$id': typeof AppEventIdRoute
+  '/_app/pending_/live': typeof AppPendingLiveRoute
   '/_app/project/$name/': typeof AppProjectNameIndexRoute
   '/_app/project/$name/task/$key': typeof AppProjectNameTaskKeyRoute
 }
@@ -83,25 +101,31 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/pending'
     | '/settings'
     | '/event/$id'
+    | '/pending/live'
     | '/project/$name/'
     | '/project/$name/task/$key'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/pending'
     | '/settings'
     | '/'
     | '/event/$id'
+    | '/pending/live'
     | '/project/$name'
     | '/project/$name/task/$key'
   id:
     | '__root__'
     | '/_app'
     | '/login'
+    | '/_app/pending'
     | '/_app/settings'
     | '/_app/'
     | '/_app/event/$id'
+    | '/_app/pending_/live'
     | '/_app/project/$name/'
     | '/_app/project/$name/task/$key'
   fileRoutesById: FileRoutesById
@@ -134,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/pending': {
+      id: '/_app/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof AppPendingRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -146,6 +177,13 @@ declare module '@tanstack/react-router' {
       path: '/event/$id'
       fullPath: '/event/$id'
       preLoaderRoute: typeof AppEventIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/pending_/live': {
+      id: '/_app/pending_/live'
+      path: '/pending/live'
+      fullPath: '/pending/live'
+      preLoaderRoute: typeof AppPendingLiveRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/project/$name/': {
@@ -166,17 +204,21 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppPendingRoute: typeof AppPendingRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppEventIdRoute: typeof AppEventIdRoute
+  AppPendingLiveRoute: typeof AppPendingLiveRoute
   AppProjectNameIndexRoute: typeof AppProjectNameIndexRoute
   AppProjectNameTaskKeyRoute: typeof AppProjectNameTaskKeyRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppPendingRoute: AppPendingRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
   AppEventIdRoute: AppEventIdRoute,
+  AppPendingLiveRoute: AppPendingLiveRoute,
   AppProjectNameIndexRoute: AppProjectNameIndexRoute,
   AppProjectNameTaskKeyRoute: AppProjectNameTaskKeyRoute,
 }

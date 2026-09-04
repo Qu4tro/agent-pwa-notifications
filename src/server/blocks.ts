@@ -59,10 +59,23 @@ const Callout = z.object({
 
 // -- Interactive blocks (questions only) --------------------------------------
 
+// One of the eight pastels the dashboard hands out by index, for an agent that
+// wants a particular one on a particular answer. Written out here rather than
+// imported from the client, because this file is the wire contract.
+const ANSWER_COLORS = ['blue', 'violet', 'mint', 'rose', 'amber', 'cyan', 'pink', 'lime'] as const
+
 const Buttons = z.object({
   type: z.literal('buttons'),
   id: z.string().max(80),
   options: z.array(z.string().max(200)).min(1).max(8),
+  // Parallel to `options`, and allowed to be shorter: an option with no entry
+  // takes its place in the palette. A name or six hex digits and nothing else,
+  // so a value that reaches a style attribute cannot carry anything a style
+  // attribute could act on.
+  colors: z
+    .array(z.union([z.enum(ANSWER_COLORS), z.string().regex(/^#[0-9a-fA-F]{6}$/)]))
+    .max(8)
+    .optional(),
 })
 
 const Field = z.object({
@@ -103,6 +116,25 @@ const INTERACTIVE = new Set(['buttons', 'form'])
 export function hasInteractive(blocks: Block[]): boolean {
   return blocks.some((b) => INTERACTIVE.has(b.type))
 }
+
+// The body of POST /api/v1/questions/:id/answer. An answer is one document in
+// two parts: `answer` is the values of the controls the agent sent, keyed by
+// block id; `text` is the human's own words. At least one part is filled - the
+// API checks that, because which part may be empty depends on the question.
+// `enc` marks both parts as ciphertext the server stores without looking
+// inside. `if_pending` is a precondition: write only while the question is
+// still waiting.
+export const AnswerEnvelope = z.object({
+  answer: z.union([z.record(z.unknown()), z.string()]).optional(),
+  text: z.string().nullable().optional(),
+  enc: z.boolean().optional(),
+  if_pending: z.boolean().optional(),
+})
+
+export type AnswerEnvelope = z.infer<typeof AnswerEnvelope>
+
+// The longest reply the text part takes, in characters.
+export const TEXT_LIMIT = 20_000
 
 // Collect the ids an answer is expected to carry, so we can validate a
 // submitted answer against the question's own blocks.

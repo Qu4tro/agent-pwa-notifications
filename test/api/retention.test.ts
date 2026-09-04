@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers'
 import { describe, expect, it } from 'vitest'
-import { api, call, createAccount, req } from '../helpers'
+import { api, call, createAccount, req, sessionFor } from '../helpers'
+import { runCron } from '../../src/server/cron'
 
 const DAY = 86_400_000
 
@@ -56,5 +57,46 @@ describe('retention defaults', () => {
     const account = await createAccount('session-ttl-var@example.invalid')
     const cookie = await loginLinkCookie(account.key, { SESSION_TTL_DAYS: '30' })
     expect(cookie).toContain(`Max-Age=${30 * 86_400}`)
+  })
+})
+
+// Note 4 moved the retention cron off DELETE. An event past its TTL leaves the
+// app, but the row stays: after this, nothing in the app deletes on its own.
+describe('the retention cron', () => {
+  it('archives an expired event instead of deleting it', async () => {
+    const account = await createAccount('retention-cron@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const res = await call('POST', '/api/v1/events', {
+      body: { agent: 'tester', title: 'Old news', project: 'p', task_id: 'thread' },
+      auth: { bearer: account.key },
+    })
+    await env.DB.prepare('UPDATE events SET expires_at = ?1 WHERE id = ?2')
+      .bind(Date.now() - 1000, res.body.id)
+      .run()
+
+    await runCron(env)
+
+    const row = await env.DB.prepare('SELECT archived_at FROM events WHERE id = ?1')
+      .bind(res.body.id)
+      .first<{ archived_at: number | null }>()
+    expect(row, 'the row is still there').not.toBe(null)
+    expect(row!.archived_at).toBeGreaterThan(0)
+
+    const tasks = await call('GET', '/api/v1/tasks?project=p', { auth: { cookie } })
+    expect(tasks.body.tasks).toEqual([])
+  })
+
+  it('leaves an event that has not expired alone', async () => {
+    const account = await createAccount('retention-cron-keep@example.invalid')
+    const cookie = await sessionFor(account.id)
+    await call('POST', '/api/v1/events', {
+      body: { agent: 'tester', title: 'Fresh', project: 'k', task_id: 'thread' },
+      auth: { bearer: account.key },
+    })
+
+    await runCron(env)
+
+    const tasks = await call('GET', '/api/v1/tasks?project=k', { auth: { cookie } })
+    expect(tasks.body.tasks).toHaveLength(1)
   })
 })

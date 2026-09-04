@@ -8,6 +8,7 @@ describe('queryKeys', () => {
       queryKeys.config(),
       queryKeys.account(),
       queryKeys.projects(),
+      queryKeys.pending(),
       queryKeys.settings(),
     ].map((k) => JSON.stringify(k))
     expect(new Set(keys).size).toBe(keys.length)
@@ -40,6 +41,9 @@ describe('LIVE_KEYS', () => {
     expect(covered(queryKeys.projects())).toBe(true)
     expect(covered(queryKeys.tasks('herdr'))).toBe(true)
     expect(covered(queryKeys.thread('herdr', 'k1'))).toBe(true)
+    // The header badge and the pending page read this one, so it has to poll
+    // and be invalidated with the lists it is derived from.
+    expect(covered(queryKeys.pending())).toBe(true)
   })
 
   it('leaves the queries that must not poll alone', () => {

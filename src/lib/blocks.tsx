@@ -1,6 +1,18 @@
-import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
-import { Button, fieldClass } from './ui'
+import { useMemo, useState } from 'react'
+import {
+  ChevronDown,
+  ChevronUp,
+  CircleCheck,
+  CircleX,
+  ExternalLink,
+  Info,
+  SendHorizontal,
+  TriangleAlert,
+} from 'lucide-react'
+import { answerStyles } from './answers'
+import type { AnswerDoc } from './api'
+import { CodeBlock } from './highlight'
+import { Button, IconButton, fieldClass } from './ui'
 
 // -- Minimal, XSS-safe markdown to React -------------------------------------
 // We never dangerouslySetInnerHTML agent content. Text is escaped by React by
@@ -70,7 +82,7 @@ function MiniMarkdown({ text }: { text: string }) {
     }
   })
   flush('end')
-  return <div className="md text-[14px]">{out}</div>
+  return <div className="md">{out}</div>
 }
 
 // -- Display blocks ----------------------------------------------------------
@@ -78,16 +90,174 @@ type AnyBlock = Record<string, unknown> & { type: string }
 
 // A callout's tone is the agent's word for what it is saying. Three of them
 // are kind colours; warn is its own token.
-const TONE: Record<string, string> = {
-  info: 'border-l-kind-update',
-  success: 'border-l-kind-done',
-  warn: 'border-l-warn',
-  error: 'border-l-kind-error',
+//
+// Four tones one under another, told apart by a 3px rail and nothing else, is
+// colour carrying the whole message (WCAG 1.4.1). So each tone gets an icon as
+// well, and the block reads as a chip - a tinted surface with an edge - which
+// is also what stops a callout from disappearing into the paragraph above it.
+//
+// Every class is written out in full, because Tailwind reads the source.
+const TONE = {
+  info: {
+    className: 'border-kind-update/40 bg-kind-update/10 text-kind-update',
+    Icon: Info,
+    label: 'Info',
+  },
+  success: {
+    className: 'border-kind-done/40 bg-kind-done/10 text-kind-done',
+    Icon: CircleCheck,
+    label: 'Success',
+  },
+  warn: {
+    className: 'border-warn/40 bg-warn/10 text-warn',
+    Icon: TriangleAlert,
+    label: 'Warning',
+  },
+  error: {
+    className: 'border-kind-error/40 bg-kind-error/10 text-kind-error',
+    Icon: CircleX,
+    label: 'Error',
+  },
+} as const
+
+export type Tone = keyof typeof TONE
+
+// The tone colours the chip and the icon; the words stay --color-text, so the
+// contrast of the message itself never depends on which tone it is.
+export function Callout({ tone = 'info', children }: { tone?: string; children: React.ReactNode }) {
+  const t = TONE[tone as Tone] ?? TONE.info
+  return (
+    <div className={`flex items-start gap-2 rounded-ui border px-3 py-2 ${t.className}`}>
+      <t.Icon size={18} className="mt-[3px] shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1 text-text">
+        <span className="sr-only">{t.label}: </span>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// -- Sortable table ----------------------------------------------------------
+// Sorting a table an agent sent is a reading aid, not an edit: the third tap on
+// a column puts the rows back in the order they arrived, and nothing is
+// remembered once the thread is closed. State is per block, so two tables in
+// one message sort independently.
+
+type Sort = { col: number; dir: 'asc' | 'desc' } | null
+
+// "18ms", "4.2 kB", "92%", "-0.01" and "1,024" all sort as numbers: agents
+// write measurements with their units attached, and a column of them sorted as
+// text puts 100ms before 20ms.
+function leadingNumber(cell: string): number | null {
+  const m = /^[+-]?\d[\d,]*\.?\d*/.exec(cell.trim())
+  if (!m) return null
+  const n = Number(m[0].replace(/,/g, ''))
+  return Number.isFinite(n) ? n : null
+}
+
+// "No value" is not a small value, so these sink to the bottom either way.
+function isBlank(cell: string): boolean {
+  const v = cell.trim().toLowerCase()
+  return v === '' || v === '-' || v === '--' || v === 'n/a'
+}
+
+function compareCells(a: string, b: string): number {
+  const na = leadingNumber(a)
+  const nb = leadingNumber(b)
+  if (na != null && nb != null) return na - nb
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+// Exported for its own test: this is the whole behaviour of note 8, and it is
+// the part with the edge cases - units, blanks, ties.
+//
+// Rows carry their arrival index, so blanks and ties keep the order the agent
+// sent them in and the sort is stable whatever the engine does.
+export function sortTableRows(
+  rows: string[][],
+  sort: Sort,
+): { row: string[]; index: number }[] {
+  const indexed = rows.map((row, index) => ({ row, index }))
+  if (!sort) return indexed
+  const { col, dir } = sort
+  return indexed.sort((x, y) => {
+    const a = String(x.row[col] ?? '')
+    const b = String(y.row[col] ?? '')
+    const blankA = isBlank(a)
+    const blankB = isBlank(b)
+    if (blankA !== blankB) return blankA ? 1 : -1
+    if (blankA) return x.index - y.index
+    return (dir === 'asc' ? 1 : -1) * compareCells(a, b) || x.index - y.index
+  })
+}
+
+function TableBlock({ columns, rows }: { columns: string[]; rows: string[][] }) {
+  const [sort, setSort] = useState<Sort>(null)
+
+  const ordered = useMemo(() => sortTableRows(rows, sort), [rows, sort])
+
+  // Ascending, descending, off.
+  function cycle(col: number) {
+    setSort((s) =>
+      s?.col !== col ? { col, dir: 'asc' } : s.dir === 'asc' ? { col, dir: 'desc' } : null,
+    )
+  }
+
+  return (
+    <div tabIndex={0} className="overflow-x-auto">
+      <table className="w-full border-collapse text-[15px]">
+        <thead>
+          <tr>
+            {columns.map((c, i) => {
+              const on = sort?.col === i
+              return (
+                <th
+                  key={i}
+                  // The one thing a screen reader needs to know about a sortable
+                  // column, and the only place that state is written down.
+                  aria-sort={on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="border-b border-line p-0 text-left font-semibold whitespace-nowrap text-muted"
+                >
+                  <button
+                    type="button"
+                    onClick={() => cycle(i)}
+                    className={`flex w-full items-center gap-1 px-2 py-1.5 text-left hover:text-text ${
+                      on ? 'text-text' : ''
+                    }`}
+                  >
+                    {c}
+                    {on ? (
+                      sort.dir === 'asc' ? (
+                        <ChevronUp size={14} aria-hidden />
+                      ) : (
+                        <ChevronDown size={14} aria-hidden />
+                      )
+                    ) : null}
+                  </button>
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {ordered.map(({ row, index }) => (
+            <tr key={index}>
+              {row.map((cell, ci) => (
+                <td key={ci} className="border-b border-line px-2 py-1.5 last:border-b-0">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 export function BlockRenderer({ blocks }: { blocks: unknown[] }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {(blocks as AnyBlock[]).map((b, i) => (
         <One key={i} b={b} />
       ))}
@@ -99,14 +269,8 @@ function One({ b }: { b: AnyBlock }) {
   switch (b.type) {
     case 'markdown':
       return <MiniMarkdown text={String(b.text ?? '')} />
-    case 'callout': {
-      const tone = String(b.tone ?? 'info')
-      return (
-        <div className={`border-l-[3px] py-0.5 pl-2 text-[14px] ${TONE[tone] ?? TONE.info}`}>
-          {String(b.text ?? '')}
-        </div>
-      )
-    }
+    case 'callout':
+      return <Callout tone={String(b.tone ?? 'info')}>{String(b.text ?? '')}</Callout>
     case 'progress': {
       const value = Number(b.value ?? 0)
       const max = Number(b.max ?? 100) || 100
@@ -114,7 +278,7 @@ function One({ b }: { b: AnyBlock }) {
       return (
         <div>
           {b.label ? (
-            <div className="mb-1 flex justify-between text-[13px] text-muted">
+            <div className="mb-1 flex justify-between text-[15px] text-muted">
               <span>{String(b.label)}</span>
               <span>{Math.round(pct)}%</span>
             </div>
@@ -128,7 +292,7 @@ function One({ b }: { b: AnyBlock }) {
     case 'keyvalue': {
       const items = (b.items as { k: string; v: string }[]) ?? []
       return (
-        <div className="grid gap-1 text-[14px]">
+        <div className="grid gap-1">
           {items.map((it, i) => (
             <div key={i} className="flex justify-between gap-4">
               <span className="text-muted">{it.k}</span>
@@ -138,46 +302,17 @@ function One({ b }: { b: AnyBlock }) {
         </div>
       )
     }
-    case 'table': {
-      const columns = (b.columns as string[]) ?? []
-      const rows = (b.rows as string[][]) ?? []
+    case 'table':
       return (
-        <div tabIndex={0} className="overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr>
-                {columns.map((c, i) => (
-                  <th
-                    key={i}
-                    className="border-b border-line px-2 py-1 text-left font-semibold whitespace-nowrap text-muted"
-                  >
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, ri) => (
-                <tr key={ri}>
-                  {r.map((cell, ci) => (
-                    <td key={ci} className="border-b border-line px-2 py-1 last:border-b-0">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <TableBlock columns={(b.columns as string[]) ?? []} rows={(b.rows as string[][]) ?? []} />
       )
-    }
     case 'link':
       return (
         <a
           href={String(b.url)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[14px]"
+          className="inline-flex items-center gap-1"
         >
           {String(b.label ?? b.url)}
           <ExternalLink size={14} aria-hidden />
@@ -193,11 +328,9 @@ function One({ b }: { b: AnyBlock }) {
         />
       )
     case 'code':
-      return (
-        <pre tabIndex={0} className="overflow-x-auto rounded-ui bg-surface p-2 text-[12.5px]">
-          <code>{String(b.text ?? '')}</code>
-        </pre>
-      )
+      // `lang` has been in the schema all along and the renderer used to drop
+      // it on the floor.
+      return <CodeBlock text={String(b.text ?? '')} lang={b.lang ? String(b.lang) : undefined} />
     // Interactive blocks are rendered by AnswerForm, not here.
     case 'buttons':
     case 'form':
@@ -208,37 +341,68 @@ function One({ b }: { b: AnyBlock }) {
 }
 
 // -- Interactive: collect the answer and submit -------------------------------
-export function AnswerForm({
+
+// The answer area is one document, and any submit sends the whole of it: the
+// values of the controls the agent sent, and the line of the human's own words
+// under them, together. `current` is the document that stands, null while the
+// question is still waiting; the controls open on it, so a second submit is a
+// correction of what is there rather than a fresh start.
+export function AnswerComposer({
   blocks,
+  current,
   disabled,
   onSubmit,
 }: {
   blocks: unknown[]
+  current: AnswerDoc | null
   disabled?: boolean
-  onSubmit: (answer: Record<string, unknown>) => void
+  onSubmit: (doc: AnswerDoc) => void
 }) {
   const interactive = (blocks as AnyBlock[]).filter(
     (b) => b.type === 'buttons' || b.type === 'form',
   )
+  const standing = current?.answer ?? {}
   const [form, setForm] = useState<Record<string, Record<string, unknown>>>({})
+  const [draft, setDraft] = useState(current?.text ?? '')
 
   const setField = (formId: string, fieldId: string, value: unknown) =>
     setForm((f) => ({ ...f, [formId]: { ...(f[formId] ?? {}), [fieldId]: value } }))
+
+  const fieldValue = (formId: string, fieldId: string) => {
+    const typed = form[formId]
+    if (typed && fieldId in typed) return typed[fieldId]
+    const stood = standing[formId]
+    return stood && typeof stood === 'object' ? (stood as Record<string, unknown>)[fieldId] : undefined
+  }
+
+  const words = draft.trim()
+  // Send carries the line as it stands. On a waiting question there has to be
+  // something in it; on an answered one it has to differ from what stands,
+  // because sending the same words again would only count as a change.
+  const canSend = current ? words !== (current.text ?? '') : words.length > 0
+
+  const send = (values: Record<string, unknown>) => onSubmit({ answer: values, text: words || null })
 
   return (
     <div className="flex flex-col gap-4">
       {interactive.map((b, i) => {
         if (b.type === 'buttons') {
           const options = (b.options as string[]) ?? []
+          // Parallel to `options`, and short or absent: an option with no
+          // entry falls back to its place in the palette.
+          const styles = answerStyles(options, b.colors as string[] | undefined)
           const id = String(b.id)
+          const chosen = standing[id]
           return (
             <div key={i} className="flex flex-wrap gap-2">
-              {options.map((opt) => (
+              {options.map((opt, oi) => (
                 <Button
                   key={opt}
-                  variant="primary"
+                  variant="answer"
+                  style={styles[oi]}
+                  aria-pressed={chosen === opt}
                   disabled={disabled}
-                  onClick={() => onSubmit({ [id]: opt })}
+                  onClick={() => send({ ...standing, [id]: opt })}
                 >
                   {opt}
                 </Button>
@@ -254,7 +418,9 @@ export function AnswerForm({
             key={i}
             onSubmit={(e) => {
               e.preventDefault()
-              onSubmit({ [id]: form[id] ?? {} })
+              const values: Record<string, unknown> = {}
+              for (const f of fields) values[String(f.id)] = fieldValue(id, String(f.id))
+              send({ ...standing, [id]: values })
             }}
             className="flex flex-col gap-3"
           >
@@ -262,7 +428,7 @@ export function AnswerForm({
               <FieldInput
                 key={fi}
                 field={f}
-                value={form[id]?.[String(f.id)]}
+                value={fieldValue(id, String(f.id))}
                 onChange={(v) => setField(id, String(f.id), v)}
               />
             ))}
@@ -272,6 +438,33 @@ export function AnswerForm({
           </form>
         )
       })}
+
+      {/* Every question takes words, whatever controls it carries. Enter
+          sends; Shift+Enter keeps writing. */}
+      <div className="flex items-end gap-2">
+        <textarea
+          rows={1}
+          value={draft}
+          disabled={disabled}
+          placeholder="Or in your own words"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              if (canSend && !disabled) send({ ...standing })
+            }
+          }}
+          className={`${fieldClass} field-sizing-content max-h-40 resize-none`}
+        />
+        <IconButton
+          aria-label="Send"
+          disabled={disabled || !canSend}
+          onClick={() => send({ ...standing })}
+          className="shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <SendHorizontal size={18} aria-hidden />
+        </IconButton>
+      </div>
     </div>
   )
 }
@@ -291,7 +484,7 @@ function FieldInput({
   const req = Boolean(field.required)
 
   const wrap = (child: React.ReactNode) => (
-    <label className="flex flex-col gap-1 text-[13px]">
+    <label className="flex flex-col gap-1 text-[15px]">
       <span className="text-muted">
         {label}
         {req ? <span className="text-kind-error"> *</span> : null}
@@ -317,7 +510,7 @@ function FieldInput({
         required={req}
         value={String(value ?? '')}
         onChange={(e) => onChange(e.target.value)}
-        className={`${fieldClass} min-h-9`}
+        className={`${fieldClass} min-h-11`}
       >
         <option value="">Choose one</option>
         {options.map((o) => (
@@ -367,7 +560,7 @@ function FieldInput({
       placeholder={String(field.placeholder ?? '')}
       value={String(value ?? '')}
       onChange={(e) => onChange(kind === 'number' ? e.target.valueAsNumber : e.target.value)}
-      className={`${fieldClass} min-h-9`}
+      className={`${fieldClass} min-h-11`}
     />,
   )
 }

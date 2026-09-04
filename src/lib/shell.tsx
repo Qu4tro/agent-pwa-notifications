@@ -1,24 +1,73 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { onlineManager, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { onlineManager, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Bell } from 'lucide-react'
 import { APP_NAME } from './brand'
+import { pendingQuery } from './queries'
+import { iconButtonClass } from './ui'
 
 // Mounted once by the app layout, so it never unmounts between pages. Pages
-// contribute their own actions through `useHeaderActions`.
-export function Header({ right }: { right?: React.ReactNode }) {
+// contribute their own slots through `useHeaderBack` and `useHeaderActions`.
+//
+// The left slot is where a page says how to get out of it, and on a sub page
+// the back link stands in for the app name: the name is only worth the room on
+// the one page that has nowhere to go back to. Back on the left is where every
+// phone puts it, and where a thumb looks for it. Actions stay on the right.
+export function Header({ left, right }: { left?: React.ReactNode; right?: React.ReactNode }) {
   return (
     <header className="safe-top sticky top-0 z-10 border-b border-line bg-bg">
-      <div className="mx-auto flex h-11 max-w-[44rem] items-center justify-between gap-3 px-3">
+      <div className="mx-auto flex h-13 max-w-[44rem] items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Link to="/" className="truncate font-semibold text-text no-underline">
-            {APP_NAME}
-          </Link>
+          {left ?? (
+            <Link to="/" className="truncate font-semibold text-text no-underline">
+              {APP_NAME}
+            </Link>
+          )}
           <ConnectionDot />
         </div>
-        <div className="flex items-center gap-1">{right}</div>
+        <div className="flex items-center gap-1">
+          <PendingButton />
+          {right}
+        </div>
       </div>
     </header>
+  )
+}
+
+// Everything waiting on you, from wherever you are. The count is the one thing
+// worth carrying on every page, and the app already knows it: the pending query
+// polls with the lists, so the badge is as live as the rows behind it.
+//
+// The bell stays even at zero, muted, so the eye knows where to look when
+// something arrives. The count badge appears only when there is something.
+function PendingButton() {
+  const { data } = useQuery(pendingQuery())
+  const waiting = data?.length ?? 0
+  return (
+    <Link
+      to="/pending"
+      title="Needs you"
+      aria-label={
+        waiting === 0
+          ? 'Needs you'
+          : `Needs you: ${waiting} question${waiting === 1 ? '' : 's'}`
+      }
+      className={`${iconButtonClass} relative ${
+        waiting > 0
+          ? 'text-kind-question hover:text-kind-question'
+          : 'text-muted hover:text-text'
+      }`}
+    >
+      <Bell size={18} aria-hidden />
+      {waiting > 0 ? (
+        <span
+          aria-hidden
+          className="absolute top-1 right-0.5 min-w-[1.1rem] rounded-full bg-kind-question px-1 text-center text-[12px] leading-[1.1rem] font-semibold text-bg"
+        >
+          {waiting}
+        </span>
+      ) : null}
+    </Link>
   )
 }
 
@@ -71,22 +120,42 @@ function ConnectionDot() {
   )
 }
 
-// The header outlives the pages, so a page hands it its actions instead of
-// rendering its own header. The layout owns the state; a page calls
-// `useHeaderActions` and gets out of the way when it unmounts.
-export const HeaderActionsContext = createContext<(node: React.ReactNode) => void>(() => {})
+// The header outlives the pages, so a page hands it its slots instead of
+// rendering its own header. The layout owns the state; a page fills a slot and
+// gets out of the way when it unmounts. Two setters rather than one node, so
+// filling one slot never clears the other.
+export interface HeaderSlots {
+  setLeft: (node: React.ReactNode) => void
+  setRight: (node: React.ReactNode) => void
+}
 
+export const HeaderActionsContext = createContext<HeaderSlots>({
+  setLeft: () => {},
+  setRight: () => {},
+})
+
+// The right slot: what this page can do. Trash, settings, and the like.
 export function useHeaderActions(node: React.ReactNode, deps: React.DependencyList) {
-  const setActions = useContext(HeaderActionsContext)
+  const { setRight } = useContext(HeaderActionsContext)
   useEffect(() => {
-    setActions(node)
-    return () => setActions(null)
+    setRight(node)
+    return () => setRight(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+}
+
+// The left slot: the way out of this page, in place of the app name.
+export function useHeaderBack(node: React.ReactNode, deps: React.DependencyList) {
+  const { setLeft } = useContext(HeaderActionsContext)
+  useEffect(() => {
+    setLeft(node)
+    return () => setLeft(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 }
 
 export function Container({ children }: { children: React.ReactNode }) {
-  return <main className="safe-bottom mx-auto max-w-[44rem] pt-3">{children}</main>
+  return <main className="safe-bottom mx-auto max-w-[44rem] pt-5">{children}</main>
 }
 
 // A back link in the header. Always the same shape, so the way out of a page
@@ -97,10 +166,12 @@ export function BackLink({ to, params, label }: { to: string; params?: object; l
       // The router's typed link map cannot see a `to` passed as a prop.
       to={to as never}
       params={params as never}
-      className="inline-flex min-h-9 items-center gap-1 px-1 text-[14px] text-muted no-underline hover:text-text"
+      // -ml-1 pulls the arrow back onto the header's own 16px gutter, so the
+      // way out starts at the same edge as everything under it.
+      className="-ml-1 inline-flex min-h-11 min-w-0 items-center gap-1.5 px-1 text-[16px] text-muted no-underline hover:text-text"
     >
-      <ArrowLeft size={16} aria-hidden />
-      <span className="max-w-[9rem] truncate">{label}</span>
+      <ArrowLeft size={18} aria-hidden />
+      <span className="max-w-[10rem] truncate">{label}</span>
     </Link>
   )
 }

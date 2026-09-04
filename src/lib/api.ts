@@ -1,10 +1,23 @@
 // Thin client-side fetch helpers. Same-origin, cookie-authed.
 
+// An answer is one document in two parts: the values of the controls the agent
+// sent, keyed by block id, and the human's own words. Either part may be
+// empty, and at least one is filled.
+export interface AnswerDoc {
+  answer: Record<string, unknown>
+  text: string | null
+}
+
 export interface QuestionState {
   status: 'pending' | 'answered' | 'expired'
   answer: Record<string, unknown> | string | null // string = ciphertext when enc
+  text: string | null // the human's own words; ciphertext when enc
+  answered_at: number | null // when the document that stands was written
   timeout_at: number
   picked_up_at: number | null // set once the agent has received the answer
+  // How many times the answer was replaced after it was first given. A change
+  // clears picked_up_at, so the screen waits on the agent again.
+  changes: number
 }
 
 export interface EventItem {
@@ -36,6 +49,11 @@ export interface ProjectRow {
   models: string[]
 }
 
+// Which section of the project page a thread belongs in. The server decides
+// it, from what the agent said and how long it has been quiet - not from what
+// the human has read. See ThreadState in src/server/api.ts.
+export type ThreadState = 'pending' | 'active' | 'done'
+
 export interface TaskSummary {
   key: string
   project: string
@@ -48,11 +66,35 @@ export interface TaskSummary {
   pending_event_id: string | null
   pending_question: string | null
   // Non-empty only for a micro-question: the 2 or 3 options that can be
-  // answered straight from the project list.
-  pending_answers: { label: string; answer: Record<string, string> }[]
+  // answered straight from the project list. `color` is what the agent asked
+  // for, if it asked; absent means the option takes its place in the palette.
+  pending_answers: { label: string; answer: Record<string, string>; color?: string }[]
+  // When the question was asked. Null unless `pending`; the pending page
+  // orders on it, so the longest wait is at the top.
+  pending_since: number | null
   latest_title: string
   latest_kind: 'update' | 'question' | 'done' | 'error'
   last_activity: number
+  state: ThreadState
+  // What the agent set, if it set anything. null means the hub's default.
+  idle_minutes: number | null
+  // The last three events on the thread, oldest first. `count` says how many
+  // there are in total, so `count - recent.length` is what is not shown.
+  recent: {
+    id: string
+    kind: 'update' | 'question' | 'done' | 'error'
+    title: string
+    created_at: number
+    read_at: number | null
+    // Set only on a question. `answer` is the ciphertext string when the event
+    // is encrypted, which is why the row says "answered" and not what. `text`
+    // is the human's own words, and may be the whole of the answer.
+    question: {
+      status: 'pending' | 'answered' | 'expired'
+      answer: unknown
+      text: string | null
+    } | null
+  }[]
 }
 
 export interface ThreadData {
@@ -92,6 +134,8 @@ export const api = {
     req<{ ok: boolean; thread: ThreadData }>(
       `/api/v1/thread?project=${encodeURIComponent(project)}&key=${encodeURIComponent(key)}`,
     ),
+  // Every question waiting on you, across every project, oldest first.
+  pending: () => req<{ ok: boolean; pending: TaskSummary[] }>('/api/v1/pending'),
   stats: () => req<{ ok: boolean; unread: number; pending_questions: number }>('/api/v1/stats'),
   markRead: (id: string) => req(`/api/v1/event/${id}/read`, { method: 'POST' }),
   markUnread: (id: string) => req(`/api/v1/event/${id}/unread`, { method: 'POST' }),
@@ -102,10 +146,20 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ scope, ...(project != null ? { project } : {}) }),
     }),
-  answer: (id: string, answer: Record<string, unknown>) =>
-    req<{ ok: boolean; error?: string }>(`/api/v1/questions/${id}/answer`, {
+  // Take finished threads out of the app. The keys are the ones the page is
+  // showing, so what the human sees go is what goes.
+  archive: (project: string, keys: string[]) =>
+    req<{ ok: boolean; archived: number }>('/api/v1/archive', {
       method: 'POST',
-      body: JSON.stringify(answer),
+      body: JSON.stringify({ project, keys }),
+    }),
+  // The envelope: `answer` and `text` as siblings, both ciphertext when the
+  // event is encrypted. `if_pending` asks the server to write only while the
+  // question is still waiting.
+  answer: (id: string, body: Record<string, unknown>) =>
+    req<{ ok: boolean; error?: string; changes?: number }>(`/api/v1/questions/${id}/answer`, {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
   settings: () => req<{ ok: boolean; quiet_hours: unknown }>('/api/v1/settings'),
   putSettings: (body: unknown) =>
@@ -145,4 +199,15 @@ export function timeAgo(ts: number): string {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`
   return `${Math.floor(s / 86400)}d ago`
+}
+
+// The same interval in as few characters as a 56px gutter will hold. Every
+// list row and every message in a thread stands its time in this column, so it
+// has to fit at 13px next to a three-digit day count.
+export function timeAgoShort(ts: number): string {
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 60) return 'now'
+  if (s < 3600) return `${Math.floor(s / 60)}m`
+  if (s < 86400) return `${Math.floor(s / 3600)}h`
+  return `${Math.floor(s / 86400)}d`
 }

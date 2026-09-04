@@ -1,12 +1,13 @@
 import { KIND_BG, KIND_LABEL, KIND_TEXT, projectColor } from '../project'
 
-// The kind of an event, as a short uppercase word in the kind's colour. It is
-// the only thing on a list row that is coloured, so the eye can sort a list by
-// kind without reading it.
+// The kind of an event, as one word in the kind's colour. It is the only thing
+// on a list row that is coloured, so the eye can sort a list by kind without
+// reading it. Sentence case, not tracked caps: caps read as a terminal, and the
+// colour already does the scanning work.
 export function KindLabel({ kind, className = '' }: { kind: string; className?: string }) {
   return (
     <span
-      className={`shrink-0 text-[11px] font-semibold tracking-wider uppercase ${
+      className={`shrink-0 text-[13px] font-semibold ${
         KIND_TEXT[kind] ?? 'text-muted'
       } ${className}`}
     >

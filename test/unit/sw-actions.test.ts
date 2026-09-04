@@ -44,48 +44,58 @@ function quickAnswers(titles: string[]) {
   }))
 }
 
-function actionsFor(maxActions: number | undefined, answers: string[]) {
+const REPLY = { action: 'reply', type: 'text', title: 'Reply', placeholder: 'Your answer' }
+
+function actionsFor(
+  maxActions: number | undefined,
+  answers: string[],
+  data: Record<string, unknown> = {},
+) {
   const { context } = loadSw({ maxActions })
   const fn = runInContext('actionsForNotification', context) as (data: unknown) => unknown[]
-  return fn({ quickAnswers: quickAnswers(answers) }) as { action: string; title: string }[]
+  return fn({ kind: 'question', quickAnswers: quickAnswers(answers), ...data }) as {
+    action: string
+    title: string
+  }[]
 }
 
 const two = ['Yes', 'No']
 const three = ['A', 'B', 'C']
 
+// The rule for the action row: the options the agent sent, and Reply in a spare
+// slot so a question with no options can still be answered in words.
 describe('service worker notification actions', () => {
   it('shows nothing when the browser reports no action slots', () => {
     expect(actionsFor(0, two)).toEqual([])
     expect(actionsFor(0, three)).toEqual([])
+    expect(actionsFor(0, [])).toEqual([])
   })
 
   it('shows nothing when Notification.maxActions is missing', () => {
     expect(actionsFor(undefined, two)).toEqual([])
   })
 
-  it('collapses to a single More action when only one slot exists', () => {
-    expect(actionsFor(1, two)).toEqual([{ action: 'more', title: 'More' }])
-    expect(actionsFor(1, three)).toEqual([{ action: 'more', title: 'More' }])
+  it('shows nothing on an event that is not a question', () => {
+    expect(actionsFor(2, two, { kind: 'update' })).toEqual([])
   })
 
-  it('shows both answers when two answers fill the two slots', () => {
-    expect(actionsFor(2, two)).toEqual([
+  it('shows nothing on an encrypted question, which the worker cannot read', () => {
+    expect(actionsFor(2, two, { encrypted: true })).toEqual([])
+    expect(actionsFor(3, [], { encrypted: true })).toEqual([])
+  })
+
+  it('gives the spare slot to Reply', () => {
+    expect(actionsFor(2, [])).toEqual([REPLY])
+    expect(actionsFor(1, [])).toEqual([REPLY])
+    expect(actionsFor(3, two)).toEqual([
       { action: 'answer-0', title: 'Yes' },
       { action: 'answer-1', title: 'No' },
+      REPLY,
     ])
   })
 
-  it('drops to one answer plus More when three answers need two slots', () => {
-    expect(actionsFor(2, three)).toEqual([
-      { action: 'answer-0', title: 'A' },
-      { action: 'more', title: 'More' },
-    ])
-  })
-
-  // Phase 2 rule: if every answer fits, show only the answers. Tapping the
-  // notification body still opens the thread, so More earns nothing here.
-  it('leaves a spare slot empty rather than adding More', () => {
-    expect(actionsFor(3, two)).toEqual([
+  it('keeps both options when two answers fill the two slots', () => {
+    expect(actionsFor(2, two)).toEqual([
       { action: 'answer-0', title: 'Yes' },
       { action: 'answer-1', title: 'No' },
     ])
@@ -99,28 +109,45 @@ describe('service worker notification actions', () => {
     ])
   })
 
-  it('shows no actions at all when there are no usable quick answers', () => {
+  it('drops to one answer plus Reply when three answers need two slots', () => {
+    expect(actionsFor(2, three)).toEqual([{ action: 'answer-0', title: 'A' }, REPLY])
+    expect(actionsFor(1, two)).toEqual([REPLY])
+  })
+
+  it('names Reply as an inline text action', () => {
+    const [reply] = actionsFor(1, [])
+    expect(reply).toEqual({
+      action: 'reply',
+      type: 'text',
+      title: 'Reply',
+      placeholder: 'Your answer',
+    })
+  })
+
+  it('offers Reply alone when there are no usable quick answers', () => {
     const { context } = loadSw({ maxActions: 2 })
     const fn = runInContext('actionsForNotification', context) as (data: unknown) => unknown[]
-    expect(fn({ quickAnswers: 'nope' })).toEqual([])
-    expect(fn({ quickAnswers: [{ action: 1, title: 2 }] })).toEqual([])
-    expect(fn({})).toEqual([])
+    expect(fn({ kind: 'question', quickAnswers: 'nope' })).toEqual([REPLY])
+    expect(fn({ kind: 'question', quickAnswers: [{ action: 1, title: 2 }] })).toEqual([REPLY])
+    expect(fn({ kind: 'question' })).toEqual([REPLY])
   })
 })
 
-// A quick answer POSTs to the API from the service worker. The session cookie
-// can be gone by then (expired, or logged out on this device), and a silent
-// failure would drop the answer on the floor.
+// An answer from a notification POSTs to the API from the service worker. The
+// session cookie can be gone by then (expired, or logged out on this device),
+// and a silent failure would drop the answer on the floor.
 describe('service worker notification clicks', () => {
-  async function click(harness: SwHarness, action: string) {
+  async function click(harness: SwHarness, action: string, reply?: string) {
     let waited: Promise<unknown> = Promise.resolve()
     harness.listeners.notificationclick({
       action,
+      reply,
       notification: {
         close: () => {},
         data: {
           url: '/event/01EVENT',
           eventId: '01EVENT',
+          kind: 'question',
           quickAnswers: quickAnswers(['Yes', 'No']),
         },
       },
@@ -131,15 +158,46 @@ describe('service worker notification clicks', () => {
     await waited
   }
 
-  it('posts the answer and opens nothing when the API accepts it', async () => {
+  function posted(harness: SwHarness) {
+    const [url, init] = harness.fetch.mock.calls[0] as [URL, RequestInit]
+    return { url: String(url), body: JSON.parse(String(init.body)) }
+  }
+
+  it('posts the option and opens nothing when the API accepts it', async () => {
     const harness = loadSw({ maxActions: 2 })
     await click(harness, 'answer-0')
 
     expect(harness.fetch).toHaveBeenCalledTimes(1)
-    const [url, init] = harness.fetch.mock.calls[0] as [URL, RequestInit]
-    expect(String(url)).toBe('https://hub.test/api/v1/questions/01EVENT/answer')
-    expect(init.body).toBe(JSON.stringify({ choice: 'Yes' }))
+    expect(posted(harness)).toEqual({
+      url: 'https://hub.test/api/v1/questions/01EVENT/answer',
+      body: { answer: { choice: 'Yes' }, if_pending: true },
+    })
     expect(harness.openWindow).not.toHaveBeenCalled()
+  })
+
+  it('posts the typed words and opens nothing', async () => {
+    const harness = loadSw({ maxActions: 2 })
+    await click(harness, 'reply', '  wait for QA  ')
+
+    expect(posted(harness).body).toEqual({ text: 'wait for QA', if_pending: true })
+    expect(harness.openWindow).not.toHaveBeenCalled()
+  })
+
+  // A browser without inline text shows Reply as a plain button, so the tap
+  // carries no words and the thread is the place to answer.
+  it('opens the thread when Reply arrives with no words', async () => {
+    const harness = loadSw({ maxActions: 2 })
+    await click(harness, 'reply')
+
+    expect(harness.fetch).not.toHaveBeenCalled()
+    expect(harness.openWindow).toHaveBeenCalledWith('https://hub.test/event/01EVENT')
+  })
+
+  it('opens the thread when the question was answered in the meantime', async () => {
+    const harness = loadSw({ maxActions: 2, fetchStatus: 409 })
+    await click(harness, 'reply', 'too late')
+
+    expect(harness.openWindow).toHaveBeenCalledWith('https://hub.test/event/01EVENT')
   })
 
   it('opens the login page with a next path when the session has gone', async () => {
@@ -156,9 +214,17 @@ describe('service worker notification clicks', () => {
     expect(harness.openWindow).toHaveBeenCalledWith('https://hub.test/event/01EVENT')
   })
 
-  it('opens the thread for the More action without posting anything', async () => {
+  it('opens the thread for an unknown action without posting anything', async () => {
     const harness = loadSw({ maxActions: 2 })
     await click(harness, 'more')
+
+    expect(harness.fetch).not.toHaveBeenCalled()
+    expect(harness.openWindow).toHaveBeenCalledWith('https://hub.test/event/01EVENT')
+  })
+
+  it('opens the thread on a body tap, with no action at all', async () => {
+    const harness = loadSw({ maxActions: 2 })
+    await click(harness, '')
 
     expect(harness.fetch).not.toHaveBeenCalled()
     expect(harness.openWindow).toHaveBeenCalledWith('https://hub.test/event/01EVENT')

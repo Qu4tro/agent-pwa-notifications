@@ -11,6 +11,10 @@ dist/
 # Worktrunk worktrees.
 .worktrees/
 
+# The route generator's scratch directory. src/routeTree.gen.ts is the output
+# and is tracked; this is not.
+.tanstack/
+
 # Local agent tooling: the design skills. Not published.
 .claude/
 

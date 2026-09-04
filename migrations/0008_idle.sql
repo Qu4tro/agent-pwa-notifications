@@ -1,0 +1,11 @@
+-- Note 5: "done" is a fact about the agent, not about the human.
+--
+-- Until now the dashboard called a thread finished when the human had read
+-- everything in it, which said nothing about whether the agent was still
+-- working. A thread is finished when its latest event is a `done`, or when the
+-- agent has been quiet for longer than it said it would be. This column is
+-- that second half: how many minutes of silence still count as working.
+--
+-- Set on any event, by the agent; the latest value on the thread wins. NULL
+-- means the default (240 minutes, four hours), which is in src/server/api.ts.
+ALTER TABLE events ADD COLUMN idle_minutes INTEGER;

@@ -20,9 +20,11 @@ const { values: flags, positionals } = parseArgs({
     'task-id': { type: 'string' },
     model: { type: 'string' },
     kind: { type: 'string' },
+    idle: { type: 'string' },
     tag: { type: 'string', multiple: true },
     markdown: { type: 'string' },
     button: { type: 'string', multiple: true },
+    color: { type: 'string', multiple: true },
     ack: { type: 'string' },
     e2e: { type: 'boolean' },
     agent: { type: 'string' },
@@ -130,6 +132,7 @@ async function notify() {
     agent: flags.agent || 'agent-notify-pwa',
     priority: flags.priority ? Number(flags.priority) : 0,
     kind: flags.kind || 'update',
+    idle_minutes: flags.idle ? Number(flags.idle) : undefined,
     project: flags.project,
     task: flags.task,
     task_id: flags['task-id'],
@@ -139,7 +142,21 @@ async function notify() {
   await attachBlocks(body, blocks, conf)
   const { status, json } = await hub('POST', '/api/v1/events', conf, body)
   if (status !== 200 || !json.ok) die(`Failed (${status}): ${json.error || 'unknown error'}`)
+  await reportChangedAnswers(json, conf)
   console.log(`Sent (${json.id})`)
+}
+
+// The human can replace an answer after giving it. A change rides on the next
+// call on the thread, so it lands here: one line per answer on stderr, which
+// leaves stdout to the caller's pipeline.
+async function reportChangedAnswers(json, conf) {
+  for (const item of json.changed_answers || []) {
+    let answer = item.answer
+    let text = item.text
+    if (conf.encKey && typeof answer === 'string') answer = await decrypt(conf.encKey, answer)
+    if (conf.encKey && typeof text === 'string') text = await decrypt(conf.encKey, text)
+    process.stderr.write(`changed answer ${item.id} "${item.title}": ${JSON.stringify({ answer, text })}\n`)
+  }
 }
 
 // -- ask: post a question, wait for the answer, print it ----------------------
@@ -150,10 +167,13 @@ async function ask() {
     positionals.slice(1).join(' ') || die(`Usage: ${BIN} ask "question" --button A --button B`)
   const options = flags.button || []
   if (options.length < 1) die('Provide at least one --button option.')
+  // Paired with --button by position, and allowed to run short: an option with
+  // no --color of its own takes its place in the dashboard's palette.
+  const colors = flags.color || []
 
   const blocks = [
     ...(flags.markdown ? [{ type: 'markdown', text: flags.markdown }] : []),
-    { type: 'buttons', id: 'choice', options },
+    { type: 'buttons', id: 'choice', options, ...(colors.length ? { colors } : {}) },
   ]
   const body = {
     title,
@@ -164,6 +184,7 @@ async function ask() {
     model: flags.model,
     tags: flags.tag,
     ack: flags.ack,
+    idle_minutes: flags.idle ? Number(flags.idle) : undefined,
   }
   await attachBlocks(body, blocks, conf)
   const { status, json } = await hub('POST', '/api/v1/questions', conf, body)
@@ -180,9 +201,16 @@ async function ask() {
     }
     if (r.json.status === 'answered') {
       let answer = r.json.answer
+      let text = r.json.text
       if (conf.encKey && typeof answer === 'string') answer = await decrypt(conf.encKey, answer)
+      if (conf.encKey && typeof text === 'string') text = await decrypt(conf.encKey, text)
       process.stderr.write('\n')
-      console.log(JSON.stringify(answer)) // stdout = machine-readable
+      // Flattened, because this command owns the block id `choice`: one object
+      // of the option and the words, so `jq -r .choice` reads the choice and
+      // `jq -r .text` reads what the human wrote. Either can be null.
+      console.log(
+        JSON.stringify({ choice: answer?.choice ?? null, text: text ?? null }),
+      ) // stdout = machine-readable
       return
     }
     if (r.json.status === 'expired') die('The question expired with no answer.')
@@ -233,9 +261,21 @@ ${BIN} ${VERSION} - talk to your Agent Notifications hub
   ${BIN} notify "msg" [--priority 0|1|2] [--kind update|done|error]
                           [--project P] [--task T] [--task-id ID] [--model M]
                           [--markdown "..."] [--tag x] [--agent NAME]
+                          [--idle MINUTES]
+      --kind done is what ends a thread on the dashboard. --idle says how long
+      silence still counts as working (default 240). An answer the human
+      changed on this thread since you last read it prints on stderr as
+      \`changed answer <id> "<title>": {...}\`.
 
-  ${BIN} ask "question" --button A --button B [--markdown "..."] [--ack "..."]
-      Post a question, wait, then print the answer JSON on stdout.
+  ${BIN} ask "question" --button A --button B [--color NAME|#rrggbb]
+                          [--markdown "..."] [--ack "..."] [--idle MINUTES]
+      Post a question, wait, then print { "choice": ..., "text": ... } on
+      stdout. The human can tap an option, write words, or both, so either
+      field can be null: \`jq -r .choice\` for the option, \`jq -r .text\` for
+      the words.
+      Every option is already a different colour. --color pairs with --button
+      by position when a particular choice should read a particular way:
+      blue, violet, mint, rose, amber, cyan, pink, lime, or #rrggbb.
 
   ${BIN} status [--json]
       Show the saved hub URL, the key prefix and whether E2E is on.
