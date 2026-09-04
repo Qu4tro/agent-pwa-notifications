@@ -69,9 +69,9 @@ export function TasksSkeleton() {
   )
 }
 
-// A thread arrives as a list of message summaries, most of them shut, so the
-// placeholder is a list of rows - not the two tall blocks that stood in for
-// messages back when every one of them was open.
+// A thread arrives as a list of shut message rows, so the placeholder is a
+// list of rows - not the two tall blocks that stood in for messages back when
+// a message could be open on the page.
 // The pending page is a single list of question rows, each with its answer
 // buttons hanging under it.
 export function PendingSkeleton() {
