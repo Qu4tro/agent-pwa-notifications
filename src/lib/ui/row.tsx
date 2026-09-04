@@ -1,5 +1,4 @@
 import { KIND_BG, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../project'
-import { Time } from './time'
 
 // One line in a list. Everything on a list page is made of these: a time
 // gutter, a 3px rail, 12px by 16px of padding, a hairline under it, one line of
@@ -60,18 +59,15 @@ export function Row({
   )
 }
 
-// One event on a task row's timeline. `at` is null on the newest event, whose
-// time the row's gutter is already showing.
 export interface TimelineItem {
   id: string
   kind: string
   title: string
-  at: number | null
   unread: boolean
   // What was decided, on a question that has been settled. `answered` carries
-  // the answer itself; `expired` carries the word. A question still waiting
-  // carries nothing, because its buttons are on the row.
-  answer?: { status: 'answered' | 'expired'; text: string } | null
+  // the answer itself; `expired` carries the word. A pending question says it
+  // needs one, so the timeline reads as open.
+  answer?: { status: 'answered' | 'expired' | 'pending'; text: string } | null
 }
 
 // The middle of a row: title on top, and under it either one muted line of
@@ -142,14 +138,15 @@ function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }
                   <span className="sr-only">answered </span>
                   {it.answer.text}
                 </span>
+              ) : it.answer.status === 'pending' ? (
+                <span className={`shrink-0 text-[15px] italic leading-[1.35] ${STATE_TEXT.pending}`}>
+                  {it.answer.text}
+                </span>
               ) : (
                 <span className={`shrink-0 text-[15px] leading-[1.35] ${STATE_TEXT.expired}`}>
                   expired
                 </span>
               )
-            ) : null}
-            {it.at != null ? (
-              <Time at={it.at} className="shrink-0 pt-[3px] text-[13px] text-faint" />
             ) : null}
           </li>
         ))}

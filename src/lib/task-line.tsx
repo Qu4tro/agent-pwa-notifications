@@ -27,16 +27,12 @@ function taskParams(t: TaskSummary) {
 // newest event's own title when it did not, so in that second case the newest
 // line is already the title and is left off rather than said twice.
 export function timelineOf(t: TaskSummary): { items: TimelineItem[]; earlier: number } {
-  const newest = t.recent[t.recent.length - 1]
   const shown = t.task ? t.recent : t.recent.slice(0, -1)
   const items = shown
     .map((r) => ({
       id: r.id,
       kind: r.kind,
       title: r.title,
-      // The gutter is already showing the newest event's time; the same three
-      // characters twice on one row says nothing the second time.
-      at: r.id === newest?.id ? null : r.created_at,
       unread: r.read_at == null,
       answer: settled(r.question),
     }))
@@ -44,9 +40,8 @@ export function timelineOf(t: TaskSummary): { items: TimelineItem[]; earlier: nu
   return { items, earlier: Math.max(0, t.count - t.recent.length) }
 }
 
-// A question line says what was decided, so a row does not stop at asking. A
-// question still waiting says nothing extra: its buttons are the answer, and
-// they are on the row.
+// A question line says what was decided, so a row does not stop at asking.
+// A pending question says it needs one, so the timeline reads as open.
 //
 // An encrypted answer is a ciphertext string here, and decrypting it would be
 // one async hook per line of every list, so the row says that it was answered
@@ -54,7 +49,8 @@ export function timelineOf(t: TaskSummary): { items: TimelineItem[]; earlier: nu
 function settled(
   q: TaskSummary['recent'][number]['question'],
 ): TimelineItem['answer'] {
-  if (!q || q.status === 'pending') return null
+  if (!q) return null
+  if (q.status === 'pending') return { status: 'pending', text: 'needs answer' }
   if (q.status === 'expired') return { status: 'expired', text: 'expired' }
   const text = typeof q.answer === 'string' ? 'answered' : shortAnswer(q.answer, q.text)
   return { status: 'answered', text: text || 'answered' }
