@@ -45,7 +45,86 @@ function inline(text: string, key: string): React.ReactNode[] {
   return parts
 }
 
+// -- Fenced code inside a markdown block --------------------------------------
+// A coding agent told to send `markdown` writes fenced code into it, because
+// that is what writing markdown means. Until now the fence came through as a
+// paragraph of literal backticks and the code as prose. A fence is the same
+// thing a `code` block is, so it renders as one - same highlighting, same copy
+// button - and the prose around it stays markdown.
+export type MdSegment =
+  | { kind: 'text'; text: string }
+  | { kind: 'code'; lang?: string; text: string }
+
+// Up to three spaces of indent and three or more backticks, then an info
+// string with no backtick in it. CommonMark's rule, and the reason for the
+// last part: `` ```a``b `` is inline code, not a fence.
+const FENCE_OPEN = /^ {0,3}(`{3,})[ \t]*([^`\n]*?)[ \t]*$/
+
+// Exported for its own test: the edge cases here - the info string, an
+// unclosed fence, a fence that is only part of the message - are what decides
+// whether an agent's code survives the trip.
+export function splitFences(text: string): MdSegment[] {
+  const segments: MdSegment[] = []
+  const lines = text.split('\n')
+  let prose: string[] = []
+
+  // Blank runs between fences are separation, not a paragraph: dropping them
+  // keeps the flex gap from doubling around every block.
+  const flushProse = () => {
+    if (prose.some((l) => l.trim() !== '')) segments.push({ kind: 'text', text: prose.join('\n') })
+    prose = []
+  }
+
+  let i = 0
+  while (i < lines.length) {
+    const open = FENCE_OPEN.exec(lines[i])
+    if (!open) {
+      prose.push(lines[i])
+      i++
+      continue
+    }
+    flushProse()
+    // A fence closes on a run of backticks at least as long as the one that
+    // opened it, so a block can quote a shorter fence.
+    const close = new RegExp(`^ {0,3}\`{${open[1].length},}[ \t]*$`)
+    // The first word of the info string is the language; the rest is metadata
+    // no highlighter here reads. Capped like the `code` block's own `lang`.
+    const lang = open[2].split(/\s+/)[0].slice(0, 40) || undefined
+    const body: string[] = []
+    i++
+    while (i < lines.length && !close.test(lines[i])) {
+      body.push(lines[i])
+      i++
+    }
+    i++ // step over the closing fence, or past the end if there wasn't one
+    // An unclosed fence runs to the end of the message rather than losing the
+    // code under it - the call CommonMark makes, and the safer one here.
+    segments.push({ kind: 'code', lang, text: body.join('\n') })
+  }
+  flushProse()
+  return segments
+}
+
 function MiniMarkdown({ text }: { text: string }) {
+  const segments = useMemo(() => splitFences(text), [text])
+  if (segments.length === 0) return null
+  // The common case is prose with no fence in it, and it renders exactly as it
+  // did: one .md element, no wrapper around it.
+  if (segments.length === 1 && segments[0].kind === 'text') return <Prose text={segments[0].text} />
+  return (
+    <div className="flex flex-col gap-3">
+      {segments.map((s, i) =>
+        s.kind === 'code' ? (
+          <CodeBlock key={i} text={s.text} lang={s.lang} />
+        ) : (
+          <Prose key={i} text={s.text} />
+        ),
+      )}
+    </div>
+  )
+}
+
+function Prose({ text }: { text: string }) {
   const lines = text.split('\n')
   const out: React.ReactNode[] = []
   let list: string[] = []
