@@ -525,7 +525,7 @@ pub struct Config {
         title: 'v0.9.0 is on crates.io',
         read: true,
         blocks: [
-          md('Six weeks, 34 commits, two breaking changes, both in the config file.'),
+          md('Six weeks, 34 commits, two breaking changes, both in the config file. The migration note is at https://docs.rs/sunset-cli/0.9.0/migrating, and the whole diff is at https://github.com/Qu4tro/sunset-cli/compare/v0.8.3...v0.9.0.'),
           link('https://crates.io/crates/sunset-cli', 'crates.io/crates/sunset-cli'),
           image('http://localhost:3000/icon-512.png', 'The release banner'),
         ],
@@ -616,7 +616,7 @@ pub struct Config {
         title: 'acme renewal failed for hub.internal, 6 days left',
         priority: 2,
         blocks: [
-          callout('error', 'DNS-01 challenge timed out three times. The certificate expires in six days.'),
+          callout('error', 'DNS-01 challenge timed out three times. The certificate expires in six days. The run log is at https://ci.internal/acme/run/4471.'),
           kv(['domain', 'hub.internal'], ['expires', '2026-09-10T04:12:00Z'], ['issuer', "Let's Encrypt R11"], ['attempts', '3']),
         ],
       },
