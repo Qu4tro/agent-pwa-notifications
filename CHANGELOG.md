@@ -12,6 +12,16 @@ released section and opens a fresh empty one.
 
 ### Added
 
+- One page for everything waiting on you. `GET /api/v1/pending` gathers every
+  unanswered question across every project, longest wait first, and a bell in
+  the header carries the count on every page. Answering from it drops the row
+  the same way answering from a project does.
+- A live mode, at `/pending/live`. One question at a time, full screen, with
+  the next card prefetched while the current one is up: answer, watch it
+  acknowledge, and the next question is answerable 2.6 seconds later. The
+  screen is held awake while the tab is visible, and every animation collapses
+  under `prefers-reduced-motion`. Set it as the installed app's start page and
+  the phone becomes a queue.
 - Free text on every question. A line under the controls takes your own words,
   so a form question, an eight-option question and a yes/no question can all be
   answered in prose. The words arrive at the agent as `text`, beside the values.
@@ -25,16 +35,93 @@ released section and opens a fresh empty one.
   cursor: the arrows under the card, or the arrow keys, walk back through what
   you answered this sitting and forward to what is waiting. The position
   replaces the count of what is left.
+- Answers colour themselves. A plain affirmative comes out mint and a plain
+  denial rose - whole labels, matched against two published lists - and every
+  other option takes a pastel from the palette by position, so two choices are
+  told apart before they are read. Green and red are never handed out by
+  position. `colors` on a `buttons` block, and `--color` on `agent-notify-pwa
+  ask`, override the whole rule per option.
+- Clear on Done. The section grows a Clear that archives the threads under it.
+  `POST /api/v1/archive` is a soft delete on `events`: the rows leave every
+  list, and nothing in the app can delete an archived event afterwards - not
+  the agent's `clear`, not the retention cron. Taking a thread out of the app
+  is not a request to lose it.
+- Syntax highlighting in code blocks, from the `lang` an agent could always
+  send and the renderer used to drop. The highlighter is a 24 kB gzip chunk of
+  its own, fetched only when a block that needs it is on screen; the plain
+  block paints first and stays standing if the chunk never arrives.
+- Copy on a code block. A strip above the block copies the raw text the agent
+  sent, never the highlighted DOM. Where the clipboard API is missing it is not
+  rendered at all, rather than rendered and lying.
+- Sortable tables. A tap on a header cell cycles ascending, descending, then
+  back to the order the agent sent. The comparator reads the leading number out
+  of a cell, so `18ms`, `4.2 kB` and `1,024` sort as numbers, and empty cells
+  sink to the bottom whichever way the column points.
+- Collapsible messages. Each message in a thread is a native `<details>`. A
+  question still waiting, anything unread and the newest message are open on
+  arrival; everything settled starts shut, with the answer you gave on the
+  summary line, so you can tell without opening it whether it is worth opening.
+- `idle_minutes` on every write path, 1 to 10080, and `--idle` on the CLI. It
+  is how long a thread may stay quiet before it counts as finished, and the
+  latest value on the thread wins.
+- The task row is a timeline. Each row carries the last three events on its
+  thread - kind, title, time, and for a question, what was decided - instead of
+  the newest title and a count of the rest. `GET /api/v1/tasks` returns
+  `recent` for it.
 
 ### Changed
 
+- "Done" is the agent's word, not the human's. A thread is finished when its
+  newest event is `kind: done`, or when it has been quiet longer than its idle
+  timeout, four hours by default. It is no longer finished by the human having
+  read everything in it, which dropped a thread the agent was still working on
+  into Done the moment its last update was seen. An `error` does not finish a
+  thread, because an agent that hit one may still retry.
+
+  **This changes what existing agents produce.** One that never sends `kind:
+  done` will see its threads sit in Active for four hours instead of falling
+  into Done on read. End a run with a `done`, or raise `--idle` before going
+  quiet.
+- The retention cron archives instead of deleting. Nothing in the app deletes
+  on its own any more: only the trash panel and the agent `clear` endpoint
+  delete, and both skip archived rows.
+- A bigger type scale and one web font. Atkinson Hyperlegible Next, self-hosted
+  as a 33 kB variable file with a metric-matched fallback, so the swap changes
+  the shapes and never moves a line. Body 15 to 17 px, page titles 17 to 22,
+  buttons 36 to 44 px tall, radius 4 to 8.
+- The thread reads newest first, so a question still waiting is at the top,
+  where the reader lands and where the buttons want to be.
+- Back sits on the left of the header, where the app name was. The name only
+  earns its room on the one page with nowhere to go back to.
+- Callouts are chips with an icon, a tinted surface and an edge, not a coloured
+  rail. A rail alone left colour carrying the whole message.
+- The bell stays on screen at zero, muted, instead of disappearing. A control
+  that comes and goes is one whose position has to be found again each time.
+- The answer buttons are outlines in their own colour, and the answers on a
+  list row share one fixed column. Eleven solid pale blocks down a five-row
+  list won the hierarchy against the titles they belong to.
 - The body of `POST /api/v1/questions/:id/answer` is an envelope of `answer`
   and `text`, with an optional `if_pending` that writes only while the question
-  is still waiting.
+  is still waiting. The endpoint is session-only, so this changes nothing for
+  an agent; a browser that has the app cached picks the new shape up with the
+  new build.
 - `GET /api/v1/questions/:id` returns `text` and `changes` beside the answer.
 - More is replaced by Reply in the notification's action row.
 - `agent-notify-pwa ask` prints `{ "choice": ..., "text": ... }`. `jq -r
   .choice` still reads the option and is null on an answer of words alone.
+
+### Removed
+
+- The count on the right of a task row, and the "Open to answer" link under a
+  question in a list. The row's own lines already say what the events are, and
+  the row was already a link to the same thread.
+
+### Fixed
+
+- Back from a question opened in Needs you returns to Needs you, not to the
+  question's project. The thread page reads a `from` search param, so it
+  survives a reload and a shared URL.
+- The timeline rail on a task row runs under the dots, down their centre.
 
 ## [1.1.0] - 2026-09-03
 
