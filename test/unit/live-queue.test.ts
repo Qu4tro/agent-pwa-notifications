@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LIVE_START, liveQueue, type LiveState } from '../../src/routes/_app.pending_.live'
+import { LIVE_START, liveQueue, liveStart, type LiveState } from '../../src/routes/_app.pending_.live'
 
 // The live mode's whole behaviour is this function. Everything below is the
 // four inputs the page can hand it - a poll, a tap, a failure, a timer - and
@@ -12,12 +12,34 @@ const run = (state: LiveState, ...inputs: Parameters<typeof liveQueue>[1][]) =>
 const tick = { type: 'timer' } as const
 const data = (...ids: string[]) => ({ type: 'data', ids }) as const
 
-describe('an empty queue', () => {
-  it('shows nothing and waits', () => {
-    expect(run(LIVE_START, data(), tick)).toEqual(LIVE_START)
+describe('opening the page', () => {
+  it('brings the first question straight in, with no breath before it', () => {
+    expect(liveStart(['a', 'b'])).toMatchObject({ current: 'a', phase: 'entering', queue: ['b'] })
   })
 
-  it('takes the first question a breath after it arrives, not the instant it lands', () => {
+  it('draws the calm line at once when nothing is waiting', () => {
+    expect(liveStart([])).toMatchObject({ current: null, phase: 'calm', queue: [] })
+  })
+})
+
+describe('an empty queue', () => {
+  it('settles into the calm line after a breath, and waits there', () => {
+    const calm = run(LIVE_START, data(), tick)
+    expect(calm).toMatchObject({ current: null, phase: 'calm', queue: [] })
+    expect(run(calm, tick)).toBe(calm)
+    expect(run(calm, data())).toBe(calm)
+  })
+
+  it('lets the calm line leave before the question that ends it comes in', () => {
+    const calm = run(LIVE_START, data(), tick)
+    const going = liveQueue(calm, data('a'))
+    expect(going).toMatchObject({ current: null, phase: 'leaving', queue: ['a'] })
+    const gap = run(going, tick)
+    expect(gap).toMatchObject({ current: null, phase: 'empty', queue: ['a'] })
+    expect(run(gap, tick)).toMatchObject({ current: 'a', phase: 'entering', queue: [] })
+  })
+
+  it('takes a question that lands mid-breath once the breath is over', () => {
     const waiting = run(LIVE_START, data('a'))
     expect(waiting).toMatchObject({ current: null, phase: 'empty', queue: ['a'] })
     expect(run(waiting, tick)).toMatchObject({ current: 'a', phase: 'entering', queue: [] })
@@ -52,10 +74,11 @@ describe('one question at a time', () => {
     expect(run(gap, tick)).toMatchObject({ current: 'b', phase: 'entering', queue: ['c'] })
   })
 
-  it('draws the calm line once the last one is answered', () => {
+  it('draws the calm line a breath after the last one is answered', () => {
     const only = run(LIVE_START, data('a'), tick, tick)
-    const done = run(liveQueue(only, { type: 'answered', answer: 'Yes' }), data(), tick, tick)
-    expect(done).toMatchObject({ current: null, phase: 'empty', queue: [] })
+    const gone = run(liveQueue(only, { type: 'answered', answer: 'Yes' }), data(), tick, tick)
+    expect(gone).toMatchObject({ current: null, phase: 'empty', queue: [] })
+    expect(run(gone, tick)).toMatchObject({ current: null, phase: 'calm', queue: [] })
   })
 })
 

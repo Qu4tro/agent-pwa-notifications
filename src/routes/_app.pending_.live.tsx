@@ -35,7 +35,10 @@ export const Route = createFileRoute('/_app/pending_/live')({
 
 // -- The queue ----------------------------------------------------------------
 
-export type LivePhase = 'empty' | 'entering' | 'showing' | 'acked' | 'leaving'
+// `empty` is the breath: nothing on screen, a timer running. `calm` is the
+// "all caught up" line, which waits for a question the way `showing` waits for
+// an answer. `leaving` with no current card is that line on its way out.
+export type LivePhase = 'empty' | 'calm' | 'entering' | 'showing' | 'acked' | 'leaving'
 
 export interface LiveState {
   // The question on screen, or null when nothing is.
@@ -56,6 +59,13 @@ export type LiveInput =
 
 export const LIVE_START: LiveState = { current: null, phase: 'empty', queue: [], answered: null }
 
+// Where the page begins, given what was waiting when it opened: the first
+// question already on its way in, or the calm line. The breath is for the gap
+// between two things on the screen, and on arrival there was nothing before.
+export function liveStart(ids: string[]): LiveState {
+  return liveQueue({ ...LIVE_START, queue: ids }, { type: 'timer' })
+}
+
 // The whole of the mode's behaviour, as one pure function. Nothing here knows
 // about React, a clock or the network: the page turns a poll, a tap and an
 // expired timer into these four inputs and paints whatever comes back.
@@ -70,6 +80,8 @@ export function liveQueue(state: LiveState, input: LiveInput): LiveState {
       // has nothing to acknowledge, so it leaves without one.
       if (gone && (state.phase === 'entering' || state.phase === 'showing'))
         return { ...state, phase: 'leaving', answered: null, queue }
+      // The calm line was up. It goes first; the question follows it in.
+      if (state.phase === 'calm' && queue.length > 0) return { ...state, phase: 'leaving', queue }
       if (queue.length === state.queue.length && queue.every((id, i) => id === state.queue[i]))
         return state
       return { ...state, queue }
@@ -92,12 +104,12 @@ export function liveQueue(state: LiveState, input: LiveInput): LiveState {
           return { ...state, phase: 'leaving' }
         case 'leaving':
           return { ...state, current: null, phase: 'empty', answered: null }
-        // The breath between two questions, and the wait for the first one.
+        // The breath is over: the next question, or the calm line.
         case 'empty':
           return state.queue.length === 0
-            ? state
+            ? { ...state, phase: 'calm' }
             : { current: state.queue[0], phase: 'entering', queue: state.queue.slice(1), answered: null }
-        // Showing waits for you, not for a clock.
+        // Showing waits for you, and calm waits for a question. Not for a clock.
         default:
           return state
       }
@@ -106,7 +118,10 @@ export function liveQueue(state: LiveState, input: LiveInput): LiveState {
 
 // How long each phase lasts. The hold and the breath are time, not motion, so
 // they are the same however the reader feels about animation; only the fades
-// shorten. `showing` has no duration - it ends when you answer.
+// shorten. `showing` and `calm` have no duration - they end on an answer or a
+// question. The clock decides state, never what is drawn: a card keeps its
+// entrance animation until it leaves, so a timer that runs ahead of the
+// browser cuts nothing short.
 function phaseMs(phase: LivePhase, reduced: boolean): number | null {
   switch (phase) {
     case 'entering':
@@ -130,32 +145,46 @@ function LivePage() {
   const reduced = useReducedMotion()
   const client = useQueryClient()
   const { data: pending, isError, refetch } = useQuery(pendingQuery())
-  const [state, dispatch] = useReducer(liveQueue, LIVE_START)
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
 
   // Every question waiting, as ids, in the order the server gave them.
   const ids = (pending ?? []).map((t) => t.pending_event_id).filter((id): id is string => !!id)
   const idsKey = ids.join(',')
+  // The loader has already put the list in the cache, so the queue starts from
+  // it rather than from nothing: the first card is on its way in on the first
+  // paint, and the calm line never shows for a frame ahead of a full queue.
+  // With no list at all - the load failed - it starts empty and still.
+  const [state, dispatch] = useReducer(liveQueue, pending ? ids : undefined, (ids) =>
+    ids ? liveStart(ids) : LIVE_START,
+  )
   useEffect(() => {
     dispatch({ type: 'data', ids: idsKey ? idsKey.split(',') : [] })
   }, [idsKey])
 
   // The clock. One timer per phase, cleared on every change, so a phase that
-  // is cut short by an answer or by the poll never fires the old one.
-  const ms = phaseMs(state.phase, reduced)
+  // is cut short by an answer or by the poll never fires the old one. It does
+  // not run while the page has no list to draw from: the skeleton or the error
+  // is up then, and a breath that ended behind them would settle into the
+  // calm phase and later fade out a line nobody saw.
+  const ms = pending ? phaseMs(state.phase, reduced) : null
   useEffect(() => {
     if (ms == null) return
-    if (state.phase === 'empty' && state.queue.length === 0) return
     const t = setTimeout(() => dispatch({ type: 'timer' }), ms)
     return () => clearTimeout(t)
   }, [state.phase, state.current, state.queue.length, ms])
 
   // The body of the question. A TaskSummary carries the title and the
   // micro-answers, not the blocks, so a form question or a five-option one has
-  // nothing to render from; the event has all of it.
+  // nothing to render from; the event has all of it. Read straight off the
+  // query, in the same render that sets `current`: a card pinned in state
+  // would lag one render behind and paint the wrong thing for a frame - the
+  // last card at full opacity after its fade, or the calm line before the
+  // next card. The event key is not among the ones an answer invalidates, so
+  // the card is still here for the acknowledgement and the leave.
   const current = state.current
   const { data: event } = useQuery({ ...eventQuery(current ?? ''), enabled: current != null })
+  const card = current != null && event?.id === current ? event : null
 
   // The next one, fetched while this one is still up, so the swap never shows
   // a placeholder.
@@ -164,17 +193,6 @@ function LivePage() {
     if (next) void client.prefetchQuery(eventQuery(next))
   }, [next, client])
 
-  // The card is pinned here rather than read straight off the query: answering
-  // takes the question out of the pending list, and the acknowledgement and
-  // the leave animation both happen after that.
-  const [card, setCard] = useState<EventItem | null>(null)
-  useEffect(() => {
-    if (current == null) {
-      setCard(null)
-      return
-    }
-    if (event && event.id === current) setCard(event)
-  }, [current, event])
   useEffect(() => setError(null), [current])
 
   async function submit(answer: Record<string, unknown>) {
@@ -211,6 +229,10 @@ function LivePage() {
     )
   if (!pending) return <LiveSkeleton />
 
+  // A card whose body has not arrived yet draws nothing, never the calm line:
+  // that line is a phase of its own, entered only once the queue is empty.
+  const calm = current == null && (state.phase === 'calm' || state.phase === 'leaving')
+
   return (
     <Stage>
       {card ? (
@@ -224,8 +246,8 @@ function LivePage() {
           waiting={state.queue.length}
           onSubmit={submit}
         />
-      ) : state.queue.length === 0 ? (
-        <EmptyQueue />
+      ) : calm ? (
+        <EmptyQueue leaving={state.phase === 'leaving'} />
       ) : null}
     </Stage>
   )
@@ -261,8 +283,11 @@ function LiveCard({
   const { blocks, locked } = useQuestionContent(e)
   const settled = phase === 'acked' || phase === 'leaving'
 
+  // The entrance stays on the card for as long as it is up. Taking it off
+  // when the clock says "showing" would snap the last frames of the rise, and
+  // a card whose body came late would arrive with no rise at all.
   return (
-    <div className={phase === 'entering' ? 'live-in' : phase === 'leaving' ? 'live-out' : undefined}>
+    <div className={phase === 'leaving' ? 'live-out' : 'live-in'}>
       <div className="rounded-ui border border-edge bg-surface p-5">
         <div className="flex items-center gap-2 text-[15px] text-muted">
           <ProjectDot project={e.project ?? ''} size={6} />
@@ -282,12 +307,26 @@ function LiveCard({
         <div className="mt-4">{locked ? <LockedNote /> : <BlockRenderer blocks={blocks} />}</div>
 
         {locked ? null : (
-          <div className="mt-4 border-t border-line pt-4">
+          // One grid cell for both, so the answer area fades out under the
+          // acknowledgement rather than making way for it: the card keeps its
+          // height on the tap, and nothing on it moves.
+          <div className="mt-4 grid border-t border-line pt-4">
+            <div
+              className={settled ? 'live-fade col-start-1 row-start-1' : 'col-start-1 row-start-1'}
+              inert={settled}
+            >
+              <AnswerArea
+                blocks={blocks}
+                disabled={sending || settled}
+                error={error}
+                onSubmit={onSubmit}
+              />
+            </div>
             {settled ? (
-              <Acknowledgement answer={answered ?? ''} ack={e.ack} />
-            ) : (
-              <AnswerArea blocks={blocks} disabled={sending} error={error} onSubmit={onSubmit} />
-            )}
+              <div className="col-start-1 row-start-1">
+                <Acknowledgement answer={answered ?? ''} ack={e.ack} />
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -322,10 +361,11 @@ function Acknowledgement({ answer, ack }: { answer: string; ack: string | null }
 
 // Nothing waiting. Two lines, centred, and no button, no list, no picture. The
 // connection dot in the header still says whether the hub is reachable, so
-// this is never a lie about a dead connection.
-function EmptyQueue() {
+// this is never a lie about a dead connection. When a question arrives the
+// lines fade out first, and the card rises into the space they leave.
+function EmptyQueue({ leaving }: { leaving: boolean }) {
   return (
-    <div className="live-calm px-4 text-center">
+    <div className={`${leaving ? 'live-out' : 'live-calm'} px-4 text-center`}>
       <p className="text-[32px] leading-tight font-semibold">You&apos;re all caught up.</p>
       <p className="mt-3 text-[17px] text-muted">
         Your agents are working. The next question will appear here.

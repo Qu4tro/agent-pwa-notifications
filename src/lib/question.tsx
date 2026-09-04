@@ -16,14 +16,15 @@ export function useQuestionContent(e: EventItem): {
   locked: boolean
 } {
   const q = e.question
+  // Plaintext is read straight off the event, on the first render. Going
+  // through the effect would paint the card once with no blocks and no
+  // buttons, and it would grow a frame later - mid-rise, in the live mode.
+  const plain = e.enc ? null : { blocks: e.blocks as unknown[], answer: q?.answer ?? null }
   const [dec, setDec] = useState<{ blocks: unknown[]; answer: unknown } | null>(null)
   const [locked, setLocked] = useState(false)
 
   useEffect(() => {
-    if (!e.enc) {
-      setDec({ blocks: e.blocks as unknown[], answer: q?.answer ?? null })
-      return
-    }
+    if (!e.enc) return
     const key = getEncKey()
     if (!key) {
       setLocked(true)
@@ -46,7 +47,8 @@ export function useQuestionContent(e: EventItem): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [e.id, e.enc, typeof e.blocks === 'string' ? e.blocks : '', q?.answer])
 
-  return { blocks: dec?.blocks ?? [], answer: dec?.answer ?? null, locked }
+  const content = plain ?? dec
+  return { blocks: content?.blocks ?? [], answer: content?.answer ?? null, locked }
 }
 
 // For an E2E question, encrypt the answer before it leaves the device. The

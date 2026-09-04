@@ -781,11 +781,18 @@ pub struct Config {
   },
 
   // ------------------------------------------------------------ yes and no
-  // A project of nothing but yes/no decisions, for looking at what the affirm
-  // and deny lists do to a page of them: the two words carry their own colour,
-  // so a row of them can be read without reading. The last thread is the
-  // control - the same shape of question with labels that are not on either
-  // list, which fall back to the palette.
+  // A project of decisions, for looking at a page of answer buttons. Four
+  // yes/no rows first, where the affirm and deny lists give the two words their
+  // own colour so the row can be read without reading; then a control, whose
+  // three labels are on neither list and take the palette; then the shapes the
+  // answer column has to hold: a listed word beside two neutral ones, labels
+  // wider than the column, colours the agent set (two of them too dark to be a
+  // label), four options (which the row cannot answer, so it opens the
+  // thread), and an expired question for the settled register. A second batch
+  // turns the lists around: a denial beside a neutral word, "No" before "Yes",
+  // two multi-word list entries, an agent painting a cautious yes amber over
+  // the word rule, six options (thread page only, every colour of the walk), a
+  // form, and a question title at the 80-character limit of a row answer.
   {
     project: 'gate-keeper',
     task: 'Nightly release gate',
@@ -926,6 +933,318 @@ pub struct Config {
         blocks: [
           md('The control is the question above it: none of these words is on either list, so they take the palette.'),
           buttons('shape', ['All of it', 'Half', 'A tenth']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Hotfix for the checkout timeout',
+    agent: 'release-bot',
+    model: 'claude-opus-5',
+    taskId: 'gk-hotfix',
+    tags: ['release', 'hotfix'],
+    events: [
+      {
+        min: 12,
+        kind: 'question',
+        title: 'Ship the hotfix now?',
+        status: 'pending',
+        priority: 2,
+        timeoutMin: 2 * H,
+        blocks: [
+          md('One word on the affirm list beside two that are not: the walk has to step past green for the other two.'),
+          buttons('ship', ['Yes', 'Staging first', 'Monday']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Signing key rotation',
+    agent: 'janitor',
+    model: 'claude-sonnet-5',
+    taskId: 'gk-keys',
+    tags: ['security'],
+    events: [
+      {
+        min: 70,
+        kind: 'question',
+        title: 'Rotate the signing key today?',
+        status: 'pending',
+        timeoutMin: 24 * H,
+        blocks: [
+          md('Two labels at the 20-character limit, together wider than the answer column, which has to widen for them.'),
+          buttons('rotate', ['Rotate the key now', 'Wait for the window']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Ranker to the EU cluster',
+    agent: 'release-bot',
+    model: 'claude-opus-5',
+    taskId: 'gk-eu',
+    tags: ['release'],
+    events: [
+      {
+        min: 2 * H + 10,
+        kind: 'question',
+        title: 'Deploy the ranker to the EU cluster?',
+        status: 'pending',
+        timeoutMin: 8 * H,
+        blocks: [
+          md('Colours the agent set: mint and amber by name, and a third option left to the walk.'),
+          buttons('eu', ['Deploy', 'Hold', 'Roll back'], ['mint', 'amber']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Brand colour on the login page',
+    agent: 'claude-code',
+    model: 'claude-opus-5',
+    taskId: 'gk-brand',
+    tags: ['ui'],
+    events: [
+      {
+        min: 2 * H + 40,
+        kind: 'question',
+        title: 'Which blue for the login page?',
+        status: 'pending',
+        timeoutMin: 24 * H,
+        blocks: [
+          md('The candidates themselves, as hex. Both are too dark to be read as a label on this page, so the outline keeps the colour and the label falls back to the page text.'),
+          buttons('blue', ['Navy', 'Slate'], ['#1e3a8a', '#334155']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Region order for the ranker',
+    agent: 'release-bot',
+    model: 'gpt-5.2',
+    taskId: 'gk-region',
+    tags: ['release'],
+    events: [
+      {
+        min: 4 * H + 30,
+        kind: 'question',
+        title: 'Which region takes the ranker first?',
+        status: 'pending',
+        timeoutMin: 12 * H,
+        blocks: [
+          md('Four options: one more than a row can answer, so this one has no buttons on the list and opens the thread.'),
+          buttons('region', ['eu-west-1', 'us-east-1', 'ap-south-1', 'All at once']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Flaky gate test',
+    agent: 'janitor',
+    model: null,
+    taskId: 'gk-flaky',
+    tags: ['ci'],
+    events: [
+      {
+        min: 9 * H,
+        kind: 'question',
+        title: 'Quarantine the flaky gate test?',
+        status: 'expired',
+        timeoutMin: 2 * H,
+        blocks: [
+          md('It has blocked three merges today.'),
+          buttons('quarantine', ['Quarantine', 'Leave it']),
+        ],
+      },
+    ],
+  },  {
+    project: 'gate-keeper',
+    task: 'Payments PR review',
+    agent: 'claude-code',
+    model: 'claude-opus-5',
+    taskId: 'gk-review',
+    tags: ['review'],
+    events: [
+      {
+        min: 3 * H,
+        kind: 'update',
+        title: 'Read the payments PR: 14 files, two of them tests',
+        read: true,
+        blocks: [kv(['files', '14'], ['tests', '2'], ['author', 'mira'])],
+      },
+      {
+        min: 2 * H + 30,
+        kind: 'update',
+        title: 'Suite is green against the branch',
+        read: true,
+        blocks: [kv(['tests', '1291 passed'], ['duration', '6m 50s'])],
+      },
+      {
+        min: 18,
+        kind: 'question',
+        title: 'Does the payments PR look good to merge?',
+        status: 'pending',
+        timeoutMin: 12 * H,
+        blocks: [
+          md('A two-word affirm beside a label on neither list, on a thread with history under the title.'),
+          buttons('merge', ['Looks good', 'Needs work']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Nightly backup',
+    agent: 'janitor',
+    model: null,
+    taskId: 'gk-backup',
+    tags: ['ops'],
+    events: [
+      {
+        min: 8,
+        kind: 'question',
+        title: 'The backup failed on shard 3. Retry it?',
+        status: 'pending',
+        priority: 3,
+        timeoutMin: 60,
+        blocks: [
+          md('A neutral word first and a denial second: red on the right, the walk on the left.'),
+          buttons('retry', ['Retry', 'Cancel']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Checkout feature flag',
+    agent: 'release-bot',
+    model: 'claude-sonnet-5',
+    taskId: 'gk-flag',
+    tags: ['release'],
+    events: [
+      {
+        min: 33,
+        kind: 'question',
+        title: 'Turn the new checkout off for everyone?',
+        status: 'pending',
+        timeoutMin: 4 * H,
+        blocks: [
+          md('"No" before "Yes": the colour follows the word, not the position.'),
+          buttons('off', ['No', 'Yes']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Log retention',
+    agent: 'janitor',
+    model: null,
+    taskId: 'gk-logs',
+    tags: ['ops'],
+    events: [
+      {
+        min: 95,
+        kind: 'question',
+        title: 'Archive the 2024 request logs to cold storage?',
+        status: 'pending',
+        timeoutMin: 48 * H,
+        blocks: [
+          md('Two multi-word entries from the lists.'),
+          buttons('archive', ['Yes please', 'No thanks']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Icon for the release channel',
+    agent: 'claude-code',
+    model: 'claude-opus-5',
+    taskId: 'gk-icon',
+    tags: ['ui'],
+    events: [
+      {
+        min: 2 * H + 55,
+        kind: 'question',
+        title: 'Which icon for the release channel?',
+        status: 'pending',
+        timeoutMin: 24 * H,
+        blocks: [
+          md('Six options: too many for a row, so this opens the thread, where the walk shows every colour it has.'),
+          buttons('icon', ['Rocket', 'Flag', 'Tag', 'Bolt', 'Leaf', 'Star']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Schema PR with a deprecation warning',
+    agent: 'migrator',
+    model: 'gpt-5.2',
+    taskId: 'gk-deprec',
+    tags: ['db'],
+    events: [
+      {
+        min: 3 * H + 20,
+        kind: 'question',
+        title: 'Merge the schema PR with the deprecation warning?',
+        status: 'pending',
+        timeoutMin: 12 * H,
+        blocks: [
+          md('The agent overrules the word rule: a cautious yes in amber, the no left to the list.'),
+          buttons('merge', ['Yes', 'No'], ['amber']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Rollback target',
+    agent: 'release-bot',
+    model: 'claude-opus-5',
+    taskId: 'gk-rollback',
+    tags: ['release'],
+    events: [
+      {
+        min: 4 * H + 5,
+        kind: 'question',
+        title: 'Which build should the rollback target?',
+        status: 'pending',
+        timeoutMin: 6 * H,
+        blocks: [
+          md('A form, not buttons, so the row has nothing to answer with and opens the thread.'),
+          form('target', 'Roll back', [
+            { id: 'build', kind: 'number', label: 'Build number', placeholder: '4820', required: true },
+            { id: 'reason', kind: 'textarea', label: 'Why', placeholder: 'Optional' },
+          ]),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'EU promotion timing',
+    agent: 'release-bot',
+    model: 'claude-opus-5',
+    taskId: 'gk-timing',
+    tags: ['release'],
+    events: [
+      {
+        min: 5 * H + 15,
+        kind: 'question',
+        title: 'Promote the ranker to every EU region before Monday traffic, or wait a week?',
+        status: 'pending',
+        timeoutMin: 24 * H,
+        blocks: [
+          md('A title at the 80-character limit of a row answer, beside the column.'),
+          buttons('timing', ['Promote', 'Wait a week']),
         ],
       },
     ],

@@ -267,10 +267,11 @@
     }
   }
 
-  /* The live mode: one question at a time, and the two movements that carry
-     it. A card rises in and fades out; --live-rise is how far it travels, and
+  /* The live mode: one question at a time, and the movements that carry it.
+     A card rises in and fades out; --live-rise is how far it travels, and
      the `translate` property is used rather than `transform` so the distance
-     can be a variable the reduced-motion rule sets to zero.
+     can be a variable the reduced-motion rule sets to zero. On a tap the
+     answer area fades in place, with no travel, under the acknowledgement.
 
      The 1600ms the acknowledgement holds and the 300ms breath between two
      questions are not here, because they are time rather than motion: they
@@ -307,12 +308,17 @@
   .live-note {
     animation: rise-in 200ms ease-out both;
   }
+  .live-fade {
+    --live-rise: 0px;
+    animation: fade-out 200ms ease-out both;
+  }
 
   @media (prefers-reduced-motion: reduce) {
     .live-in,
     .live-out,
     .live-calm,
-    .live-note {
+    .live-note,
+    .live-fade {
       --live-rise: 0px;
       animation-duration: 150ms;
     }
