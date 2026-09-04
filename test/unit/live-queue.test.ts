@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { LIVE_START, liveQueue, liveStart, type LiveState } from '../../src/routes/_app.pending_.live'
+import {
+  LIVE_START,
+  liveQueue,
+  livePosition,
+  liveStart,
+  type LiveState,
+} from '../../src/routes/_app.pending_.live'
 
 // The live mode's whole behaviour is this function. Everything below is the
 // four inputs the page can hand it - a poll, a tap, a failure, a timer - and
@@ -11,6 +17,13 @@ const run = (state: LiveState, ...inputs: Parameters<typeof liveQueue>[1][]) =>
 // The page's own clock, as one step: the timer that ends whatever phase it is in.
 const tick = { type: 'timer' } as const
 const data = (...ids: string[]) => ({ type: 'data', ids }) as const
+const back = { type: 'back' } as const
+const forward = { type: 'forward' } as const
+const answer = (a: string) => ({ type: 'answered', answer: a }) as const
+
+// One card answered and gone: the strip now has something behind the cursor.
+const afterAnswering = (state: LiveState, a = 'Yes') =>
+  run(state, answer(a), tick, tick)
 
 describe('opening the page', () => {
   it('brings the first question straight in, with no breath before it', () => {
@@ -122,5 +135,139 @@ describe('a poll that changes nothing', () => {
   it('appends what arrives, behind what was already waiting', () => {
     const showing = run(LIVE_START, data('a', 'b'), tick, tick)
     expect(liveQueue(showing, data('a', 'b', 'd'))).toMatchObject({ queue: ['b', 'd'] })
+  })
+})
+
+// The page is a strip of cards with a cursor. What settled sits behind it, what
+// waits sits ahead, and answering always takes you to what is next.
+describe('walking the strip', () => {
+  const showing = run(LIVE_START, data('a', 'b', 'c'), tick, tick)
+
+  it('puts the answered card behind the cursor and rises the next one', () => {
+    const gap = afterAnswering(showing)
+    expect(gap).toMatchObject({ current: null, phase: 'empty', behind: ['a'], queue: ['b', 'c'] })
+    expect(run(gap, tick)).toMatchObject({ current: 'b', phase: 'entering', motion: 'rise' })
+  })
+
+  it('goes back to the last card that settled', () => {
+    const next = run(afterAnswering(showing), tick, tick)
+    expect(next).toMatchObject({ current: 'b', phase: 'showing', behind: ['a'] })
+
+    const going = liveQueue(next, back)
+    expect(going).toMatchObject({ phase: 'leaving', motion: 'back', destination: 'a' })
+    expect(run(going, tick)).toMatchObject({
+      current: 'a',
+      phase: 'entering',
+      motion: 'back',
+      destination: null,
+      // 'b' was at the edge and is still waiting, so it goes back in the queue.
+      queue: ['b', 'c'],
+    })
+  })
+
+  it('ignores back with nothing behind the cursor', () => {
+    expect(liveQueue(showing, back)).toBe(showing)
+  })
+
+  it('ignores back at the oldest card on the strip', () => {
+    const at = run(afterAnswering(showing), tick, tick, back, tick, tick)
+    expect(at).toMatchObject({ current: 'a', phase: 'showing', behind: ['a'] })
+    expect(liveQueue(at, back)).toBe(at)
+  })
+
+  it('goes forward from the last card behind the cursor to the edge', () => {
+    const at = run(afterAnswering(showing), tick, tick, back, tick, tick)
+    const going = liveQueue(at, forward)
+    expect(going).toMatchObject({ phase: 'leaving', motion: 'forward', destination: 'edge' })
+    expect(run(going, tick)).toMatchObject({
+      current: 'b',
+      phase: 'entering',
+      motion: 'forward',
+      queue: ['c'],
+    })
+  })
+
+  it('goes forward to the calm line when nothing is waiting', () => {
+    const only = run(LIVE_START, data('a'), tick, tick)
+    const calm = run(afterAnswering(only), data(), tick, tick)
+    expect(calm).toMatchObject({ current: null, phase: 'calm', behind: ['a'], queue: [] })
+
+    const at = run(calm, back, tick, tick)
+    expect(at).toMatchObject({ current: 'a', phase: 'showing' })
+    expect(run(at, forward, tick)).toMatchObject({ current: null, phase: 'calm', behind: ['a'] })
+  })
+
+  it('ignores forward at the edge', () => {
+    expect(liveQueue(showing, forward)).toBe(showing)
+    const calm = run(LIVE_START, data(), tick)
+    expect(liveQueue(calm, forward)).toBe(calm)
+  })
+
+  it('ignores both arrows while a card is entering, acked, leaving or gone', () => {
+    const walked = run(LIVE_START, data('a', 'b'), tick, tick, answer('Yes'), tick, tick)
+    const entering = run(walked, tick)
+    expect(entering.phase).toBe('entering')
+    for (const state of [entering, run(walked, answer('x')), walked]) {
+      expect(liveQueue(state, back)).toBe(state)
+      expect(liveQueue(state, forward)).toBe(state)
+    }
+    const acked = liveQueue(showing, answer('Yes'))
+    expect(liveQueue(acked, back)).toBe(acked)
+    const leaving = run(acked, tick)
+    expect(liveQueue(leaving, back)).toBe(leaving)
+    expect(liveQueue(leaving, forward)).toBe(leaving)
+  })
+
+  it('takes a change on a card behind the cursor back to the edge', () => {
+    const at = run(afterAnswering(showing), tick, tick, back, tick, tick)
+    expect(at).toMatchObject({ current: 'a', phase: 'showing', behind: ['a'] })
+
+    const changed = run(at, answer('No'))
+    expect(changed).toMatchObject({ phase: 'acked', answered: 'No' })
+    const gap = run(changed, tick, tick)
+    expect(gap).toMatchObject({ current: null, phase: 'empty', behind: ['a'], queue: ['b', 'c'] })
+    expect(run(gap, tick)).toMatchObject({ current: 'b', phase: 'entering', motion: 'rise' })
+  })
+
+  it('lets a queued card answered elsewhere leave while you look back', () => {
+    const at = run(afterAnswering(showing), tick, tick, back, tick, tick)
+    const polled = liveQueue(at, data('c'))
+    expect(polled).toMatchObject({ current: 'a', phase: 'showing', behind: ['a'], queue: ['c'] })
+  })
+
+  it('leaves the card on screen alone when the data no longer holds it', () => {
+    const at = run(afterAnswering(showing), tick, tick, back, tick, tick)
+    // 'a' is answered, so it is never in the data. Nothing about that moves it.
+    expect(liveQueue(at, data('b', 'c'))).toBe(at)
+  })
+
+  it('puts a card the server calls stale behind the cursor too', () => {
+    const going = liveQueue(showing, { type: 'stale' })
+    expect(going).toMatchObject({ current: 'a', phase: 'leaving', answered: null })
+    expect(run(going, tick)).toMatchObject({ current: null, phase: 'empty', behind: ['a'] })
+  })
+})
+
+describe('where the cursor stands', () => {
+  const showing = run(LIVE_START, data('a', 'b', 'c'), tick, tick)
+
+  it('counts the card on screen among everything on the strip', () => {
+    expect(livePosition(showing)).toEqual({ at: 1, of: 3 })
+    expect(livePosition(run(afterAnswering(showing), tick, tick))).toEqual({ at: 2, of: 3 })
+  })
+
+  it('counts back from the oldest card when looking back', () => {
+    const at = run(afterAnswering(showing), tick, tick, back, tick, tick)
+    expect(livePosition(at)).toEqual({ at: 1, of: 3 })
+  })
+
+  it('gives the calm line the last slot when nothing waits', () => {
+    const only = run(LIVE_START, data('a'), tick, tick)
+    const calm = run(afterAnswering(only), data(), tick, tick)
+    expect(livePosition(run(calm, back, tick, tick))).toEqual({ at: 1, of: 2 })
+  })
+
+  it('says nothing at all while the calm line is up at the edge', () => {
+    expect(livePosition(run(LIVE_START, data(), tick))).toBe(null)
   })
 })

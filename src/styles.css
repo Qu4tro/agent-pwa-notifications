@@ -313,13 +313,75 @@
     animation: fade-out 200ms ease-out both;
   }
 
+  /* A step along the strip. Going back, the card on screen slides out to the
+     right and the older one slides in from the left; going forward, the
+     reverse. --live-slide is how far they travel, so the reduced-motion rule
+     can take the travel out and leave the fade. */
+  @keyframes slide-out-back {
+    from {
+      opacity: 1;
+      translate: 0;
+    }
+    to {
+      opacity: 0;
+      translate: var(--live-slide, 16px);
+    }
+  }
+  @keyframes slide-in-back {
+    from {
+      opacity: 0;
+      translate: calc(-1 * var(--live-slide, 16px));
+    }
+    to {
+      opacity: 1;
+      translate: 0;
+    }
+  }
+  @keyframes slide-out-forward {
+    from {
+      opacity: 1;
+      translate: 0;
+    }
+    to {
+      opacity: 0;
+      translate: calc(-1 * var(--live-slide, 16px));
+    }
+  }
+  @keyframes slide-in-forward {
+    from {
+      opacity: 0;
+      translate: var(--live-slide, 16px);
+    }
+    to {
+      opacity: 1;
+      translate: 0;
+    }
+  }
+  .live-out-back {
+    animation: slide-out-back 150ms ease-in both;
+  }
+  .live-out-forward {
+    animation: slide-out-forward 150ms ease-in both;
+  }
+  .live-in-back {
+    animation: slide-in-back 250ms ease-out both;
+  }
+  .live-in-forward {
+    animation: slide-in-forward 250ms ease-out both;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .live-in,
     .live-out,
     .live-calm,
     .live-note,
-    .live-fade {
+    .live-fade,
+    .live-out-back,
+    .live-out-forward,
+    .live-in-back,
+    .live-in-forward {
       --live-rise: 0px;
+      --live-slide: 0px;
       animation-duration: 150ms;
     }
   }
