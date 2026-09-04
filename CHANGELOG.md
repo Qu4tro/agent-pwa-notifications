@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-04
+
 ### Added
 
 - One page for everything waiting on you. `GET /api/v1/pending` gathers every
