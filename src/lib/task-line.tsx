@@ -4,6 +4,7 @@ import type { QueryKey } from '@tanstack/react-query'
 import { type TaskSummary } from './api'
 import { useAnswerFromList } from './queries'
 import { answerStyle } from './answers'
+import { shortAnswer } from './question'
 import { toParam } from './project'
 import { Button, KindLabel, Row, RowBody, Time, UnreadDot, rowLinkClass, type TimelineItem } from './ui'
 
@@ -37,9 +38,26 @@ export function timelineOf(t: TaskSummary): { items: TimelineItem[]; earlier: nu
       // characters twice on one row says nothing the second time.
       at: r.id === newest?.id ? null : r.created_at,
       unread: r.read_at == null,
+      answer: settled(r.question),
     }))
     .reverse()
   return { items, earlier: Math.max(0, t.count - t.recent.length) }
+}
+
+// A question line says what was decided, so a row does not stop at asking. A
+// question still waiting says nothing extra: its buttons are the answer, and
+// they are on the row.
+//
+// An encrypted answer is a ciphertext string here, and decrypting it would be
+// one async hook per line of every list, so the row says that it was answered
+// and not what. Nobody has yet said they miss the value.
+function settled(
+  q: TaskSummary['recent'][number]['question'],
+): TimelineItem['answer'] {
+  if (!q || q.status === 'pending') return null
+  if (q.status === 'expired') return { status: 'expired', text: 'expired' }
+  const text = typeof q.answer === 'string' ? 'answered' : shortAnswer(q.answer)
+  return { status: 'answered', text: text || 'answered' }
 }
 
 export function TaskLine({

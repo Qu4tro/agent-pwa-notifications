@@ -34,7 +34,13 @@ async function tasks(cookie: string, project = 'p') {
     idle_minutes: number | null
     latest_kind: string
     count: number
-    recent: { id: string; kind: string; title: string; read_at: number | null }[]
+    recent: {
+      id: string
+      kind: string
+      title: string
+      read_at: number | null
+      question: { status: string; answer: unknown } | null
+    }[]
   }[]
 }
 
@@ -268,6 +274,47 @@ describe('GET /api/v1/tasks recent', () => {
     expect(task.recent.map((r) => r.kind)).toEqual(['update', 'error'])
     expect(task.recent[0].read_at).not.toBe(null)
     expect(task.recent[1].read_at).toBe(null)
+  })
+
+  // Note 5: the row showed "Question Roll the flag to production today?" and
+  // nothing about what was decided, though the SELECT behind it already reads
+  // the question's status and answer.
+  it('carries what a settled question was answered with', async () => {
+    const account = await createAccount('recent-answer@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account, 'Roll it?', [
+      { type: 'buttons', id: 'roll', options: ['Yes', 'No'] },
+    ])
+    const answered = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { roll: 'Yes' },
+      auth: { cookie },
+    })
+    expect(answered.status).toBe(200)
+
+    const [task] = await tasks(cookie)
+    const entry = task.recent.find((r) => r.id === id)
+    expect(entry?.question).toEqual({ status: 'answered', answer: { roll: 'Yes' } })
+  })
+
+  it('says a question is still pending, and carries no answer for it', async () => {
+    const account = await createAccount('recent-pending@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account, 'Roll it?', [
+      { type: 'buttons', id: 'roll', options: ['Yes', 'No'] },
+    ])
+
+    const [task] = await tasks(cookie)
+    const entry = task.recent.find((r) => r.id === id)
+    expect(entry?.question).toEqual({ status: 'pending', answer: null })
+  })
+
+  it('leaves an event that is not a question with no question at all', async () => {
+    const account = await createAccount('recent-noq@example.invalid')
+    const cookie = await sessionFor(account.id)
+    await notify(account, 'r5', { title: 'Just an update' })
+
+    const [task] = await tasks(cookie, 'r5')
+    expect(task.recent[0].question).toBe(null)
   })
 
   it('has one entry for a thread of one event', async () => {

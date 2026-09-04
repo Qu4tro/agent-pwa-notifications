@@ -1,4 +1,4 @@
-import { KIND_BG, KIND_LABEL, KIND_TEXT } from '../project'
+import { KIND_BG, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../project'
 import { Time } from './time'
 
 // One line in a list. Everything on a list page is made of these: a time
@@ -61,6 +61,10 @@ export interface TimelineItem {
   title: string
   at: number | null
   unread: boolean
+  // What was decided, on a question that has been settled. `answered` carries
+  // the answer itself; `expired` carries the word. A question still waiting
+  // carries nothing, because its buttons are on the row.
+  answer?: { status: 'answered' | 'expired'; text: string } | null
 }
 
 // The middle of a row: title on top, and under it either one muted line of
@@ -101,23 +105,42 @@ function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }
         {/* First dot's centre to last dot's centre, and no further. */}
         <span aria-hidden className="absolute top-[10px] bottom-[10px] left-[2.5px] w-px bg-line" />
         {items.map((it) => (
-          <li key={it.id} className="flex items-start gap-2">
+          <li key={it.id} className="flex items-start gap-x-1.5 gap-y-0">
             <span
               aria-hidden
-              className={`mt-[7px] size-1.5 shrink-0 rounded-full ${KIND_BG[it.kind] ?? 'bg-muted'}`}
+              className={`mt-[7px] mr-0.5 size-1.5 shrink-0 rounded-full ${KIND_BG[it.kind] ?? 'bg-muted'}`}
             />
+            <span
+              className={`shrink-0 text-[13px] font-semibold ${KIND_TEXT[it.kind] ?? 'text-muted'}`}
+            >
+              {KIND_LABEL[it.kind] ?? 'Event'}
+            </span>
             {/* Unread keeps full-weight text, the same signal the row uses. */}
             <span
               className={`min-w-0 flex-1 truncate text-[15px] leading-[1.35] ${
                 it.unread ? 'text-text' : 'text-muted'
               }`}
             >
-              <span className={`text-[13px] font-semibold ${KIND_TEXT[it.kind] ?? 'text-muted'}`}>
-                {KIND_LABEL[it.kind] ?? 'Event'}
-              </span>{' '}
               {it.title}
             </span>
-            {/* The time never truncates; the title gives way to it first. */}
+            {/* What was decided, and then when. The title gives way to both
+                before either gives way - but only as far as half the line: an
+                answer that is a whole sentence would otherwise leave a row
+                that says what was decided and never what was asked. */}
+            {it.answer ? (
+              it.answer.status === 'answered' ? (
+                <span
+                  className={`max-w-[55%] shrink-0 truncate text-[15px] leading-[1.35] font-semibold ${STATE_TEXT.answered}`}
+                >
+                  <span className="sr-only">answered </span>
+                  {it.answer.text}
+                </span>
+              ) : (
+                <span className={`shrink-0 text-[15px] leading-[1.35] ${STATE_TEXT.expired}`}>
+                  expired
+                </span>
+              )
+            ) : null}
             {it.at != null ? (
               <Time at={it.at} className="shrink-0 pt-[3px] text-[13px] text-faint" />
             ) : null}

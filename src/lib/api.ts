@@ -73,6 +73,9 @@ export interface TaskSummary {
     title: string
     created_at: number
     read_at: number | null
+    // Set only on a question. `answer` is the ciphertext string when the event
+    // is encrypted, which is why the row says "answered" and not what.
+    question: { status: 'pending' | 'answered' | 'expired'; answer: unknown } | null
   }[]
 }
 

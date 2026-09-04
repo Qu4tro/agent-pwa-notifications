@@ -477,6 +477,7 @@ function summarizeThreads(rows: Record<string, unknown>[]): any[] {
           title: unknown
           created_at: unknown
           read_at: unknown
+          question: { status: unknown; answer: unknown } | null
         }[],
       }
       threads.set(id, t)
@@ -500,6 +501,21 @@ function summarizeThreads(rows: Record<string, unknown>[]): any[] {
       title: row.title,
       created_at: row.created_at,
       read_at: row.read_at ?? null,
+      // What was decided, so a row can say it. The SELECT already joins
+      // questions for the pending check below; this is the same two columns,
+      // parsed by the same rule as `hydrate` - ciphertext straight through
+      // when the event is encrypted, JSON otherwise.
+      question:
+        row.q_status != null
+          ? {
+              status: row.q_status,
+              answer: row.q_answer
+                ? Number(row.enc ?? 0) === 1
+                  ? (row.q_answer as string)
+                  : JSON.parse(row.q_answer as string)
+                : null,
+            }
+          : null,
     })
     if (t.recent.length > RECENT_ON_A_ROW) t.recent.shift()
     t.last_activity = Math.max(t.last_activity, Number(row.updated_at ?? row.created_at))
