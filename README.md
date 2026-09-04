@@ -16,7 +16,9 @@ Think "ntfy for agents, with a reply button". One person, one hub, no vendor.
   through quiet hours.
 - **Ask and wait.** An agent posts a question and polls until you answer. A
   short question with two or three short options is answerable straight from
-  the notification, so a decision costs one tap.
+  the notification, so a decision costs one tap. Every question also takes your
+  own words, and an answer you have given can be changed: the latest one is the
+  answer, and the agent is told it moved.
 - **Structured messages.** Agents send typed blocks (markdown, progress, table,
   key-values, buttons, form), validated against a schema and rendered by the
   app. Agent text is never treated as HTML.
@@ -92,7 +94,8 @@ agent-notify-pwa open                        # one-time sign-in link, with a QR
 ```
 
 `ask` blocks until the question is answered or expires and prints the answer as
-JSON, so it composes:
+JSON - `{ "choice": ..., "text": ... }`, either of which can be null - so it
+composes:
 
 ```bash
 CHOICE=$(agent-notify-pwa ask "Ship it?" --button Ship --button Hold | jq -r .choice)
@@ -123,11 +126,14 @@ types.
 A question carries its answers as notification buttons when the title is at
 most 80 characters, the blocks hold exactly one `buttons` block with two or
 three options of at most 20 characters, and the question is not encrypted.
-Anything larger opens the thread instead. How many buttons appear depends on
-the browser, which the service worker asks through `Notification.maxActions`.
+Anything larger takes a Reply instead: a text action that answers the question
+in your own words without opening the app, on a browser that types into a
+notification. How many buttons appear depends on the browser, which the service
+worker asks through `Notification.maxActions`.
 
-Two taps can race, one from the phone and one from the desktop; the first
-answer wins and the second gets a 409.
+An answer from a notification lands only on a question still waiting, so two
+taps that race - one from the phone, one from the desktop - settle with one
+winner and a 409 for the other. In the app the latest answer is the answer.
 
 [public_docs/notifications.md](public_docs/notifications.md) has the rules, the
 per-browser results, what each tap does, and why encrypted questions never get
@@ -197,9 +203,9 @@ What this fork changes:
 - `ALLOWED_EMAILS` closes registration on a hub that does have an email sender.
 - The skill and the MCP tools describe the endpoints this server implements,
   with no hosted-service tier and no capability negotiation.
-- Notification answers: a first-answer-wins write, a button rule that stops
-  hiding answers behind "More", and a session long enough that a tap on a
-  notification is not a trip through the sign-in page.
+- Notification answers: a write that lands only on a waiting question, a button
+  rule that gives a spare slot to Reply, and a session long enough that a tap on
+  a notification is not a trip through the sign-in page.
 - A test suite, a release workflow, and a data layer that paints from cache.
 - A compact single-column interface where colour carries meaning.
 

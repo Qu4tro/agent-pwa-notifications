@@ -201,9 +201,16 @@ async function ask() {
     }
     if (r.json.status === 'answered') {
       let answer = r.json.answer
+      let text = r.json.text
       if (conf.encKey && typeof answer === 'string') answer = await decrypt(conf.encKey, answer)
+      if (conf.encKey && typeof text === 'string') text = await decrypt(conf.encKey, text)
       process.stderr.write('\n')
-      console.log(JSON.stringify(answer)) // stdout = machine-readable
+      // Flattened, because this command owns the block id `choice`: one object
+      // of the option and the words, so `jq -r .choice` reads the choice and
+      // `jq -r .text` reads what the human wrote. Either can be null.
+      console.log(
+        JSON.stringify({ choice: answer?.choice ?? null, text: text ?? null }),
+      ) // stdout = machine-readable
       return
     }
     if (r.json.status === 'expired') die('The question expired with no answer.')
@@ -256,11 +263,16 @@ ${BIN} ${VERSION} - talk to your Agent Notifications hub
                           [--markdown "..."] [--tag x] [--agent NAME]
                           [--idle MINUTES]
       --kind done is what ends a thread on the dashboard. --idle says how long
-      silence still counts as working (default 240).
+      silence still counts as working (default 240). An answer the human
+      changed on this thread since you last read it prints on stderr as
+      \`changed answer <id> "<title>": {...}\`.
 
   ${BIN} ask "question" --button A --button B [--color NAME|#rrggbb]
                           [--markdown "..."] [--ack "..."] [--idle MINUTES]
-      Post a question, wait, then print the answer JSON on stdout.
+      Post a question, wait, then print { "choice": ..., "text": ... } on
+      stdout. The human can tap an option, write words, or both, so either
+      field can be null: \`jq -r .choice\` for the option, \`jq -r .text\` for
+      the words.
       Every option is already a different colour. --color pairs with --button
       by position when a particular choice should read a particular way:
       blue, violet, mint, rose, amber, cyan, pink, lime, or #rrggbb.

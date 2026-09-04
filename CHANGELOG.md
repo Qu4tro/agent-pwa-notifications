@@ -10,6 +10,32 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Added
+
+- Free text on every question. A line under the controls takes your own words,
+  so a form question, an eight-option question and a yes/no question can all be
+  answered in prose. The words arrive at the agent as `text`, beside the values.
+- Reply from the notification. On Android Chrome a question with a spare action
+  slot carries a text action: type the answer in the shade and it lands without
+  the app opening.
+- Changing an answer. Tap a different option, or edit the words and send. The
+  agent gets `changes`, a count of the replacements, and `changed_answers` on
+  the next call it makes on the thread, so an agent that moved on is told.
+- Back and forward in the live mode. The page is a strip of cards with a
+  cursor: the arrows under the card, or the arrow keys, walk back through what
+  you answered this sitting and forward to what is waiting. The position
+  replaces the count of what is left.
+
+### Changed
+
+- The body of `POST /api/v1/questions/:id/answer` is an envelope of `answer`
+  and `text`, with an optional `if_pending` that writes only while the question
+  is still waiting.
+- `GET /api/v1/questions/:id` returns `text` and `changes` beside the answer.
+- More is replaced by Reply in the notification's action row.
+- `agent-notify-pwa ask` prints `{ "choice": ..., "text": ... }`. `jq -r
+  .choice` still reads the option and is null on an answer of words alone.
+
 ## [1.1.0] - 2026-09-03
 
 ### Changed

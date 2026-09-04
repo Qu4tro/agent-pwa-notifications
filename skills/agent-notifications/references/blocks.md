@@ -91,6 +91,20 @@ A single highlighted line. `tone` is `info` (default), `success`, `warn` or
 
 ## Interactive blocks (questions only)
 
+An answer is one document in two parts. `answer` holds the values of the blocks
+below, keyed by block id; `text` holds the human's own words. They are
+siblings, so no block id can collide with the words, and either part may be
+empty:
+
+```json
+{ "answer": { "confirm": "Deploy" }, "text": null }
+{ "answer": { "confirm": "Deploy" }, "text": "after the demo, not before" }
+{ "answer": {}, "text": "wait for QA to sign off" }
+```
+
+Every question takes words, whatever blocks it carries, so plan for an answer
+that arrives as prose alone.
+
 ### buttons
 
 One choice from a list. `id` is the key the answer comes back under. Up to 8
@@ -101,7 +115,7 @@ answerable straight from the notification.
 { "type": "buttons", "id": "confirm", "options": ["Deploy", "Hold"] }
 ```
 
-Answer shape: `{ "confirm": "Deploy" }`.
+Answer shape: `{ "answer": { "confirm": "Deploy" }, "text": null }`.
 
 An option's colour is decided by three rules, in this order:
 
@@ -150,9 +164,12 @@ and `placeholder`.
 }
 ```
 
-Answer shape: `{ "deck": { "audience": "Investor", "tone": "Punchy", "notes": "Lead with traction" } }`.
+Answer shape:
+`{ "answer": { "deck": { "audience": "Investor", "tone": "Punchy", "notes": "Lead with traction" } }, "text": null }`.
 
-A form always opens the app: it cannot fit in a notification.
+A form always opens the app: its fields cannot fit in a notification. The
+notification still carries a Reply action, so the human can answer it in words
+without opening anything.
 
 ## A whole question
 

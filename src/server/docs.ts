@@ -56,11 +56,31 @@ export function blockSchemaDoc(): Response {
           { type: 'buttons', id: 'confirm', options: ['Deploy', 'Cancel'], colors: ['mint', 'rose'] },
         ],
       },
+      // An answer is one document in two parts. `answer` holds the values of
+      // the controls, keyed by block id; `text` holds the human's own words.
+      // They are siblings, so no block id can collide with the words. Either
+      // part may be empty, and at least one is filled.
+      answers: {
+        description:
+          'What GET /api/v1/questions/{id} returns as `answer` and `text`. Every question takes words, whatever controls it carries.',
+        buttons: { answer: { confirm: 'Deploy' }, text: null },
+        form: {
+          answer: { deck: { audience: 'VC', tone: 'Punchy', notes: 'Keep it to ten slides.' } },
+          text: null,
+        },
+        both: { answer: { confirm: 'Deploy' }, text: 'after the demo, not before' },
+        words_alone: { answer: {}, text: 'wait for QA to sign off' },
+      },
     },
     200,
     { 'access-control-allow-origin': '*' },
   )
 }
+
+// An agent that moved on has no poll running, so a changed answer rides on the
+// next call it makes on the thread.
+const CHANGED_ANSWERS =
+  ' Carries `changed_answers` when the human replaced an answer on this thread and no poll has collected it since: read each item, then poll its id to acknowledge it.'
 
 export function openApiDoc(origin: string): Response {
   const spec = {
@@ -105,7 +125,12 @@ export function openApiDoc(origin: string): Response {
               },
             },
           },
-          responses: { '200': { description: 'Created', content: { 'application/json': {} } } },
+          responses: {
+            '200': {
+              description: 'Created.' + CHANGED_ANSWERS,
+              content: { 'application/json': {} },
+            },
+          },
         },
       },
       '/api/v1/questions': {
@@ -131,7 +156,7 @@ export function openApiDoc(origin: string): Response {
               },
             },
           },
-          responses: { '200': { description: 'Created; returns id + poll_url' } },
+          responses: { '200': { description: 'Created; returns id + poll_url.' + CHANGED_ANSWERS } },
         },
       },
       '/api/v1/questions/{id}': {
@@ -139,7 +164,45 @@ export function openApiDoc(origin: string): Response {
           operationId: 'wait_for_answer',
           summary: 'Poll for the answer. Repeat every ~10s while status is pending.',
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-          responses: { '200': { description: 'status: pending | answered | expired' } },
+          responses: {
+            '200': {
+              description:
+                'status: pending | answered | expired, answer (the values keyed by block id, {} when only words were sent), text (the human own words, or null), answered_at, changes (how many times the answer was replaced after it was first given).',
+            },
+          },
+        },
+      },
+      '/api/v1/questions/{id}/answer': {
+        post: {
+          operationId: 'answer',
+          summary: 'Write the answer. The latest one is the answer.',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    answer: {
+                      type: 'object',
+                      description: 'The values of the question own controls, keyed by block id.',
+                    },
+                    text: {
+                      type: 'string',
+                      nullable: true,
+                      description: 'The human own words, 20000 characters at most.',
+                    },
+                    if_pending: {
+                      type: 'boolean',
+                      description: 'Write only while the question is still waiting.',
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { '200': { description: 'ok, status, changes' } },
         },
       },
       '/api/v1/inbox': {
@@ -176,7 +239,7 @@ export function openApiDoc(origin: string): Response {
               },
             },
           },
-          responses: { '200': { description: 'Updated' } },
+          responses: { '200': { description: 'Updated.' + CHANGED_ANSWERS } },
         },
       },
       '/api/v1/clear': {
