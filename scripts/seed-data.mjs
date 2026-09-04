@@ -779,6 +779,157 @@ pub struct Config {
       },
     ],
   },
+
+  // ------------------------------------------------------------ yes and no
+  // A project of nothing but yes/no decisions, for looking at what the affirm
+  // and deny lists do to a page of them: the two words carry their own colour,
+  // so a row of them can be read without reading. The last thread is the
+  // control - the same shape of question with labels that are not on either
+  // list, which fall back to the palette.
+  {
+    project: 'gate-keeper',
+    task: 'Nightly release gate',
+    agent: 'release-bot',
+    model: 'claude-opus-5',
+    taskId: 'gk-release',
+    tags: ['release', 'gate'],
+    events: [
+      {
+        min: 6 * H,
+        kind: 'update',
+        title: 'Build 4821 is green on every runner',
+        blocks: [kv(['tests', '1284 passed'], ['duration', '6m 41s'], ['runners', '4'])],
+      },
+      {
+        min: 25,
+        kind: 'question',
+        title: 'Promote build 4821 to production?',
+        status: 'pending',
+        priority: 2,
+        timeoutMin: 6 * H,
+        ack: 'Understood - {answer}.',
+        blocks: [
+          md('Every check passed and the canary has been quiet for an hour.'),
+          buttons('promote', ['Yes', 'No']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Schema change on the events table',
+    agent: 'migrator',
+    model: 'gpt-5.2',
+    taskId: 'gk-schema',
+    tags: ['db'],
+    events: [
+      {
+        min: 3 * H,
+        kind: 'question',
+        title: 'The migration drops a column. Is that right?',
+        status: 'pending',
+        timeoutMin: 12 * H,
+        blocks: [
+          md('`events.legacy_payload` has been null on every row for six weeks.'),
+          buttons('drop', ['Correct', 'Wrong']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Dependency bump: zod 3 to 4',
+    agent: 'dependabot-ish',
+    model: null,
+    taskId: 'gk-zod',
+    tags: ['deps'],
+    events: [
+      {
+        min: 90,
+        kind: 'question',
+        title: 'Go ahead with the zod 4 bump?',
+        status: 'pending',
+        timeoutMin: 24 * H,
+        blocks: [
+          md('Four call sites change. The block schema is the only public one.'),
+          buttons('bump', ['Go ahead', 'Not now']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Stale branch cleanup',
+    agent: 'janitor',
+    model: null,
+    taskId: 'gk-branches',
+    tags: ['cleanup'],
+    events: [
+      {
+        min: 40,
+        kind: 'question',
+        title: 'Delete 31 branches merged more than 90 days ago?',
+        status: 'pending',
+        timeoutMin: 48 * H,
+        blocks: [
+          md('None of them is the base of an open pull request.'),
+          buttons('clean', ['Approve', 'Reject']),
+        ],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Quiet hours for the on-call phone',
+    agent: 'release-bot',
+    model: 'claude-sonnet-5',
+    taskId: 'gk-quiet',
+    tags: ['ops'],
+    events: [
+      {
+        min: 5 * H,
+        kind: 'question',
+        title: 'Silence non-critical pushes between 23:00 and 07:00?',
+        status: 'answered',
+        answer: { quiet: 'OK' },
+        answeredMin: 4 * H + 20,
+        pickedMin: 4 * H + 10,
+        timeoutMin: 24 * H,
+        ack: 'Understood - {answer}. Quiet hours are on.',
+        blocks: [
+          md('Priority 2 still gets through.'),
+          buttons('quiet', ['OK', 'Nope']),
+        ],
+      },
+      {
+        min: 4 * H,
+        kind: 'done',
+        title: 'Quiet hours set on the on-call phone',
+        blocks: [callout('success', 'Anything below priority 2 will hold until 07:00.')],
+      },
+    ],
+  },
+  {
+    project: 'gate-keeper',
+    task: 'Rollout shape for the new ranker',
+    agent: 'release-bot',
+    model: 'claude-opus-5',
+    taskId: 'gk-ranker',
+    tags: ['release'],
+    events: [
+      {
+        min: 55,
+        kind: 'question',
+        title: 'How much traffic should the new ranker take?',
+        status: 'pending',
+        timeoutMin: 8 * H,
+        blocks: [
+          md('The control is the question above it: none of these words is on either list, so they take the palette.'),
+          buttons('shape', ['All of it', 'Half', 'A tenth']),
+        ],
+      },
+    ],
+  },
 ]
 
 // -- Encrypted thread ---------------------------------------------------------

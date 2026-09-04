@@ -28,6 +28,49 @@ const ORDER = Object.keys(ANSWER_PALETTE) as AnswerColorName[]
 
 const HEX = /^#[0-9a-f]{6}$/i
 
+// Two short lists of what an answer can be, where the colour is not decoration
+// but the answer itself. "Yes" and "No" in two arbitrary pastels make the eye
+// stop and read; in green and red they do not have to. Everything else keeps
+// the "these are different choices" register, which says nothing about which
+// one is which.
+//
+// Green is the palette's mint and red its rose - pale, and in the answers'
+// own register, so a deny option never reads as the error colour an event
+// kind uses.
+//
+// Whole labels, not substrings, with case and trailing punctuation ignored. A
+// substring rule would colour "Nope, not now" from "no" and "Yes, but hold"
+// from "yes", which is the opposite of what either list is for. Multi-word
+// entries are allowed, and are why the match is on the whole label.
+export const AFFIRM = new Set([
+  'yes', 'y', 'yep', 'yeah', 'yup', 'ok', 'okay', 'sure', 'correct', 'right',
+  'true', 'confirm', 'confirmed', 'approve', 'approved', 'accept', 'accepted',
+  'agree', 'i agree', 'allow', 'enable', 'go', 'go ahead', 'do it', 'proceed',
+  'continue', 'looks good', 'lgtm', 'all good', 'sounds good', 'yes please',
+])
+
+export const DENY = new Set([
+  'no', 'n', 'nope', 'nah', 'wrong', 'incorrect', 'false', 'deny', 'denied',
+  'reject', 'rejected', 'decline', 'declined', 'disagree', 'cancel', 'stop',
+  'abort', 'never', 'do not', "don't", 'not now', 'disable', 'block', 'skip it',
+  'no thanks', 'leave it',
+])
+
+// Case, surrounding space and a trailing full stop or bang are noise: an agent
+// writes "Yes." as readily as "yes".
+function normalise(label: string): string {
+  return label.toLowerCase().trim().replace(/[.!?,;:]+$/, '').replace(/\s+/g, ' ')
+}
+
+// The colour a label earns by what it says, or null when it says nothing about
+// which choice it is.
+export function wordColor(label: string): string | null {
+  const word = normalise(label)
+  if (AFFIRM.has(word)) return ANSWER_PALETTE.mint
+  if (DENY.has(word)) return ANSWER_PALETTE.rose
+  return null
+}
+
 // What an agent is allowed to send: one of the eight names, or six hex digits.
 // Nothing else resolves, so nothing a style attribute could act on - `url(`,
 // an expression, a second declaration - can ever reach the DOM through here.
@@ -75,13 +118,26 @@ export function answerTextColor(fill: string): string {
 // than a class, because the value is per option and Tailwind can only see
 // class names it can read in the source.
 //
+// Three rules, in this order, and the order is the contract:
+//
+//   1. What the agent asked for. A `colors` entry - which is what the CLI's
+//      --color sends - always wins, on "Yes" as much as on anything else. An
+//      agent that names a colour has said something the app does not overrule.
+//   2. What the label says it is. A plain affirmative or denial takes green or
+//      red, so the reader does not have to read it.
+//   3. The palette, by position, which says only "these are different".
+//
 // Resolved for the whole question at once, not one option at a time, so the
-// palette can walk past anything an agent has already claimed. Colouring the
-// first of three options mint and leaving the rest alone would otherwise hand
-// the third one mint as well, which is the one thing this is here to prevent.
-export function answerStyles(count: number, colors?: (string | undefined)[]): React.CSSProperties[] {
-  const overrides = Array.from({ length: count }, (_, i) => overrideColor(colors?.[i]))
-  const taken = new Set(overrides.filter((fill): fill is string => fill != null))
+// palette can walk past anything the first two rules have claimed. Colouring
+// the first of three options mint and leaving the rest alone would otherwise
+// hand the third one mint as well, which is the one thing this is here to
+// prevent.
+export function answerStyles(
+  labels: string[],
+  colors?: (string | undefined)[],
+): React.CSSProperties[] {
+  const fixed = labels.map((label, i) => overrideColor(colors?.[i]) ?? wordColor(label))
+  const taken = new Set(fixed.filter((fill): fill is string => fill != null))
 
   let cursor = 0
   const nextFree = (): string => {
@@ -99,8 +155,8 @@ export function answerStyles(count: number, colors?: (string | undefined)[]): Re
     return fill
   }
 
-  return overrides.map((override) => {
-    const fill = override ?? nextFree()
+  return fixed.map((known) => {
+    const fill = known ?? nextFree()
     return { '--answer-bg': fill, '--answer-fg': answerTextColor(fill) } as React.CSSProperties
   })
 }

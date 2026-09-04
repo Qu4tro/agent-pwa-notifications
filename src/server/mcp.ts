@@ -71,7 +71,7 @@ const TOOLS = [
         blocks: {
           type: 'array',
           description:
-            'Must include a buttons or form block. Notification answers require exactly one buttons block with 2-3 labels of at most 20 characters each. Put longer context in markdown; e.g. [{"type":"markdown","text":"The checks passed."},{"type":"buttons","id":"go","options":["Ship","Hold"]}]. Every option is already a different colour; add "colors" (one per option: blue|violet|mint|rose|amber|cyan|pink|lime or #rrggbb) only when a particular choice should read a particular way.',
+            'Must include a buttons or form block. Notification answers require exactly one buttons block with 2-3 labels of at most 20 characters each. Put longer context in markdown; e.g. [{"type":"markdown","text":"The checks passed."},{"type":"buttons","id":"go","options":["Ship","Hold"]}]. Every option is already a different colour, and a plain affirmative or denial ("Yes"/"No", "Correct"/"Wrong", "Approve"/"Reject", "Go ahead"/"Not now") comes out green/red on its own - write the plain word and let it. Add "colors" (one per option: blue|violet|mint|rose|amber|cyan|pink|lime or #rrggbb) only when a particular choice should read a particular way; it overrules both of the above, so never use it to paint an affirmative red.',
         },
         timeout_minutes: { type: 'number', description: 'How long to wait before the question expires. Default 1440 (24h).' },
         idle_minutes: { type: 'number', description: 'How many minutes of silence still count as working. Once it passes with nothing new on the thread, the dashboard moves the thread out of Active. Default 240 (4h). Set it when you are about to go quiet for longer than that.' },

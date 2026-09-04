@@ -136,7 +136,7 @@ export function PendingLine({
   if (options.length === 0 || !eventId) return <TaskLine t={t} from={from} />
 
   const styles = answerStyles(
-    options.length,
+    options.map((o) => o.label),
     options.map((o) => o.color),
   )
 

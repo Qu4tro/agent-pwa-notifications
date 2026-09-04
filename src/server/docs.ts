@@ -23,7 +23,7 @@ export function blockSchemaDoc(): Response {
           id: 'string',
           options: 'string[] (the choices)',
           colors:
-            'string[]? (one per option, in the same order: blue|violet|mint|rose|amber|cyan|pink|lime, or #rrggbb. Leave it out and each option takes its own colour anyway.)',
+            'string[]? (one per option, in the same order: blue|violet|mint|rose|amber|cyan|pink|lime, or #rrggbb. Leave it out: every option already gets its own colour, and a plain "Yes"/"No", "Correct"/"Wrong", "Approve"/"Reject" comes out green/red on its own. An entry here overrules both.)',
         },
         form: {
           type: 'form',

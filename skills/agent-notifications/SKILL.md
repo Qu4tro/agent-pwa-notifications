@@ -336,9 +336,12 @@ That is the whole API:
 - Always pass `timeout_minutes` on a question and handle `expired`.
 - Prefer a micro-question: two short buttons the human can tap from the
   notification beats a form they have to open the app for.
-- The options already come out in different colours; `colors` on a buttons
-  block is for the rare case where one choice should read a particular way.
-  Red reads as an error in this app, so never paint the safe choice with it.
+- Do not colour the answers. The options already come out in different
+  colours, and a plain "Yes"/"No" - or "Correct"/"Wrong", "Approve"/"Reject",
+  "Go ahead"/"Not now" - comes out green/red on its own. Write the plain word
+  and let it. `colors` on a buttons block overrules that, and is for the rare
+  case where one choice should read a particular way; never use it to paint an
+  affirmative red.
 - Do not block forever. If you stop waiting, say so in a follow-up update on
   the same thread, so the human knows the question no longer matters.
 

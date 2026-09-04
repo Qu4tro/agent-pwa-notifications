@@ -363,7 +363,7 @@ export function AnswerForm({
           const options = (b.options as string[]) ?? []
           // Parallel to `options`, and short or absent: an option with no
           // entry falls back to its place in the palette.
-          const styles = answerStyles(options.length, b.colors as string[] | undefined)
+          const styles = answerStyles(options, b.colors as string[] | undefined)
           const id = String(b.id)
           return (
             <div key={i} className="flex flex-wrap gap-2">

@@ -96,10 +96,16 @@ CHOICE=$(agent-notify-pwa ask "Ship it?" --button Ship --button Hold | jq -r .ch
 Two or three buttons of at most 20 characters, with a title of at most 80
 characters, make the question answerable straight from the notification.
 
-Every option already gets its own colour, so two choices side by side are told
-apart before they are read. `--color` pairs with `--button` by position when a
-particular choice should read a particular way; an option with no `--color` of
-its own takes its place in the palette:
+Answers colour themselves. A plain affirmative or denial comes out green or
+red, and anything else takes its own colour from a palette, so two choices are
+told apart before they are read:
+
+```bash
+agent-notify-pwa ask "Promote build 4821?" --button Yes --button No
+```
+
+`--color` overrides that, always, and pairs with `--button` by position from
+the left. Use it when a particular choice should read a particular way:
 
 ```bash
 agent-notify-pwa ask "Roll the flag?" --button "Roll it" --button Wait \
@@ -107,7 +113,13 @@ agent-notify-pwa ask "Roll the flag?" --button "Roll it" --button Wait \
 ```
 
 The values are `blue`, `violet`, `mint`, `rose`, `amber`, `cyan`, `pink`,
-`lime`, or `#rrggbb`.
+`lime`, or `#rrggbb`. Pass fewer `--color`s than `--button`s and the options
+past the end colour themselves; because the pairing is positional, colouring
+only the second button means giving the first one a value too.
+
+Because `--color` wins over the affirmative/denial rule, it is also the only
+way to paint a "Yes" red. Do not: red is the error colour everywhere else in
+the app.
 
 ### status
 
