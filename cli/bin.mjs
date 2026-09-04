@@ -49,7 +49,7 @@ async function prompt(q) {
 
 // -- login: save hub url + agent key, verify ----------------------------------
 async function login() {
-  console.log('\nAgent Notifications: connect an agent\n')
+  console.log('\nAgent PWA Notifications: connect an agent\n')
   const cfg = loadConfig()
   const urlPrompt = cfg.url ? `Hub URL [${cfg.url}]: ` : 'Hub URL: '
   let url = flags.url || (await prompt(urlPrompt)) || cfg.url
@@ -247,7 +247,7 @@ function status() {
 
 function help() {
   console.log(`
-${BIN} ${VERSION} - talk to your Agent Notifications hub
+${BIN} ${VERSION} - talk to your Agent PWA Notifications hub
 
   ${BIN} login [--url U --key K] [--enc-key E]
       Save and verify the hub URL and the account key.

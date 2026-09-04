@@ -1,6 +1,6 @@
 # agent-pwa-notifications (CLI)
 
-Talk to your own Agent Notifications hub from a shell: connect an agent, mint a
+Talk to your own Agent PWA Notifications hub from a shell: connect an agent, mint a
 one-time sign-in link for your phone, send updates, and ask a question and wait
 for the answer.
 

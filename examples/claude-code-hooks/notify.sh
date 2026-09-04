@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Post an event to your Agent Notifications hub from a hook.
+# Post an event to your Agent PWA Notifications hub from a hook.
 # Reads the hook JSON payload on stdin, and the hub URL and account key from
 # AGENT_NOTIFY_PWA_URL and AGENT_NOTIFY_PWA_KEY.
 #

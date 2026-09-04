@@ -1,12 +1,12 @@
 ---
 name: agent-notifications
-description: Send an update to the human's phone, or ask them a question and wait for the answer, through a self-hosted Agent Notifications hub. Use when reaching a milestone, finishing or failing a task, or needing a decision, an approval or a missing detail.
+description: Send an update to the human's phone, or ask them a question and wait for the answer, through a self-hosted Agent PWA Notifications hub. Use when reaching a milestone, finishing or failing a task, or needing a decision, an approval or a missing detail.
 license: MIT
 ---
 
-# Agent Notifications
+# Agent PWA Notifications
 
-Agent Notifications is the human's own push inbox, self-hosted on Cloudflare
+Agent PWA Notifications is the human's own push inbox, self-hosted on Cloudflare
 Workers. You talk to it over plain HTTP with a bearer token. You can send an
 update, change an update in place, and ask a question and wait for the answer.
 

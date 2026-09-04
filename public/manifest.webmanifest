@@ -1,6 +1,6 @@
 {
-  "name": "Agent Notifications",
-  "short_name": "Agents",
+  "name": "Agent PWA Notifications",
+  "short_name": "Agent PWA",
   "description": "Push updates and ask-and-wait questions from your AI agents, on your own hub.",
   "start_url": "/",
   "scope": "/",

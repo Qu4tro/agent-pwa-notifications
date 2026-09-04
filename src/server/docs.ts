@@ -6,7 +6,7 @@ export function blockSchemaDoc(): Response {
   return json(
     {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
-      title: 'Agent Notifications blocks',
+      title: 'Agent PWA Notifications blocks',
       description:
         'A JSON array of typed UI blocks. Display blocks work in any event. Interactive blocks (buttons, form) are only valid on a question.',
       blocks: {
@@ -86,7 +86,7 @@ export function openApiDoc(origin: string): Response {
   const spec = {
     openapi: '3.1.0',
     info: {
-      title: 'Agent Notifications',
+      title: 'Agent PWA Notifications',
       version: __APP_VERSION__,
       description:
         'Push updates and ask-and-wait questions from AI agents to one human. Bearer auth with the account agent key.',

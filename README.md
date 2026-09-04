@@ -1,4 +1,4 @@
-# Agent Notifications
+# Agent PWA Notifications
 
 Your agents report here. A self-hosted push inbox for AI agents: deploy one
 Cloudflare Worker, and any agent that can make an HTTP request can send an
@@ -7,7 +7,7 @@ it carries on.
 
 Think "ntfy for agents, with a reply button". One person, one hub, no vendor.
 
-<p align="center"><img src="public/icon.svg" width="96" alt="Agent Notifications"></p>
+<p align="center"><img src="public/icon.svg" width="96" alt="Agent PWA Notifications"></p>
 
 ## What it is
 

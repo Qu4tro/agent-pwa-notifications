@@ -5,7 +5,7 @@ import type { Env } from './env'
 // log the code to the console instead of sending, so the whole OTP flow works
 // locally without a Resend account or a verified sending domain.
 
-const DEFAULT_FROM = 'Agent Notifications <onboarding@resend.dev>'
+const DEFAULT_FROM = 'Agent PWA Notifications <onboarding@resend.dev>'
 
 // Thrown when Resend rejects the send because the account's daily/monthly email
 // quota is exhausted (free tier is 100/day). Distinct from other failures so the
@@ -34,8 +34,8 @@ export async function sendOtpEmail(env: Env, to: string, code: string): Promise<
     body: JSON.stringify({
       from,
       to: [to],
-      subject: `Your Agent Notifications code: ${code}`,
-      text: `Your Agent Notifications login code is ${code}\n\nIt expires in 10 minutes. If you didn't request this, you can ignore this email.`,
+      subject: `Your Agent PWA Notifications code: ${code}`,
+      text: `Your Agent PWA Notifications login code is ${code}\n\nIt expires in 10 minutes. If you didn't request this, you can ignore this email.`,
       html: otpHtml(code),
     }),
   })

@@ -79,7 +79,7 @@ sender:
 ```bash
 pnpm exec wrangler secret put RESEND_API_KEY
 # and set EMAIL_FROM in the wrangler.jsonc vars, e.g.
-#   "EMAIL_FROM": "Agent Notifications <login@yourdomain>"
+#   "EMAIL_FROM": "Agent PWA Notifications <login@yourdomain>"
 ```
 
 ## 5. Close registration

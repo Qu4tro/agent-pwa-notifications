@@ -44,10 +44,10 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {}
   } catch (e) {
-    data = { title: 'Agent Notifications', body: event.data ? event.data.text() : '' }
+    data = { title: 'Agent PWA Notifications', body: event.data ? event.data.text() : '' }
   }
 
-  const title = data.title || 'Agent Notifications'
+  const title = data.title || 'Agent PWA Notifications'
   const isQuestion = data.kind === 'question'
   const actions = actionsForNotification(data)
   const options = {
