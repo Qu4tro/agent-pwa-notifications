@@ -4,7 +4,7 @@ import { onlineManager, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Bell } from 'lucide-react'
 import { APP_NAME } from './brand'
 import { pendingQuery } from './queries'
-import { iconButtonClass } from './ui'
+import { badgeClass, iconButtonClass } from './ui'
 
 // Mounted once by the app layout, so it never unmounts between pages. Pages
 // contribute their own slots through `useHeaderBack` and `useHeaderActions`.
@@ -62,7 +62,7 @@ function PendingButton() {
       {waiting > 0 ? (
         <span
           aria-hidden
-          className="absolute top-1 right-0.5 min-w-[1.1rem] rounded-full bg-kind-question px-1 text-center text-[12px] leading-[1.1rem] font-semibold text-bg"
+          className={`${badgeClass} absolute top-1 right-0.5 bg-kind-question text-bg`}
         >
           {waiting}
         </span>

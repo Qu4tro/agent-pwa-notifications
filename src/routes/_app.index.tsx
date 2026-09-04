@@ -13,6 +13,7 @@ import {
   RowBody,
   Section,
   Time,
+  badgeClass,
   iconButtonClass,
   rowLinkClass,
 } from '../lib/ui'
@@ -72,7 +73,19 @@ function Projects() {
   )
 }
 
+// A project row says two things beside its name, and they are not the same
+// thing. "N pending" is what needs an answer, in the question colour, on the
+// title line where the eye lands. New is a count in a neutral pill at the far
+// edge: it is the same pill as the bell in the header, minus the colour, so it
+// reads as a count and never as louder than the pending label beside it. It
+// used to be the words "N unread" in muted 13px text, which is the style of
+// the model list under it and read as part of that.
+//
+// The pill counts what the pending label does not. A pending question stays
+// unread until it is answered, so a row that said "2 pending  2 unread" was
+// counting the same two events twice.
 function ProjectLine({ p }: { p: ProjectRow }) {
+  const fresh = Math.max(0, p.unread - p.pending)
   return (
     <Row time={<Time at={p.last_activity} />}>
       <Link to="/project/$name" params={{ name: toParam(p.project) }} className={rowLinkClass}>
@@ -92,14 +105,19 @@ function ProjectLine({ p }: { p: ProjectRow }) {
                   {p.pending} pending
                 </span>
               ) : null}
-              {p.unread > 0 ? (
-                <span className="shrink-0 text-[13px] text-muted">{p.unread} unread</span>
-              ) : null}
             </span>
           }
           detail={p.models.length > 0 ? p.models.join(', ') : null}
           bold={p.unread > 0}
         />
+        {fresh > 0 ? (
+          // 2px down puts the 1.1rem pill on the centre of the title's 21px
+          // line, the same way the dot is nudged on the left.
+          <span className={`${badgeClass} mt-0.5 shrink-0 bg-line text-text`}>
+            {fresh}
+            <span className="sr-only"> unread</span>
+          </span>
+        ) : null}
       </Link>
     </Row>
   )
