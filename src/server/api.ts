@@ -1,6 +1,6 @@
 import type { Env } from './env'
 import { json, ulid, now } from './util'
-import { BlocksSchema, hasInteractive, answerTargets, type Block } from './blocks'
+import { AnswerEnvelope, BlocksSchema, hasInteractive, answerTargets, TEXT_LIMIT, type Block } from './blocks'
 import { pushToAll, type PushSubscription } from './push'
 import { pokeHub } from './hub'
 import { quickAnswerActions, previewText } from './quick-answers'
@@ -330,7 +330,7 @@ export async function createQuestion(request: Request, env: Env, accountId: stri
 // a waiting agent gets a definitive answer instead of hanging forever.
 export async function getQuestion(id: string, env: Env, accountId: string): Promise<Response> {
   const q = await env.DB.prepare(
-    `SELECT q.status, q.answer, q.answered_at, q.timeout_at, q.picked_up_at, e.enc
+    `SELECT q.status, q.answer, q.text, q.answered_at, q.timeout_at, q.picked_up_at, q.changes, e.enc
      FROM questions q JOIN events e ON e.id = q.event_id
      WHERE q.event_id = ?1 AND e.account_id = ?2`,
   )
@@ -338,9 +338,11 @@ export async function getQuestion(id: string, env: Env, accountId: string): Prom
     .first<{
       status: string
       answer: string | null
+      text: string | null
       answered_at: number | null
       timeout_at: number
       picked_up_at: number | null
+      changes: number
       enc: number
     }>()
 
@@ -362,9 +364,19 @@ export async function getQuestion(id: string, env: Env, accountId: string): Prom
   }
 
   // Encrypted answers are ciphertext strings - pass through for the agent to
-  // decrypt; plaintext answers are JSON.
+  // decrypt; plaintext answers are JSON. `text` is the human's own words, a
+  // ciphertext string when the event is encrypted, and null when the whole
+  // answer was made of controls. `changes` counts the replacements: a number
+  // higher than the agent last saw means the answer is new.
   const answer = q.answer ? (q.enc === 1 ? q.answer : JSON.parse(q.answer)) : null
-  return json({ ok: true, status: q.status, answer, answered_at: q.answered_at })
+  return json({
+    ok: true,
+    status: q.status,
+    answer,
+    text: q.text ?? null,
+    answered_at: q.answered_at,
+    changes: q.changes,
+  })
 }
 
 // Agent reads its recent events (dedupe / resume after a crash).
@@ -441,7 +453,8 @@ const RECENT_ON_A_ROW = 3
 // the map is keyed by both. Shared by the project list and the pending page,
 // which is why it is a function and not a loop inside getTasks.
 const SELECT_THREAD_ROWS = `SELECT e.*, ${THREAD_KEY_SQL} AS thread_key,
-       q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
+       q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
+       q.timeout_at AS q_timeout, q.picked_up_at AS q_picked, q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id`
 
 function summarizeThreads(rows: Record<string, unknown>[]): any[] {
@@ -477,7 +490,7 @@ function summarizeThreads(rows: Record<string, unknown>[]): any[] {
           title: unknown
           created_at: unknown
           read_at: unknown
-          question: { status: unknown; answer: unknown } | null
+          question: { status: unknown; answer: unknown; text: unknown } | null
         }[],
       }
       threads.set(id, t)
@@ -502,9 +515,10 @@ function summarizeThreads(rows: Record<string, unknown>[]): any[] {
       created_at: row.created_at,
       read_at: row.read_at ?? null,
       // What was decided, so a row can say it. The SELECT already joins
-      // questions for the pending check below; this is the same two columns,
+      // questions for the pending check below; these are the same columns,
       // parsed by the same rule as `hydrate` - ciphertext straight through
-      // when the event is encrypted, JSON otherwise.
+      // when the event is encrypted, JSON otherwise. `text` rides along
+      // because a row's answer may be words alone.
       question:
         row.q_status != null
           ? {
@@ -514,6 +528,7 @@ function summarizeThreads(rows: Record<string, unknown>[]): any[] {
                   ? (row.q_answer as string)
                   : JSON.parse(row.q_answer as string)
                 : null,
+              text: row.q_text ?? null,
             }
           : null,
     })
@@ -601,7 +616,8 @@ export async function getPending(env: Env, accountId: string): Promise<Response>
 // question waiting on you is at the top where the reader lands.
 export async function getThread(project: string, key: string, env: Env, accountId: string): Promise<Response> {
   const { results } = await env.DB.prepare(
-    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
+    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
+       q.timeout_at AS q_timeout, q.picked_up_at AS q_picked, q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
      WHERE e.account_id = ?1 AND e.archived_at IS NULL AND COALESCE(e.project, '') = ?2
        AND ${THREAD_KEY_SQL} = ?3
@@ -627,7 +643,8 @@ export async function getFeed(url: URL, env: Env, accountId: string): Promise<Re
   const sinceTs = Number(url.searchParams.get('since_ts') ?? '0') || 0
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? '100') | 0))
   const rows = await env.DB.prepare(
-    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
+    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
+       q.timeout_at AS q_timeout, q.picked_up_at AS q_picked, q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
      WHERE e.account_id = ?1 AND e.archived_at IS NULL
        AND COALESCE(e.updated_at, e.created_at) > ?2
@@ -640,7 +657,8 @@ export async function getFeed(url: URL, env: Env, accountId: string): Promise<Re
 
 export async function getEvent(id: string, env: Env, accountId: string): Promise<Response> {
   const row = await env.DB.prepare(
-    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked
+    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
+       q.timeout_at AS q_timeout, q.picked_up_at AS q_picked, q.changes AS q_changes
      FROM events e LEFT JOIN questions q ON q.event_id = e.id
      WHERE e.id = ?1 AND e.account_id = ?2 AND e.archived_at IS NULL`,
   )
@@ -679,7 +697,14 @@ function hydrate(row: Record<string, unknown>): Record<string, unknown> {
     read_at: row.read_at,
     question:
       row.q_status != null
-        ? { status: row.q_status, answer, timeout_at: row.q_timeout, picked_up_at: row.q_picked ?? null }
+        ? {
+            status: row.q_status,
+            answer,
+            text: row.q_text ?? null,
+            timeout_at: row.q_timeout,
+            picked_up_at: row.q_picked ?? null,
+            changes: Number(row.q_changes ?? 0),
+          }
         : null,
   }
 }
@@ -827,8 +852,14 @@ export async function archiveThreads(
   return json({ ok: true, archived })
 }
 
-// You answer a question in the UI. Validate the answer against the question's
-// own interactive blocks so a stale/garbage submit can't land.
+// You answer a question in the UI. The body is one document in two parts - the
+// values of the question's own controls, and the human's own words - and the
+// latest answer is the answer: a submit on an answered question replaces the
+// whole document and counts as a change. `if_pending` asks for the older rule
+// instead, write only while the question is still waiting; a notification tap
+// carries it, so words typed on the lock screen land only on a live question.
+// The values are validated against the question's own interactive blocks, so a
+// stale or garbage submit can't land.
 export async function answerQuestion(id: string, request: Request, env: Env, accountId: string): Promise<Response> {
   const event = await env.DB.prepare('SELECT blocks, enc FROM events WHERE id = ?1 AND account_id = ?2 AND kind = ?3')
     .bind(id, accountId, 'question')
@@ -839,33 +870,52 @@ export async function answerQuestion(id: string, request: Request, env: Env, acc
     .bind(id)
     .first<{ status: string }>()
   if (!q) return json({ ok: false, error: 'Unknown question.' }, 404)
-  if (q.status !== 'pending') return json({ ok: false, error: `Question already ${q.status}.` }, 409)
+  if (q.status === 'expired') return json({ ok: false, error: 'Question already expired.' }, 409)
 
-  let submitted: Record<string, unknown>
+  let body: unknown
   try {
-    submitted = (await request.json()) as Record<string, unknown>
+    body = await request.json()
   } catch {
     return json({ ok: false, error: 'Invalid JSON.' }, 400)
   }
 
-  // Encrypted question: the answer arrives as a ciphertext string the server
-  // can't (and shouldn't) validate. Store it opaquely for the agent to decrypt.
+  const parsed = AnswerEnvelope.safeParse(body)
+  if (!parsed.success) return json({ ok: false, error: 'Answer did not match any of the question fields.' }, 400)
+  const submitted = parsed.data
+  const ifPending = submitted.if_pending === true
+
+  // Encrypted question: both parts arrive as ciphertext strings the server
+  // can't (and shouldn't) look inside. The client always sends the values,
+  // encrypted as `{}` when no control was used, so a non-empty `answer` string
+  // is the whole rule the server can hold; the client keeps the document from
+  // being empty. Store both as given for the agent to decrypt.
   if (event.enc === 1) {
     if (submitted.enc !== true || typeof submitted.answer !== 'string' || !submitted.answer) {
       return json({ ok: false, error: 'Encrypted questions need an encrypted answer.' }, 400)
     }
-    return settleAnswer(env, accountId, id, submitted.answer)
+    const encText = typeof submitted.text === 'string' && submitted.text ? submitted.text : null
+    return settleAnswer(env, accountId, id, submitted.answer, encText, ifPending)
+  }
+
+  if (typeof submitted.answer === 'string') {
+    return json({ ok: false, error: 'Answer did not match any of the question fields.' }, 400)
+  }
+
+  const text = typeof submitted.text === 'string' ? submitted.text.trim() : null
+  if (text != null && text.length > TEXT_LIMIT) {
+    return json({ ok: false, error: `Text is too long (${TEXT_LIMIT} characters at most).` }, 400)
   }
 
   const blocks = JSON.parse(event.blocks) as Block[]
   const targets = answerTargets(blocks)
+  const values = submitted.answer ?? {}
   const answer: Record<string, unknown> = {}
 
   for (const bId of targets.buttons) {
-    if (typeof submitted[bId] === 'string') answer[bId] = submitted[bId]
+    if (typeof values[bId] === 'string') answer[bId] = values[bId]
   }
   for (const form of targets.forms) {
-    const raw = submitted[form.id]
+    const raw = values[form.id]
     if (raw && typeof raw === 'object') {
       const clean: Record<string, unknown> = {}
       for (const fId of form.fieldIds) {
@@ -875,31 +925,49 @@ export async function answerQuestion(id: string, request: Request, env: Env, acc
     }
   }
 
-  if (Object.keys(answer).length === 0) {
+  // Every key the client sent has to be a target of this question, so a submit
+  // built against a different question is refused instead of half-stored.
+  if (Object.keys(values).length !== Object.keys(answer).length) {
     return json({ ok: false, error: 'Answer did not match any of the question fields.' }, 400)
   }
 
-  return settleAnswer(env, accountId, id, JSON.stringify(answer))
+  if (Object.keys(answer).length === 0 && (text == null || text === '')) {
+    return json({ ok: false, error: 'An answer needs a choice, a form, or some words.' }, 400)
+  }
+
+  return settleAnswer(env, accountId, id, JSON.stringify(answer), text === '' ? null : text, ifPending)
 }
 
-// First answer wins. Two taps can land at once (the phone and a notification
-// action), so the write is conditional on the question still being pending and
-// the changed-row count decides the winner. The loser gets a 409 and the stored
-// answer is never a mix of the two bodies.
+// The latest answer is the answer. One statement writes the whole document and
+// counts the replacement in the same breath: SQLite reads the right-hand sides
+// against the row as it stands, so the CASE sees the status before the update.
+// Two taps can land at once (the phone and a notification action) and each one
+// writes a whole body, so the stored document is one of them, never a mix. A
+// change clears the delivery receipt, which sends the human's screen back to
+// "waiting for the agent" until the next poll stamps pickup again. An expired
+// question stays closed: it told the agent to go on without an answer, so an
+// answer to it would land nowhere.
 async function settleAnswer(
   env: Env,
   accountId: string,
   id: string,
   answer: string,
+  text: string | null,
+  ifPending: boolean,
 ): Promise<Response> {
-  const result = await env.DB.prepare(
-    `UPDATE questions SET status = 'answered', answer = ?1, answered_at = ?2
-     WHERE event_id = ?3 AND status = 'pending'`,
+  const guard = ifPending ? `status = 'pending'` : `status IN ('pending', 'answered')`
+  const row = await env.DB.prepare(
+    `UPDATE questions
+        SET status = 'answered', answer = ?1, text = ?2, answered_at = ?3,
+            changes = changes + CASE WHEN status = 'answered' THEN 1 ELSE 0 END,
+            picked_up_at = NULL
+      WHERE event_id = ?4 AND ${guard}
+      RETURNING changes`,
   )
-    .bind(answer, now(), id)
-    .run()
+    .bind(answer, text, now(), id)
+    .first<{ changes: number }>()
 
-  if (result.meta.changes === 0) {
+  if (!row) {
     const current = await env.DB.prepare('SELECT status FROM questions WHERE event_id = ?1')
       .bind(id)
       .first<{ status: string }>()
@@ -911,7 +979,7 @@ async function settleAnswer(
     .bind(now(), id)
     .run()
   await pokeHub(env, accountId)
-  return json({ ok: true })
+  return json({ ok: true, status: 'answered', changes: row.changes })
 }
 
 // -- Push subscription management (session) -----------------------------------

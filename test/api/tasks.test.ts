@@ -39,7 +39,7 @@ async function tasks(cookie: string, project = 'p') {
       kind: string
       title: string
       read_at: number | null
-      question: { status: string; answer: unknown } | null
+      question: { status: string; answer: unknown; text: string | null } | null
     }[]
   }[]
 }
@@ -114,7 +114,7 @@ describe('GET /api/v1/tasks pending_answers', () => {
     ])
 
     const answered = await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { choice: 'Ship' },
+      body: { answer: { choice: 'Ship' } },
       auth: { cookie },
     })
     expect(answered.status).toBe(200)
@@ -286,14 +286,31 @@ describe('GET /api/v1/tasks recent', () => {
       { type: 'buttons', id: 'roll', options: ['Yes', 'No'] },
     ])
     const answered = await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { roll: 'Yes' },
+      body: { answer: { roll: 'Yes' } },
       auth: { cookie },
     })
     expect(answered.status).toBe(200)
 
     const [task] = await tasks(cookie)
     const entry = task.recent.find((r) => r.id === id)
-    expect(entry?.question).toEqual({ status: 'answered', answer: { roll: 'Yes' } })
+    expect(entry?.question).toEqual({ status: 'answered', answer: { roll: 'Yes' }, text: null })
+  })
+
+  it('carries the words when the answer was words alone', async () => {
+    const account = await createAccount('recent-text@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account, 'Roll it?', [
+      { type: 'buttons', id: 'roll', options: ['Yes', 'No'] },
+    ])
+    const answered = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { text: 'wait for QA' },
+      auth: { cookie },
+    })
+    expect(answered.status).toBe(200)
+
+    const [task] = await tasks(cookie)
+    const entry = task.recent.find((r) => r.id === id)
+    expect(entry?.question).toEqual({ status: 'answered', answer: {}, text: 'wait for QA' })
   })
 
   it('says a question is still pending, and carries no answer for it', async () => {
@@ -305,7 +322,7 @@ describe('GET /api/v1/tasks recent', () => {
 
     const [task] = await tasks(cookie)
     const entry = task.recent.find((r) => r.id === id)
-    expect(entry?.question).toEqual({ status: 'pending', answer: null })
+    expect(entry?.question).toEqual({ status: 'pending', answer: null, text: null })
   })
 
   it('leaves an event that is not a question with no question at all', async () => {

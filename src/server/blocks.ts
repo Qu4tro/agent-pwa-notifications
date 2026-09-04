@@ -117,6 +117,25 @@ export function hasInteractive(blocks: Block[]): boolean {
   return blocks.some((b) => INTERACTIVE.has(b.type))
 }
 
+// The body of POST /api/v1/questions/:id/answer. An answer is one document in
+// two parts: `answer` is the values of the controls the agent sent, keyed by
+// block id; `text` is the human's own words. At least one part is filled - the
+// API checks that, because which part may be empty depends on the question.
+// `enc` marks both parts as ciphertext the server stores without looking
+// inside. `if_pending` is a precondition: write only while the question is
+// still waiting.
+export const AnswerEnvelope = z.object({
+  answer: z.union([z.record(z.unknown()), z.string()]).optional(),
+  text: z.string().nullable().optional(),
+  enc: z.boolean().optional(),
+  if_pending: z.boolean().optional(),
+})
+
+export type AnswerEnvelope = z.infer<typeof AnswerEnvelope>
+
+// The longest reply the text part takes, in characters.
+export const TEXT_LIMIT = 20_000
+
 // Collect the ids an answer is expected to carry, so we can validate a
 // submitted answer against the question's own blocks.
 export function answerTargets(blocks: Block[]): { buttons: string[]; forms: { id: string; fieldIds: string[] }[] } {

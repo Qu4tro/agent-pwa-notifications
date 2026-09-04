@@ -87,7 +87,7 @@ describe('GET /api/v1/pending', () => {
     expect(await pending(cookie)).toHaveLength(1)
 
     const answered = await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { choice: 'Ship' },
+      body: { answer: { choice: 'Ship' } },
       auth: { cookie },
     })
     expect(answered.status).toBe(200)

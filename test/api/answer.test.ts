@@ -13,11 +13,56 @@ async function ask(account: TestAccount, title = 'Ship it?'): Promise<string> {
   return res.body.id as string
 }
 
-async function storedAnswer(id: string): Promise<{ status: string; answer: string | null }> {
-  const row = await env.DB.prepare('SELECT status, answer FROM questions WHERE event_id = ?1')
+type StoredAnswer = {
+  status: string
+  answer: string | null
+  text: string | null
+  changes: number
+  picked_up_at: number | null
+}
+
+async function storedAnswer(id: string): Promise<StoredAnswer> {
+  const row = await env.DB.prepare(
+    'SELECT status, answer, text, changes, picked_up_at FROM questions WHERE event_id = ?1',
+  )
     .bind(id)
-    .first<{ status: string; answer: string | null }>()
+    .first<StoredAnswer>()
   return row!
+}
+
+const formBlock = [
+  {
+    type: 'form',
+    id: 'deck',
+    submitLabel: 'Save',
+    fields: [
+      { id: 'title', kind: 'text', label: 'Title' },
+      { id: 'slides', kind: 'number', label: 'Slides' },
+    ],
+  },
+]
+
+async function askWithBlocks(account: TestAccount, blocks: unknown, title = 'Ship it?'): Promise<string> {
+  const res = await call('POST', '/api/v1/questions', {
+    body: { agent: 'tester', title, blocks },
+    auth: { bearer: account.key },
+  })
+  expect(res.status).toBe(200)
+  return res.body.id as string
+}
+
+// The agent's own read of the question, which is also how it acknowledges an
+// answer: the poll stamps the delivery receipt.
+async function poll(account: TestAccount, id: string) {
+  const res = await call('GET', `/api/v1/questions/${id}`, { auth: { bearer: account.key } })
+  expect(res.status).toBe(200)
+  return res.body as {
+    status: string
+    answer: unknown
+    text: string | null
+    answered_at: number | null
+    changes: number
+  }
 }
 
 // Note 3: an agent may name the colour of an answer, so a particular choice
@@ -72,76 +117,206 @@ describe('colors on a buttons block', () => {
   })
 })
 
+// An answer is one document in two parts: `answer` carries the values of the
+// controls the agent sent, keyed by block id, and `text` carries the human's
+// own words. At least one part is filled, and the latest document is the
+// answer - a submit on an answered question replaces the whole of it and
+// counts as a change.
 describe('POST /api/v1/questions/:id/answer', () => {
-  it('stores the answer and marks the event read', async () => {
+  it('stores the values on their own and marks the event read', async () => {
     const account = await createAccount('answer-ok@example.invalid')
     const cookie = await sessionFor(account.id)
     const id = await ask(account)
 
     const res = await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { choice: 'Yes' },
+      body: { answer: { choice: 'Yes' } },
       auth: { cookie },
     })
     expect(res.status).toBe(200)
-    expect(await storedAnswer(id)).toMatchObject({ status: 'answered', answer: '{"choice":"Yes"}' })
+    expect(res.body).toMatchObject({ ok: true, status: 'answered', changes: 0 })
+    expect(await storedAnswer(id)).toMatchObject({
+      status: 'answered',
+      answer: '{"choice":"Yes"}',
+      text: null,
+    })
+
+    const row = await env.DB.prepare('SELECT read_at FROM events WHERE id = ?1')
+      .bind(id)
+      .first<{ read_at: number | null }>()
+    expect(row!.read_at).not.toBe(null)
   })
 
-  // Section 4.1, first-answer-wins. Two taps land at once (phone plus
-  // notification action). Exactly one must win, and the stored answer must be
-  // the winner's body - never a mix.
-  it('lets exactly one of two concurrent answers win', async () => {
-    const account = await createAccount('answer-race@example.invalid')
+  it('takes words on their own on a question made of buttons', async () => {
+    const account = await createAccount('answer-words@example.invalid')
     const cookie = await sessionFor(account.id)
     const id = await ask(account)
 
-    const [a, b] = await Promise.all([
-      api(req('POST', `/api/v1/questions/${id}/answer`, { body: { choice: 'Yes' }, auth: { cookie } })),
-      api(req('POST', `/api/v1/questions/${id}/answer`, { body: { choice: 'No' }, auth: { cookie } })),
-    ])
-
-    const statuses = [a.status, b.status].sort()
-    expect(statuses).toEqual([200, 409])
-
-    const winner = a.status === 200 ? 'Yes' : 'No'
-    const stored = await storedAnswer(id)
-    expect(stored.status).toBe('answered')
-    expect(stored.answer).toBe(JSON.stringify({ choice: winner }))
-
-    const loser = a.status === 409 ? a : b
-    expect(await loser.json()).toMatchObject({ ok: false, error: 'Question already answered.' })
+    const res = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { text: '  wait for QA  ' },
+      auth: { cookie },
+    })
+    expect(res.status).toBe(200)
+    expect(await storedAnswer(id)).toMatchObject({ answer: '{}', text: 'wait for QA' })
   })
 
-  it('rejects a second answer to an already answered question', async () => {
-    const account = await createAccount('answer-twice@example.invalid')
+  it('takes words on their own on a question made of a form', async () => {
+    const account = await createAccount('answer-words-form@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await askWithBlocks(account, formBlock, 'Name the deck')
+
+    const res = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { text: 'the old deck still stands' },
+      auth: { cookie },
+    })
+    expect(res.status).toBe(200)
+    expect(await storedAnswer(id)).toMatchObject({ answer: '{}', text: 'the old deck still stands' })
+  })
+
+  it('takes both parts at once', async () => {
+    const account = await createAccount('answer-both@example.invalid')
     const cookie = await sessionFor(account.id)
     const id = await ask(account)
 
-    await call('POST', `/api/v1/questions/${id}/answer`, { body: { choice: 'Yes' }, auth: { cookie } })
+    const res = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { answer: { choice: 'Yes' }, text: 'but only after lunch' },
+      auth: { cookie },
+    })
+    expect(res.status).toBe(200)
+    expect(await storedAnswer(id)).toMatchObject({
+      answer: '{"choice":"Yes"}',
+      text: 'but only after lunch',
+    })
+  })
+
+  it('keeps a form answer under its block id', async () => {
+    const account = await createAccount('answer-form@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await askWithBlocks(account, formBlock, 'Name the deck')
+
+    const res = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { answer: { deck: { title: 'Launch', slides: 12 } } },
+      auth: { cookie },
+    })
+    expect(res.status).toBe(200)
+    expect(JSON.parse((await storedAnswer(id)).answer!)).toEqual({
+      deck: { title: 'Launch', slides: 12 },
+    })
+  })
+
+  it('refuses a document with neither values nor words', async () => {
+    const account = await createAccount('answer-empty@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account)
+
+    for (const body of [{}, { answer: {} }, { answer: {}, text: '' }, { text: '   ' }]) {
+      const res = await call('POST', `/api/v1/questions/${id}/answer`, { body, auth: { cookie } })
+      expect(res.status, JSON.stringify(body)).toBe(400)
+      expect(res.body.error).toBe('An answer needs a choice, a form, or some words.')
+    }
+    expect((await storedAnswer(id)).status).toBe('pending')
+  })
+
+  it('refuses a value under a key the question never asked for', async () => {
+    const account = await createAccount('answer-junk@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account)
+
+    const res = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { answer: { nothing: 'here' } },
+      auth: { cookie },
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Answer did not match any of the question fields.')
+    expect((await storedAnswer(id)).status).toBe('pending')
+  })
+
+  it('refuses words past the limit', async () => {
+    const account = await createAccount('answer-long@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account)
+
+    const res = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { text: 'x'.repeat(20_001) },
+      auth: { cookie },
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Text is too long (20000 characters at most).')
+    expect((await storedAnswer(id)).status).toBe('pending')
+  })
+
+  it('replaces the whole document on a second answer and counts the change', async () => {
+    const account = await createAccount('answer-change@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account)
+
+    await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { answer: { choice: 'Yes' }, text: 'go' },
+      auth: { cookie },
+    })
+    expect((await poll(account, id)).changes).toBe(0)
+    expect((await storedAnswer(id)).picked_up_at).not.toBe(null)
+
     const second = await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { choice: 'No' },
+      body: { answer: { choice: 'No' } },
+      auth: { cookie },
+    })
+    expect(second.status).toBe(200)
+    expect(second.body).toMatchObject({ ok: true, status: 'answered', changes: 1 })
+
+    // A change sends the human's screen back to waiting: the receipt is gone
+    // until the agent polls again.
+    expect(await storedAnswer(id)).toMatchObject({
+      answer: '{"choice":"No"}',
+      text: null,
+      changes: 1,
+      picked_up_at: null,
+    })
+    expect(await poll(account, id)).toMatchObject({
+      status: 'answered',
+      answer: { choice: 'No' },
+      text: null,
+      changes: 1,
+    })
+  })
+
+  it('refuses a change when the caller asks for a pending question only', async () => {
+    const account = await createAccount('answer-ifpending@example.invalid')
+    const cookie = await sessionFor(account.id)
+    const id = await ask(account)
+
+    await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { answer: { choice: 'Yes' } },
+      auth: { cookie },
+    })
+    const second = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { text: 'from a notification', if_pending: true },
       auth: { cookie },
     })
     expect(second.status).toBe(409)
     expect(second.body).toMatchObject({ ok: false, error: 'Question already answered.' })
-    expect((await storedAnswer(id)).answer).toBe(JSON.stringify({ choice: 'Yes' }))
+    expect(await storedAnswer(id)).toMatchObject({
+      answer: '{"choice":"Yes"}',
+      text: null,
+      changes: 0,
+    })
   })
 
-  it('rejects an answer to an expired question', async () => {
+  it('refuses an answer to an expired question', async () => {
     const account = await createAccount('answer-expired@example.invalid')
     const cookie = await sessionFor(account.id)
     const id = await ask(account)
     await env.DB.prepare(`UPDATE questions SET status = 'expired' WHERE event_id = ?1`).bind(id).run()
 
     const res = await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { choice: 'Yes' },
+      body: { answer: { choice: 'Yes' } },
       auth: { cookie },
     })
     expect(res.status).toBe(409)
     expect(res.body).toMatchObject({ ok: false, error: 'Question already expired.' })
   })
 
-  it('lets exactly one of two concurrent answers win on an encrypted question', async () => {
-    const account = await createAccount('answer-race-enc@example.invalid')
+  it('stores both ciphertexts of an encrypted answer as given', async () => {
+    const account = await createAccount('answer-enc@example.invalid')
     const cookie = await sessionFor(account.id)
     const created = await call('POST', '/api/v1/questions', {
       body: { agent: 'tester', title: 'Encrypted?', enc: true, blocks: 'Y2lwaGVydGV4dA' },
@@ -150,27 +325,32 @@ describe('POST /api/v1/questions/:id/answer', () => {
     expect(created.status).toBe(200)
     const id = created.body.id as string
 
-    const [a, b] = await Promise.all([
-      api(req('POST', `/api/v1/questions/${id}/answer`, { body: { enc: true, answer: 'AAA' }, auth: { cookie } })),
-      api(req('POST', `/api/v1/questions/${id}/answer`, { body: { enc: true, answer: 'BBB' }, auth: { cookie } })),
-    ])
-    expect([a.status, b.status].sort()).toEqual([200, 409])
-
-    const stored = await storedAnswer(id)
-    expect(stored.status).toBe('answered')
-    expect(stored.answer).toBe(a.status === 200 ? 'AAA' : 'BBB')
+    const res = await call('POST', `/api/v1/questions/${id}/answer`, {
+      body: { enc: true, answer: 'QUFB', text: 'QkJC' },
+      auth: { cookie },
+    })
+    expect(res.status).toBe(200)
+    expect(await storedAnswer(id)).toMatchObject({ answer: 'QUFB', text: 'QkJC' })
+    expect(await poll(account, id)).toMatchObject({ answer: 'QUFB', text: 'QkJC' })
   })
 
-  it('rejects an answer that matches none of the question fields', async () => {
-    const account = await createAccount('answer-junk@example.invalid')
+  // Two taps can land at once - the phone and a notification action. Each one
+  // writes a whole document, so both are accepted and the stored answer is one
+  // of the two bodies, never a mix of them.
+  it('stores one whole body when two answers land at once', async () => {
+    const account = await createAccount('answer-race@example.invalid')
     const cookie = await sessionFor(account.id)
     const id = await ask(account)
 
-    const res = await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { nothing: 'here' },
-      auth: { cookie },
-    })
-    expect(res.status).toBe(400)
-    expect((await storedAnswer(id)).status).toBe('pending')
+    const [a, b] = await Promise.all([
+      api(req('POST', `/api/v1/questions/${id}/answer`, { body: { answer: { choice: 'Yes' } }, auth: { cookie } })),
+      api(req('POST', `/api/v1/questions/${id}/answer`, { body: { answer: { choice: 'No' } }, auth: { cookie } })),
+    ])
+    expect([a.status, b.status]).toEqual([200, 200])
+
+    const stored = await storedAnswer(id)
+    expect(stored.status).toBe('answered')
+    expect([JSON.stringify({ choice: 'Yes' }), JSON.stringify({ choice: 'No' })]).toContain(stored.answer)
+    expect(stored.changes).toBe(1)
   })
 })
