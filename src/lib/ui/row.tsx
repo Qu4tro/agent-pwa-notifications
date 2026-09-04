@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import { KIND_BG, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../project'
 
 // One line in a list. Everything on a list page is made of these: a time
@@ -127,35 +128,54 @@ function Timeline({ items, earlier }: { items: TimelineItem[]; earlier: number }
             >
               {KIND_LABEL[it.kind] ?? 'Event'}
             </span>
-            {/* Unread keeps full-weight text, the same signal the row uses. */}
+            {/* Unread keeps full-weight text, the same signal the row uses.
+                The title does not grow: what became of it follows immediately,
+                and the slack is left at the end of the line. */}
             <span
-              className={`min-w-0 flex-1 truncate text-[15px] ${
+              className={`min-w-0 truncate text-[15px] ${
                 it.unread ? 'text-text' : 'text-muted'
               }`}
             >
               {it.title}
             </span>
-            {/* What was decided, and then when. The title gives way to both
-                before either gives way - but only as far as half the line: an
-                answer that is a whole sentence would otherwise leave a row
-                that says what was decided and never what was asked. */}
+            {/* What became of the question, set against the words it answers
+                rather than out at the row's right edge. The eye pairs by
+                proximity, and there is none across a row: an answer in a column
+                of its own reads as a second, unrelated thing, and the reader
+                has to cross the line to find which question it settled.
+
+                The arrow is the cue that is not colour, so the join holds for
+                a reader who does not see the green (WCAG 1.4.1). It is drawn
+                rather than typed, like every other glyph here, so its shape is
+                the same one whichever face ends up painting the text around
+                it. Its 3px of top margin centres 14px in the 20px line, the
+                same sum the dot's 7px is set by. The answer takes the title's
+                weight - one clause in one voice - and keeps the state colour,
+                which is the only thing colour carries.
+
+                The title gives way first, but only as far as half the line: an
+                answer that is a whole sentence would otherwise leave a row that
+                says what was decided and never what was asked. */}
             {it.answer ? (
-              it.answer.status === 'answered' ? (
-                <span
-                  className={`max-w-[55%] shrink-0 truncate text-[15px] font-semibold ${STATE_TEXT.answered}`}
-                >
-                  <span className="sr-only">answered </span>
-                  {it.answer.text}
-                </span>
-              ) : it.answer.status === 'pending' ? (
-                <span className={`shrink-0 text-[15px] italic ${STATE_TEXT.pending}`}>
-                  {it.answer.text}
-                </span>
-              ) : (
-                <span className={`shrink-0 text-[15px] ${STATE_TEXT.expired}`}>
-                  expired
-                </span>
-              )
+              <>
+                <ArrowRight size={14} aria-hidden className="mt-[3px] shrink-0 text-faint" />
+                {it.answer.status === 'answered' ? (
+                  <span
+                    className={`max-w-[55%] shrink-0 truncate text-[15px] ${STATE_TEXT.answered}`}
+                  >
+                    <span className="sr-only">answered </span>
+                    {it.answer.text}
+                  </span>
+                ) : it.answer.status === 'pending' ? (
+                  <span className={`shrink-0 text-[15px] italic ${STATE_TEXT.pending}`}>
+                    {it.answer.text}
+                  </span>
+                ) : (
+                  <span className={`shrink-0 text-[15px] ${STATE_TEXT.expired}`}>
+                    expired
+                  </span>
+                )}
+              </>
             ) : null}
           </li>
         ))}
