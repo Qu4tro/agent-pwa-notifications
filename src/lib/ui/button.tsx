@@ -15,10 +15,14 @@ const VARIANT: Record<Variant, string> = {
   // outline colour when that can be read on the page, and the page's own text
   // colour when an agent chose one that cannot. An outline and not a fill: the
   // secondary weight, in colour, so a list of these does not outshout the rows
-  // it sits on. Hover tints the inside with the same colour. The option that
-  // stands as the answer is filled with it, so the choice reads off the row.
+  // it sits on. Hover doubles the outline instead of washing the inside with
+  // the colour: at this saturation a wash of a colour under its own label takes
+  // the label below the 4.5:1 it has to keep, and the surface the other two
+  // hover to is already what a row wears under the pointer. The option that
+  // stands as the answer is filled with it, so the choice reads off the row -
+  // a dark label on the fill, at the ratio the colour has on the page.
   answer:
-    'border border-[color:var(--answer-color)] text-[color:var(--answer-fg)] hover:bg-[color-mix(in_srgb,var(--answer-color)_15%,transparent)] aria-pressed:bg-[var(--answer-color)] aria-pressed:text-bg',
+    'border border-[color:var(--answer-color)] text-[color:var(--answer-fg)] hover:ring-1 hover:ring-[color:var(--answer-color)] aria-pressed:bg-[var(--answer-color)] aria-pressed:text-bg',
 }
 
 const BASE =

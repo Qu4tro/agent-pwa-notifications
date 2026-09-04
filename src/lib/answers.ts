@@ -3,25 +3,31 @@
 //
 // This is the second deliberate exception to "colour carries meaning and
 // nothing else" in src/styles.css; the first is .hl. What the colour says here
-// is "these are different choices" and nothing more. It is a register of its
-// own - eight pale tints, well away from the four saturated kind colours - so
-// an answer never reads as an event kind.
+// is "these are different choices" and nothing more. Eight saturated colours,
+// far enough apart that a question with six options still reads as six.
 //
-// The colour is worn as an outline and a label, never as a fill. The rows the
-// buttons sit on are muted text on a dark page, and a pale block on that page
-// is the loudest thing on it: a list of them outweighs the titles they belong
-// to. A pale line and pale text tell two choices apart just as well, at the
-// weight of the row.
+// The names put five of them in a hue family a kind colour already owns, so
+// each of those five sits a step below its kind: the answer blue is deeper and
+// stronger than the update blue, the answer rose than the error red, and so on
+// down. The rest of the distance is the shape - a kind is a word and a hairline
+// rail, an answer is a bordered pill - so an answer never reads as an event
+// kind.
+//
+// The colour is worn as an outline and a label, never as a fill. Each of these
+// carries a label on its own - 4.9 to 9.6 on --color-bg, 4.6 to 8.9 on
+// --color-surface, which is what a row under the pointer wears - and a list of
+// solid blocks outweighs the titles the rows belong to. The fill is spoken for
+// besides: it is what the option that stands is wearing.
 
 export const ANSWER_PALETTE = {
-  blue: '#bcd4ff',
-  violet: '#d6cbfd',
-  mint: '#a9edd0',
-  rose: '#fcc7c7',
-  amber: '#fbe2a8',
-  cyan: '#aeeaf6',
-  pink: '#fbc6e2',
-  lime: '#d9f2a4',
+  blue: '#3b82f6',
+  violet: '#a35bff',
+  mint: '#16a34a',
+  rose: '#f43f5e',
+  amber: '#f59e0b',
+  cyan: '#06b6d4',
+  pink: '#ee46b0',
+  lime: '#84cc16',
 } as const
 
 export type AnswerColorName = keyof typeof ANSWER_PALETTE
@@ -42,14 +48,14 @@ const WALK: AnswerColorName[] = ['blue', 'violet', 'amber', 'cyan', 'lime', 'pin
 const HEX = /^#[0-9a-f]{6}$/i
 
 // Two short lists of what an answer can be, where the colour is not decoration
-// but the answer itself. "Yes" and "No" in two arbitrary pastels make the eye
+// but the answer itself. "Yes" and "No" in two arbitrary colours make the eye
 // stop and read; in green and red they do not have to. Everything else keeps
 // the "these are different choices" register, which says nothing about which
 // one is which.
 //
-// Green is the palette's mint and red its rose - pale, and in the answers'
-// own register, so a deny option never reads as the error colour an event
-// kind uses.
+// Green is the palette's mint and red its rose, each a step off the done and
+// the error colour of the kind axis, so a deny option reads as the red answer
+// and not as an error.
 //
 // Whole labels, not substrings, with case and trailing punctuation ignored. A
 // substring rule would colour "Nope, not now" from "no" and "Yes, but hold"
@@ -116,8 +122,8 @@ function contrast(a: number, b: number): number {
 
 // The label colour for an answer colour: the colour itself when it can be read
 // on the page, and the page's own text colour when it cannot. The eight names
-// all clear 10:1 against the background, so this only ever matters for a hex
-// an agent chose - #1e3a8a is under 2:1 here and would be lost as a label. The
+// are chosen to clear the same 4.5 this asks for, so it only ever matters for
+// a hex an agent chose - #1e3a8a is under 2:1 here and would be lost. The
 // outline keeps the colour either way, since the agent asked for it; the label
 // is the part that has to be readable.
 const BG_LUMINANCE = luminance('#0f1115') // --color-bg

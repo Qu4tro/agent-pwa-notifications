@@ -59,9 +59,10 @@ const Callout = z.object({
 
 // -- Interactive blocks (questions only) --------------------------------------
 
-// One of the eight pastels the dashboard hands out by index, for an agent that
-// wants a particular one on a particular answer. Written out here rather than
-// imported from the client, because this file is the wire contract.
+// One of the eight answer colours the dashboard hands out by index, for an
+// agent that wants a particular one on a particular answer. Written out here
+// rather than imported from the client, because this file is the wire
+// contract.
 const ANSWER_COLORS = ['blue', 'violet', 'mint', 'rose', 'amber', 'cyan', 'pink', 'lime'] as const
 
 const Buttons = z.object({

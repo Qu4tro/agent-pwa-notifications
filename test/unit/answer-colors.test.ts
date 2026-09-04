@@ -50,11 +50,36 @@ describe('the walk', () => {
     expect(first).not.toContain(ANSWER_PALETTE.lime)
     expect(first).not.toContain(ANSWER_PALETTE.pink)
   })
+})
 
-  it('keeps the app background above 10:1 on every entry, as they are read as text', () => {
+describe('the eight', () => {
+  it('is readable as text on both surfaces a button sits on', () => {
+    // The page, and the row under the pointer. The same ratio covers the
+    // option that stands, which is the page colour on a fill of the colour.
     for (const [name, hex] of Object.entries(ANSWER_PALETTE)) {
-      expect(contrast(hex, '#0f1115'), name).toBeGreaterThan(10)
+      expect(contrast(hex, '#0f1115'), name).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(hex, '#161920'), name).toBeGreaterThanOrEqual(4.5)
     }
+  })
+
+  it('is a register of its own, a step under the kind colour of its family', () => {
+    // Five of the eight share a hue family with a colour the kind axis owns,
+    // which the names make unavoidable. What keeps an answer from reading as
+    // an event kind is that every one of the five is the darker of the pair.
+    const family: [keyof typeof ANSWER_PALETTE, string][] = [
+      ['blue', '#5b9bff'], // --color-kind-update
+      ['violet', '#a78bfa'], // --color-kind-question
+      ['mint', '#34d399'], // --color-kind-done
+      ['rose', '#f87171'], // --color-kind-error
+      ['amber', '#fbbf24'], // --color-warn
+    ]
+    for (const [name, kind] of family) {
+      expect(luminance(ANSWER_PALETTE[name]), name).toBeLessThan(luminance(kind))
+    }
+  })
+
+  it('gives every name a colour of its own', () => {
+    expect(new Set(Object.values(ANSWER_PALETTE)).size).toBe(names.length)
   })
 })
 
@@ -142,7 +167,7 @@ describe('a question with some colours set and some not', () => {
   })
 })
 
-// A "yes" and a "no" in two arbitrary pastels make the eye stop and read. The
+// A "yes" and a "no" in two arbitrary colours make the eye stop and read. The
 // two lists are the one case where the colour is the answer, not a tag.
 describe('the affirm and deny lists', () => {
   const color = (label: string) =>
