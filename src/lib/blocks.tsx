@@ -319,10 +319,19 @@ function TableBlock({ columns, rows }: { columns: string[]; rows: string[][] }) 
           </tr>
         </thead>
         <tbody>
-          {ordered.map(({ row, index }) => (
-            <tr key={index}>
+          {/* Banding replaces the hairline that used to sit under every row:
+              two ways of saying "the row ends here" is one more than the eye
+              needs, and the shaded band is the one that also keeps a wide row
+              on its own line across a scroll. The step is --color-surface over
+              --color-bg, a surface and not a colour, because in this app a
+              colour would claim to mean something. */}
+          {ordered.map(({ row, index }, pos) => (
+            // Striped on where the row sits now, not on where it arrived, so
+            // the bands stay alternating after a sort. `index` stays the key,
+            // so React moves the row it already has.
+            <tr key={index} className={pos % 2 ? 'bg-surface' : undefined}>
               {row.map((cell, ci) => (
-                <td key={ci} className="border-b border-line px-2 py-1.5 last:border-b-0">
+                <td key={ci} className="px-2 py-1.5">
                   {cell}
                 </td>
               ))}
