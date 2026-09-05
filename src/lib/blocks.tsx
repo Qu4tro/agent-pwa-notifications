@@ -445,8 +445,8 @@ function One({ b }: { b: AnyBlock }) {
               <span>{Math.round(pct)}%</span>
             </div>
           ) : null}
-          <div className="h-1 overflow-hidden bg-surface">
-            <div className="h-full bg-kind-question" style={{ width: `${pct}%` }} />
+          <div className="ui-progress h-1 overflow-hidden bg-surface">
+            <div className="ui-progress-fill h-full bg-kind-question" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )

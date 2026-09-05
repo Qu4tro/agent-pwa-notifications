@@ -10,6 +10,28 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Added
+
+- Themes, under Appearance in Settings, and a second one to choose: Windows 95.
+  The app in a grey window on a teal desktop - a navy title bar, raised buttons
+  that sink one pixel when they are pressed, sunken white fields, a segmented
+  progress bar and no corner anywhere. The default is unchanged and is what a
+  device that has never chosen still gets.
+
+  A theme is a second set of values for the tokens `src/styles.css` declares
+  and nothing else: every utility compiles to `var(--color-...)`, so the whole
+  app follows one attribute on `<html>`, and no page or component knows a
+  theme exists. What a variable cannot say - a bevel is a shape, not a colour -
+  is reached through a handful of marker classes on the shared controls.
+
+  The choice is this device's, like the encryption key: it is kept in the
+  browser, never sent to the hub, and applied by an inline script before the
+  first paint, so a themed device never flashes the other theme. The browser
+  chrome follows it. Every colour in the new theme is checked for contrast in
+  `test/unit/theme.test.ts` - the VGA palette's green, olive and grey are
+  2.2-2.8:1 on the window face, so those three are darkened until 15px text on
+  grey clears 4.5:1.
+
 ## [1.3.1] - 2026-09-05
 
 ### Changed

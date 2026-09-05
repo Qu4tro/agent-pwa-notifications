@@ -1,0 +1,376 @@
+/* Windows 95.
+
+   The app in the one interface everybody already knows how to read: a grey
+   window on a teal desktop, a navy title bar across the top of it, and every
+   control drawn as a raised or a sunken block of the same grey.
+
+   Two halves, and they do different work:
+
+   1. The tokens. src/styles.css declares every colour, radius and font the app
+      uses, and every Tailwind utility compiles to `var(--color-...)`, so
+      re-declaring them here re-paints the whole app - rows, rails, labels,
+      syntax highlighting - without a single component knowing. Everything a
+      theme can do with variables alone is done in that first block.
+
+   2. The shape. A bevel is not a colour, so the raised and sunken edges that
+      make this interface what it is are rules on the handful of marker classes
+      the shared components carry: .ui-btn, .ui-field, .ui-window and the rest.
+      Nothing here selects on a layout class, so the layout is free to change.
+
+   These rules are unlayered on purpose. Tailwind's utilities live in
+   `@layer utilities`, and unlayered CSS beats every layer in the cascade, so
+   `background` here wins over `bg-surface` and over its `hover:` variant with
+   no `!important` and no specificity race - which is also why a state this
+   file takes over (hover, active) has to be written here in full.
+
+   The palette is the 16-colour VGA one, with three exceptions, all for the
+   same reason: #008000, #808000 and #808080 are 2.2-2.8:1 on the window face,
+   and this app puts words in the kind colours. They are darkened to the point
+   where 15px text on grey clears 4.5:1 (WCAG 1.4.3). Contrast is checked in
+   test/unit/theme.test.ts, against the values in this file. */
+
+html[data-theme='win95'] {
+  /* Surfaces and text. Contrast on --color-bg / --color-surface:
+     text 15.4 / 17.5, muted 6.0 / 8.2, faint 4.7 / 6.3.
+
+     --color-bg is the window face and not the desktop behind it: it is the
+     app's page colour, and it is also what a label on an accent fill is
+     painted in (a badge, the default button), so it has to be the light half
+     of the pair. The desktop is painted on <body>, below. */
+  --color-bg: #c0c0c0;
+  --color-surface: #dfdfdf;
+  --color-text: #000000;
+  --color-muted: #3d3d3d;
+  --color-faint: #4d4d4d;
+
+  /* #808080 is ButtonShadow, the colour a Win95 divider was etched in, and it
+     carries no information here either. --color-edge is the window frame:
+     black, as every visible boundary in this interface is. */
+  --color-line: #808080;
+  --color-edge: #000000;
+
+  /* The button face, and the face under the pointer. Win95 had no hover state
+     at all; a control that never acknowledges the pointer reads as dead on a
+     desktop, so the fill lifts by one step and no more. */
+  --color-raised: #c0c0c0;
+  --color-raised-hover: #cdcdcd;
+
+  /* Kind. Navy, purple, green and maroon out of the VGA palette, the green
+     darkened from #008000 (2.8:1) until it is readable as text. */
+  --color-kind-update: #000080;
+  --color-kind-question: #800080;
+  --color-kind-done: #005000;
+  --color-kind-error: #800000;
+
+  /* Warn. Olive (#808000) is 2.3:1 on the face, so the warning colour is the
+     dark amber of the exclamation triangle instead. */
+  --color-warn: #663d00;
+
+  /* MS Sans Serif if the device has it, and the two faces that were drawn to
+     stand in for it if not. No web font: this theme is a set of variables and
+     nothing that has to be downloaded. */
+  --font-sans:
+    'MS Sans Serif', 'Microsoft Sans Serif', Tahoma, Verdana, Geneva, 'DejaVu Sans', ui-sans-serif,
+    system-ui, sans-serif;
+  --font-mono: 'Fixedsys', 'Terminal', 'Courier New', ui-monospace, monospace;
+
+  /* Nothing in this interface has a corner. */
+  --radius-ui: 0px;
+
+  /* The two bevels everything is built from. Four inset shadows each: a
+     highlight and a light face on the top and left, a shadow and the frame on
+     the bottom and right - and the reverse, for anything sunken. Sizes are in
+     whole pixels because the original was, and a half-pixel bevel is a blur. */
+  --w95-out:
+    inset -1px -1px #000000, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+  --w95-in:
+    inset -1px -1px #ffffff, inset 1px 1px #808080, inset -2px -2px #dfdfdf, inset 2px 2px #000000;
+  /* One step, for a thing too small to spend four pixels on: a table rule, a
+     progress trough. */
+  --w95-in-thin: inset -1px -1px #ffffff, inset 1px 1px #808080;
+
+  --w95-desktop: #008080;
+  --w95-title: #000080;
+  --w95-title-far: #1084d0;
+  --w95-title-text: #ffffff;
+
+  /* Native controls - the checkbox, the radio, the time picker's own dial -
+     are the browser's to draw, and it draws them for a dark page unless told.
+     src/styles.css says `dark` on <html>; this is the other half of the theme
+     the browser gets to see. */
+  color-scheme: light;
+  scrollbar-color: #c0c0c0 #dfdfdf;
+}
+
+/* The desktop. Everything the app paints sits on it, and it is the one colour
+   in this theme that is not a token: no component ever asks for it, because
+   nothing is drawn on the desktop except the window. */
+html[data-theme='win95'] body {
+  background: var(--w95-desktop);
+}
+
+/* The window. The header is the strip the title bar sits in and the content is
+   the client area under it, and the two are the same 44rem column, so together
+   they read as one window on the desktop.
+
+   The bevel is on the title bar and on the client area separately rather than
+   around both, because the header is sticky: it stays while the client area
+   scrolls under it, and one frame drawn around a thing that moves and a thing
+   that does not would tear. */
+html[data-theme='win95'] .ui-chrome {
+  background: var(--w95-desktop);
+  border-bottom: none;
+}
+
+html[data-theme='win95'] .ui-titlebar {
+  background: linear-gradient(90deg, var(--w95-title), var(--w95-title-far));
+  color: var(--w95-title-text);
+  box-shadow: var(--w95-out);
+  /* The title sits tight against the bar, as it did, rather than on the
+     page's own 1rem column. The margin is left alone: `mx-auto` is what
+     stands the bar over the client area, and a margin here would take the
+     window's title off the window. */
+  padding-inline: 0.5rem;
+}
+
+/* The app's name is the window's title, and the one thing on the bar that is
+   painted for the navy under it. The controls at the other end keep their own
+   colours, because the bell going purple when something is waiting on you is
+   meaning; they sit on a raised grey block, so they stay readable there. */
+html[data-theme='win95'] .ui-title {
+  color: var(--w95-title-text);
+}
+
+/* Whether the hub is answering, on the title bar rather than on the page. The
+   dark green and maroon that read on grey disappear into navy, so on the bar
+   the two states go to the bright end of the same palette: 12.8:1 and 4.4:1 on
+   the title colour, and the shape still says it as well as the colour. */
+html[data-theme='win95'] .ui-conn-on {
+  background-color: #00ff00;
+}
+html[data-theme='win95'] .ui-conn-off {
+  border-color: #ff0000;
+}
+
+html[data-theme='win95'] .ui-window {
+  background: var(--color-bg);
+  box-shadow: var(--w95-out);
+  padding-top: 0.5rem;
+  /* Down to the bottom of the screen, so a page with three rows on it is a
+     window and not a strip of grey with a teal void under it. Exactly what
+     the title bar leaves - its 3.25rem and whatever the notch takes - so the
+     window fills the screen and never pushes it into a scroll. */
+  min-height: calc(100svh - 3.25rem - env(safe-area-inset-top));
+}
+
+/* Controls.
+
+   A button is a raised block of the window face; pressing it sinks the bevel
+   and moves the label one pixel down and to the right, which is the whole of
+   the feedback this interface ever gave and still the clearest there is. */
+html[data-theme='win95'] .ui-btn {
+  background: var(--color-raised);
+  color: var(--color-text);
+  border: none;
+  box-shadow: var(--w95-out);
+  font-weight: 400;
+}
+html[data-theme='win95'] .ui-btn:hover:not(:disabled) {
+  background: var(--color-raised-hover);
+}
+html[data-theme='win95'] .ui-btn:active:not(:disabled) {
+  box-shadow: var(--w95-in);
+  padding: 2px 15px 0 17px;
+}
+/* The default action. Win95 marked it with a black ring around the button and
+   nothing else - no colour anywhere in the dialog - so the accent fill goes
+   and the ring takes over. The margin is the room the ring stands in. */
+html[data-theme='win95'] .ui-btn-primary {
+  font-weight: 700;
+  box-shadow: var(--w95-out), 0 0 0 1px #000000;
+  margin: 1px;
+}
+/* A destructive action keeps its colour, because the colour is the meaning.
+   The outline it wears in the dark theme is a bevel here, like every other
+   button, so the word is what marks it. */
+html[data-theme='win95'] .ui-btn-danger {
+  color: var(--color-kind-error);
+  font-weight: 700;
+}
+
+/* An icon on its own - the bell, the live mode, settings, the way out of a
+   message - is the same raised block, square. Its colour is left to whatever
+   class it carries: the bell goes purple when something is waiting on you, and
+   that is meaning, not decoration. */
+html[data-theme='win95'] .ui-icon-btn {
+  background: var(--color-raised);
+  box-shadow: var(--w95-out);
+}
+html[data-theme='win95'] .ui-icon-btn:hover {
+  background: var(--color-raised-hover);
+}
+html[data-theme='win95'] .ui-icon-btn:active {
+  box-shadow: var(--w95-in);
+}
+
+/* An answer button is a toggle: the option that stands is held in, and its
+   bevel says so before its colour does. The colour an agent asked for is
+   mixed over the face here rather than taken from --answer-fill, because that
+   value was worked out against the dark theme's near-black fill (answerFills
+   in src/lib/answers.ts) and would come out unreadable on grey. Black label on
+   every one of them, at 6.9:1 or better. */
+html[data-theme='win95'] .ui-answer {
+  background: color-mix(in srgb, var(--answer-color, var(--color-raised)) 30%, var(--color-raised));
+  color: var(--color-text);
+}
+html[data-theme='win95'] .ui-answer:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--answer-color, var(--color-raised-hover)) 30%,
+    var(--color-raised-hover)
+  );
+}
+html[data-theme='win95'] .ui-answer[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--answer-color, var(--color-raised)) 50%, var(--color-raised));
+  color: var(--color-text);
+  box-shadow: var(--w95-in);
+  font-weight: 700;
+}
+
+/* Anything you type into is sunken and white: the one place in the interface
+   where the page goes to paper. */
+html[data-theme='win95'] .ui-field {
+  background: #ffffff;
+  color: #000000;
+  border: none;
+  box-shadow: var(--w95-in);
+}
+html[data-theme='win95'] .ui-field::placeholder {
+  color: var(--color-faint);
+}
+
+/* Emphasis in a message goes to the brightest thing the theme has, which in
+   the dark one is white; here that is the page's own black. */
+html[data-theme='win95'] .md strong {
+  color: var(--color-text);
+}
+
+/* Text that cannot be edited but can be read and copied - a command, a key, a
+   code block in a message - is the same paper, sunken the same way. */
+html[data-theme='win95'] pre {
+  background: #ffffff;
+  box-shadow: var(--w95-in);
+  padding: 0.75rem;
+}
+/* The one control that sits on the paper rather than beside it. It is a
+   button, so on this desktop it looks like one. */
+html[data-theme='win95'] .ui-copy {
+  background: var(--color-raised);
+  box-shadow: var(--w95-out);
+  color: var(--color-text);
+}
+html[data-theme='win95'] .ui-copy:active {
+  box-shadow: var(--w95-in);
+}
+
+/* A panel that has just appeared to ask something - the confirmations - and
+   the message that opens over the page are both raised blocks of the face,
+   with the frame they carry taken off and the one rail that means something
+   left on. */
+html[data-theme='win95'] .ui-panel,
+html[data-theme='win95'] .ui-dialog {
+  background: var(--color-bg);
+  box-shadow: var(--w95-out);
+  /* Three sides of the frame go, because the bevel is the frame now. The
+     fourth is the 3px rail down the left - the kind of the message, or the
+     red of a confirmation - and that one is meaning, so it stays. */
+  border-top-color: transparent;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+/* Signing in happens outside the app's own frame - no header, no client area -
+   so on this desktop it is what it always was: one dialog in the middle of the
+   screen. Without it the page would be black text on teal, which is 2.3:1 and
+   the one place in the theme a colour has nothing under it. */
+html[data-theme='win95'] .ui-login {
+  background: var(--color-bg);
+  box-shadow: var(--w95-out);
+  padding: 1.25rem;
+}
+
+/* The live mode is one card in the middle of the desktop, and on this desktop
+   that is what a window is: raised, with the frame it carries in the dark
+   theme given over to the bevel. */
+html[data-theme='win95'] .ui-card {
+  background: var(--color-bg);
+  box-shadow: var(--w95-out);
+  border-color: transparent;
+}
+
+/* The count on the bell and on a project row. Round is the one shape this
+   interface never used. */
+html[data-theme='win95'] .ui-badge {
+  border-radius: 0;
+  box-shadow: var(--w95-in-thin);
+}
+
+/* The progress bar an agent sends: the trough sunken and white, the bar itself
+   in navy segments with two pixels of white between them, which is how this
+   interface drew every download it ever ran. */
+html[data-theme='win95'] .ui-progress {
+  background: #ffffff;
+  box-shadow: var(--w95-in);
+  height: 16px;
+  padding: 3px;
+}
+html[data-theme='win95'] .ui-progress-fill {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--w95-title) 0 8px,
+    transparent 8px 10px
+  );
+}
+
+/* Browser furniture.
+
+   The focus rectangle is a dotted line inside the control, not a ring around
+   it: 21:1 on the face, and the same mark the original put on whatever the
+   keyboard had hold of. */
+html[data-theme='win95'] :focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -4px;
+}
+
+html[data-theme='win95'] ::selection {
+  background: var(--w95-title);
+  color: var(--w95-title-text);
+}
+
+/* The scrollbar: a dithered white-on-grey track with a raised block on it.
+   The dither is two pixels of a conic gradient, which is the checkerboard the
+   original stippled by hand. Firefox gets the two colours through
+   `scrollbar-color` above; this is for everything on Blink and WebKit. */
+html[data-theme='win95'] ::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+html[data-theme='win95'] ::-webkit-scrollbar-track {
+  background: repeating-conic-gradient(#ffffff 0% 25%, #c0c0c0 0% 50%) 0 0 / 2px 2px;
+}
+html[data-theme='win95'] ::-webkit-scrollbar-thumb {
+  background: var(--color-raised);
+  box-shadow: var(--w95-out);
+}
+html[data-theme='win95'] ::-webkit-scrollbar-corner {
+  background: var(--color-raised);
+}
+
+/* The checkbox and the radio are the browser's own, in the one colour this
+   interface highlighted anything with. */
+html[data-theme='win95'] input[type='checkbox'],
+html[data-theme='win95'] input[type='radio'] {
+  accent-color: var(--w95-title);
+  width: 15px;
+  height: 15px;
+}

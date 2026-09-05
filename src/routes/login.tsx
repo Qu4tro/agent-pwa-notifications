@@ -119,7 +119,7 @@ function LoginPage() {
 
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
-      <div className="w-full max-w-[22rem]">
+      <div className="ui-login w-full max-w-[22rem]">
         <h1 className="mb-5 text-center text-[22px] font-semibold">{APP_NAME}</h1>
 
         {linkPending && <p className="text-center text-[15px] text-muted">Signing you in...</p>}

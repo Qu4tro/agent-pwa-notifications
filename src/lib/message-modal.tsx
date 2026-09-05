@@ -162,7 +162,7 @@ export function MessageModal({
         {/* Shaped like the message it stands for: the surface, an edge, and
             the kind colour as a 3px rail down the left. */}
         <div
-          className={`flex max-h-full w-full flex-col border border-l-[3px] border-edge bg-surface text-text sm:max-w-[40rem] sm:rounded-ui ${
+          className={`ui-dialog flex max-h-full w-full flex-col border border-l-[3px] border-edge bg-surface text-text sm:max-w-[40rem] sm:rounded-ui ${
             KIND_BORDER[e.kind] ?? 'border-l-line'
           }`}
         >

@@ -39,7 +39,7 @@ export function CopyButton({
         navigator.clipboard.writeText(text)
         setCopied(true)
       }}
-      className={`inline-flex min-h-11 items-center gap-1 rounded-ui bg-surface px-3 text-[13px] text-muted hover:text-text ${className}`}
+      className={`ui-copy inline-flex min-h-11 items-center gap-1 rounded-ui bg-surface px-3 text-[13px] text-muted hover:text-text ${className}`}
     >
       {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
       {copied ? 'Copied' : 'Copy'}

@@ -130,7 +130,7 @@ export function SettingsSkeleton() {
 export function LiveSkeleton() {
   return (
     <main className="safe-bottom mx-auto flex min-h-[calc(100svh-3.25rem)] w-full max-w-[44rem] flex-col justify-center px-4 py-6">
-      <div className="rounded-ui border border-edge bg-surface p-5">
+      <div className="ui-card rounded-ui border border-edge bg-surface p-5">
         <Skeleton width="8rem" height="15px" />
         <div className="mt-2">
           <Skeleton width="75%" height="22px" />

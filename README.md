@@ -28,6 +28,9 @@ Think "ntfy for agents, with a reply button". One person, one hub, no vendor.
   Object unless you switch one on.
 - **Optional end-to-end encryption.** With an encryption key set, block content
   is encrypted before it leaves your machine and the hub stores ciphertext.
+- **Two themes.** The dark one it is drawn in, and Windows 95 - a grey window
+  on a teal desktop, bevels and all. Settings, Appearance; the choice is the
+  device's and never leaves it.
 
 ## Deploy your own
 

@@ -20,7 +20,7 @@ export function ConfirmPanel({
 }) {
   return (
     <div
-      className={`rounded-ui border border-l-[3px] border-edge border-l-kind-error bg-surface px-4 py-3 ${className}`}
+      className={`ui-panel rounded-ui border border-l-[3px] border-edge border-l-kind-error bg-surface px-4 py-3 ${className}`}
     >
       <div className="mb-3 text-text">{children}</div>
       <div className="flex flex-wrap items-center gap-2">{actions}</div>
