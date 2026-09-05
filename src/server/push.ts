@@ -145,9 +145,8 @@ export async function sendPush(
   return res.status
 }
 
-// Fan out to every stored subscription, pruning any that report gone.
-// Send to every device subscribed under one account. Scoped by account_id so a
-// notification never lands on another tenant's phone.
+// Fan out to every device subscribed under the account, pruning any
+// subscription that reports gone.
 export async function pushToAll(env: Env, accountId: string, notification: unknown): Promise<void> {
   const { results } = await env.DB.prepare(
     'SELECT id, endpoint, keys FROM push_subscriptions WHERE account_id = ?1',

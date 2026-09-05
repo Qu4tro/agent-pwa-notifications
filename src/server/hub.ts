@@ -68,8 +68,8 @@ export class Hub {
 }
 
 // Called after any change. No-op unless instant mode is enabled. Each account
-// gets its own Durable Object (idFromName(accountId)) so a poke only wakes that
-// account's open tabs - never broadcasts across tenants.
+// gets its own Durable Object (idFromName(accountId)), so a poke wakes only the
+// tabs open on that account.
 export async function pokeHub(env: Env, accountId: string): Promise<void> {
   if (env.INSTANT !== '1' || !env.HUB) return
   try {

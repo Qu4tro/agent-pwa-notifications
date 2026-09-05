@@ -6,8 +6,8 @@ import { pokeHub } from './hub'
 import { quickAnswerActions, previewText } from './quick-answers'
 
 // Every exported handler takes the resolved `accountId` and scopes all data to
-// it. This is the tenant boundary - miss it on any query and one user could see
-// or mutate another's inbox.
+// it. Miss it on a query and the handler reads or writes rows that belong to no
+// account, or to one it was not called for.
 
 // -- retention / settings helpers ---------------------------------------------
 function retentionMs(env: Env): number {
@@ -1049,8 +1049,8 @@ export async function subscribePush(request: Request, env: Env, accountId: strin
   if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
     return json({ ok: false, error: 'Malformed subscription.' }, 400)
   }
-  // endpoint is globally unique; ON CONFLICT re-homes it to the current account
-  // (e.g. a shared device that logs into a different account).
+  // endpoint is globally unique; ON CONFLICT refreshes the stored keys and owner
+  // for an endpoint this browser has registered before.
   await env.DB.prepare(
     `INSERT INTO push_subscriptions (id, account_id, endpoint, keys, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
      ON CONFLICT(endpoint) DO UPDATE SET keys = excluded.keys, account_id = excluded.account_id`,

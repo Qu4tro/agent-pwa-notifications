@@ -17,7 +17,7 @@ agent-notify-pwa status --json
 
 There is no default hub URL: every hub is somebody's own deployment. `login`
 asks for yours and saves it to `~/.config/agent-notify-pwa/config.json` (XDG
-respected). If you used the older CLI, its config is copied over on first run.
+respected).
 
 Resolution order for every value: flags, then environment, then the saved
 config.
