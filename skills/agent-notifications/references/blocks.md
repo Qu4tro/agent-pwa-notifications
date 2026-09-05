@@ -117,28 +117,24 @@ answerable straight from the notification.
 
 Answer shape: `{ "answer": { "confirm": "Deploy" }, "text": null }`.
 
-An option's colour is decided by three rules, in this order:
+The options are shown in a neutral colour, and in the app's order rather
+than yours: a plain affirmative - `Yes`, `Correct`, `Approve`, `Go ahead`,
+`OK` - first, a plain denial - `No`, `Wrong`, `Reject`, `Not now`, `Cancel` -
+last, and everything else between them as you wrote it. The whole label has
+to be the word, so "Yes, but hold" is neither and keeps its place. The answer
+comes back as the label whichever position it was shown in.
 
-1. **What you set.** A `colors` entry always wins.
-2. **What the label says.** A plain affirmative or denial - `Yes`, `Correct`,
-   `Approve`, `Go ahead`, `OK`; `No`, `Wrong`, `Reject`, `Not now`, `Cancel` -
-   comes out green or red on its own. The whole label has to be the word, so
-   "Yes, but hold" is not an affirmative and is not coloured as one.
-3. **Its position.** Everything else takes the next colour in the palette, which
-   says only that the choices are different, not which one is which. Green and
-   red are never handed out this way, so they only ever mean rule 2.
+So send nothing. A yes/no question already reads yes first, and a set of
+options in one neutral colour already reads apart by its words.
 
-So send nothing. A yes/no question is already green and red, and any other set
-of options already reads apart.
+`colors` is optional, parallel to `options` as you send them, and may be
+shorter than it; it pairs by position from the left, and an option past the
+end of it stays neutral. Each entry is `blue`, `violet`, `mint`, `rose`,
+`amber`, `cyan`, `pink`, `lime`, or `#rrggbb`, and tints that option's fill.
 
-`colors` is optional, parallel to `options`, and may be shorter than it; it
-pairs by position from the left, and an option past the end of it falls to
-rules 2 and 3. Each entry is `blue`, `violet`, `mint`, `rose`, `amber`, `cyan`,
-`pink`, `lime`, or `#rrggbb`.
-
-Use it only when a particular choice should read a particular way. Because it
-wins over rule 2, it is also the only way to paint an affirmative red - which
-is why you should not: red is the error colour everywhere else in this app.
+Use it only when a particular choice should read a particular way - a
+destructive option, say. A plain "No" is not one: red is the error colour
+everywhere else in this app, and a denial is not an error.
 
 ```json
 { "type": "buttons", "id": "confirm", "options": ["Deploy", "Hold"], "colors": ["mint", "amber"] }

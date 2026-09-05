@@ -22,6 +22,14 @@
   --color-line: #262a33;
   --color-edge: #6b7285;
 
+  /* A control that is a soft fill and not an outline: an answer button. One
+     step above --color-surface, so it still stands off a row under the
+     pointer, and a step above that again under the pointer itself - a full
+     step (1.4:1 between the two), so the change is seen and not inferred.
+     Text is 12.1 / 8.6 on the two. */
+  --color-raised: #232833;
+  --color-raised-hover: #363c4b;
+
   /* Kind. One colour per kind of event, used for the label and the rail. */
   --color-kind-update: #5b9bff;
   --color-kind-question: #a78bfa;

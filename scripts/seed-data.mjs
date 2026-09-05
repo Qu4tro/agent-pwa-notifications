@@ -21,7 +21,7 @@ const image = (url, alt) => ({ type: 'image', url, alt })
 const callout = (tone, text) => ({ type: 'callout', tone, text })
 const progress = (label, value, max = 100) => ({ type: 'progress', label, value, max })
 // `colors` is optional and may run shorter than `options`: an option with no
-// entry of its own takes its place in the dashboard's palette.
+// entry of its own stays neutral.
 const buttons = (id, options, colors) => ({
   type: 'buttons',
   id,
@@ -785,17 +785,16 @@ pub struct Config {
 
   // ------------------------------------------------------------ yes and no
   // A project of decisions, for looking at a page of answer buttons. Four
-  // yes/no rows first, where the affirm and deny lists give the two words their
-  // own colour so the row can be read without reading; then a control, whose
-  // three labels are on neither list and take the palette; then the shapes the
-  // answer column has to hold: a listed word beside two neutral ones, labels
-  // wider than the column, colours the agent set (two of them too dark to be a
-  // label), four options (which the row cannot answer, so it opens the
-  // thread), and an expired question for the settled register. A second batch
-  // turns the lists around: a denial beside a neutral word, "No" before "Yes",
-  // two multi-word list entries, an agent painting a cautious yes amber over
-  // the word rule, six options (thread page only, every colour of the walk), a
-  // form, and a question title at the 80-character limit of a row answer.
+  // yes/no rows first, where the affirm and deny lists put the yes first and
+  // the no last whatever order they were sent in; then a control, whose three
+  // labels are on neither list; then the shapes a row has to hold: a listed
+  // word beside two neutral ones, labels wider than a row on a phone, colours
+  // the agent set (two of them dark), four options (which the row cannot
+  // answer, so it opens the thread), and an expired question for the settled
+  // register. A second batch turns the lists around: a denial beside a
+  // neutral word, "No" before "Yes", two multi-word list entries, an agent
+  // painting a cautious yes amber, six options (thread page only), a form,
+  // and a question title at the 80-character limit of a row answer.
   {
     project: 'gate-keeper',
     task: 'Nightly release gate',
@@ -934,7 +933,7 @@ pub struct Config {
         status: 'pending',
         timeoutMin: 8 * H,
         blocks: [
-          md('The control is the question above it: none of these words is on either list, so they take the palette.'),
+          md('The control is the question above it: none of these words is on either list, so they stand as sent.'),
           buttons('shape', ['All of it', 'Half', 'A tenth']),
         ],
       },
@@ -956,7 +955,7 @@ pub struct Config {
         priority: 2,
         timeoutMin: 2 * H,
         blocks: [
-          md('One word on the affirm list beside two that are not: the walk has to step past green for the other two.'),
+          md('One word on the affirm list beside two that are not: "Yes" stands first, and none of the three is coloured.'),
           buttons('ship', ['Yes', 'Staging first', 'Monday']),
         ],
       },
@@ -998,7 +997,7 @@ pub struct Config {
         status: 'pending',
         timeoutMin: 8 * H,
         blocks: [
-          md('Colours the agent set: mint and amber by name, and a third option left to the walk.'),
+          md('Colours the agent set: mint and amber by name, and a third option left neutral.'),
           buttons('eu', ['Deploy', 'Hold', 'Roll back'], ['mint', 'amber']),
         ],
       },
@@ -1019,7 +1018,7 @@ pub struct Config {
         status: 'pending',
         timeoutMin: 24 * H,
         blocks: [
-          md('The candidates themselves, as hex. Both are too dark to be read as a label on this page, so the outline keeps the colour and the label falls back to the page text.'),
+          md('The candidates themselves, as hex. Each tints its own button; the label is the page text either way.'),
           buttons('blue', ['Navy', 'Slate'], ['#1e3a8a', '#334155']),
         ],
       },
@@ -1117,7 +1116,7 @@ pub struct Config {
         priority: 3,
         timeoutMin: 60,
         blocks: [
-          md('A neutral word first and a denial second: red on the right, the walk on the left.'),
+          md('A neutral word and a denial: the denial stands last, and neither is coloured.'),
           buttons('retry', ['Retry', 'Cancel']),
         ],
       },
@@ -1138,7 +1137,7 @@ pub struct Config {
         status: 'pending',
         timeoutMin: 4 * H,
         blocks: [
-          md('"No" before "Yes": the colour follows the word, not the position.'),
+          md('"No" sent before "Yes": the yes is shown first all the same.'),
           buttons('off', ['No', 'Yes']),
         ],
       },
@@ -1180,7 +1179,7 @@ pub struct Config {
         status: 'pending',
         timeoutMin: 24 * H,
         blocks: [
-          md('Six options: too many for a row, so this opens the thread, where the walk shows every colour it has.'),
+          md('Six options: too many for a row, so this opens the thread.'),
           buttons('icon', ['Rocket', 'Flag', 'Tag', 'Bolt', 'Leaf', 'Star']),
         ],
       },
@@ -1201,7 +1200,7 @@ pub struct Config {
         status: 'pending',
         timeoutMin: 12 * H,
         blocks: [
-          md('The agent overrules the word rule: a cautious yes in amber, the no left to the list.'),
+          md('The agent colours a cautious yes amber; the no stays neutral, and last.'),
           buttons('merge', ['Yes', 'No'], ['amber']),
         ],
       },

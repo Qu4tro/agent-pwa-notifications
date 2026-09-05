@@ -1,8 +1,7 @@
 // Four button roles and nothing else. Primary is the one accent colour in the
 // app; secondary is an outline; danger is an outline that has gone red; answer
-// is an outline in the colour that tells one option on a question from its
-// siblings. Every one is at least 44px tall, so it stays a comfortable touch
-// target.
+// is a soft fill, one option on a question. Every one is at least 44px tall,
+// so it stays a comfortable touch target.
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'answer'
 
@@ -11,18 +10,17 @@ const VARIANT: Record<Variant, string> = {
   primary: 'bg-kind-question text-bg font-semibold hover:opacity-90',
   secondary: 'border border-edge text-text hover:bg-surface',
   danger: 'border border-kind-error text-kind-error hover:bg-surface',
-  // Both values come from answerStyles in src/lib/answers.ts. The label is the
-  // outline colour when that can be read on the page, and the page's own text
-  // colour when an agent chose one that cannot. An outline and not a fill: the
-  // secondary weight, in colour, so a list of these does not outshout the rows
-  // it sits on. Hover doubles the outline instead of washing the inside with
-  // the colour: at this saturation a wash of a colour under its own label takes
-  // the label below the 4.5:1 it has to keep, and the surface the other two
-  // hover to is already what a row wears under the pointer. The option that
-  // stands as the answer is filled with it, so the choice reads off the row -
-  // a dark label on the fill, at the ratio the colour has on the page.
+  // A soft fill and not an outline, in no colour of its own: the neutral fill
+  // a step above the surface, the page's text on it, and a step lighter again
+  // under the pointer - a row hovers to the surface, so the fill has to sit
+  // above that to stay a control on a row under the pointer. The custom
+  // properties come from answerStyles in src/lib/answers.ts, and only for an
+  // option the agent coloured; for the rest the fallbacks stand. The option
+  // that stands as the answer is filled solid - with its colour, or with the
+  // page text where it has none - and the label goes to the page colour, so
+  // the choice reads off the row.
   answer:
-    'border border-[color:var(--answer-color)] text-[color:var(--answer-fg)] hover:ring-1 hover:ring-[color:var(--answer-color)] aria-pressed:bg-[var(--answer-color)] aria-pressed:text-bg',
+    'bg-[var(--answer-fill,var(--color-raised))] font-medium text-text hover:bg-[var(--answer-fill-hover,var(--color-raised-hover))] aria-pressed:bg-[var(--answer-color,var(--color-text))] aria-pressed:text-bg',
 }
 
 const BASE =
