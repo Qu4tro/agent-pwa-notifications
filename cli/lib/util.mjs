@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import qrcode from 'qrcode-terminal'
 
@@ -12,19 +12,7 @@ const XDG = process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
 export const CONFIG_DIR = join(XDG, 'agent-notify-pwa')
 export const CONFIG_PATH = join(CONFIG_DIR, 'config.json')
 
-// Where the pre-rename CLI kept the same file. Copied once, on first run.
-const LEGACY_CONFIG_PATH = join(XDG, 'agent-dash', 'config.json')
-
-function migrateLegacyConfig() {
-  if (existsSync(CONFIG_PATH) || !existsSync(LEGACY_CONFIG_PATH)) return
-  mkdirSync(CONFIG_DIR, { recursive: true })
-  copyFileSync(LEGACY_CONFIG_PATH, CONFIG_PATH)
-  // stderr, so `status --json` stays machine-readable on stdout.
-  console.error(`Copied your old config from ${LEGACY_CONFIG_PATH} to ${CONFIG_PATH}.`)
-}
-
 export function loadConfig() {
-  migrateLegacyConfig()
   if (!existsSync(CONFIG_PATH)) return {}
   try {
     return JSON.parse(readFileSync(CONFIG_PATH, 'utf8'))

@@ -10,6 +10,22 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Removed
+
+- The `AGENT_KEY` Worker binding, from `src/server/env.ts` and from
+  `.dev.vars.example` along with its half of the generator snippet. It was the
+  one shared agent key the app had before accounts; no code has read it since,
+  and every agent request authenticates against the account's own key.
+- The CLI's copy of a pre-rename config. `loadConfig` reads
+  `~/.config/agent-notify-pwa/config.json` and nothing else, and the sentence
+  promising the copy is out of `cli/README.md`.
+- The setup script's fallback to a pre-rename `.agent-dash.local.json`.
+  `loadSecrets` reads `.agent-notify-pwa.local.json` and nothing else.
+- Comments in `src/` that describe the hub as a hosted service with a tenant
+  boundary between one person's inbox and another's. The account scoping they
+  sit on is unchanged; the comments now say what the code does, which is filter
+  every query by `account_id`.
+
 ## [1.4.0] - 2026-09-05
 
 ### Added

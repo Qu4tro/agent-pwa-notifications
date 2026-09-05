@@ -13,10 +13,6 @@ export interface Env {
   // to anyone who knows the URL, which only matters once RESEND_API_KEY is set.
   ALLOWED_EMAILS?: string
 
-  // Legacy: single shared agent key. No longer used for auth, each account has
-  // its own key now. Left optional so existing deployments don't break on boot.
-  AGENT_KEY?: string
-
   // Vars (set in wrangler.jsonc [vars] or left unset for defaults)
   EMAIL_FROM?: string // "Agent PWA Notifications <login@yourdomain>", sender for OTP mail
   APP_URL?: string // canonical hosted URL, e.g. "https://notifications.example"
