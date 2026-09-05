@@ -1,15 +1,16 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Focus } from 'lucide-react'
 import type { TaskSummary } from '../lib/api'
-import { Container, useHeaderActions } from '../lib/shell'
+import { Container } from '../lib/shell'
 import { ensure, pendingQuery, queryKeys } from '../lib/queries'
 import { PendingSkeleton } from '../lib/skeleton'
 import { PendingLine } from '../lib/task-line'
-import { InlineError, iconButtonClass } from '../lib/ui'
+import { messageSearch, useMessageModal } from '../lib/message-modal'
+import { InlineError } from '../lib/ui'
 
 // Note 6: one page for everything waiting on the human, whatever project it is
-// in. The header's bell links here and carries the count.
+// in. The header's bell links here and carries the count; the live mode, the
+// same queue one question at a time, is the header's too.
 //
 // The rows are the same rows as the project page - micro-answers inline, and
 // the row on its own for anything larger - and they leave the same way: the
@@ -17,6 +18,9 @@ import { InlineError, iconButtonClass } from '../lib/ui'
 // brings new ones in. Nothing is dismissed by hand.
 export const Route = createFileRoute('/_app/pending')({
   ssr: false,
+  // Which row's question is open over the list, if one is: ?msg=, as on the
+  // thread page.
+  validateSearch: messageSearch,
   loader: ({ context }) =>
     context.signedIn ? ensure<TaskSummary[]>(context.queryClient, pendingQuery()) : undefined,
   pendingComponent: PendingSkeleton,
@@ -25,14 +29,8 @@ export const Route = createFileRoute('/_app/pending')({
 
 function PendingPage() {
   const { data, isError, refetch } = useQuery(pendingQuery())
-  // The same queue, one question at a time, for when the list is the part that
-  // is in the way.
-  useHeaderActions(
-    <Link to="/pending/live" title="Live mode" aria-label="Live mode" className={iconButtonClass}>
-      <Focus size={18} />
-    </Link>,
-    [],
-  )
+  const { msg } = Route.useSearch()
+  const modal = useMessageModal(msg, Route.useNavigate())
 
   if (!data) {
     if (!isError) return <PendingSkeleton />
@@ -55,6 +53,9 @@ function PendingPage() {
               key={`${t.project}/${t.key}`}
               t={t}
               queryKey={queryKeys.pending()}
+              open={msg != null && msg === t.pending_event_id}
+              onOpen={modal.open}
+              onClose={modal.close}
             />
           ))}
         </div>

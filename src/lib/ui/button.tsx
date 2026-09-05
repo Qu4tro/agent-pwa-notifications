@@ -39,11 +39,9 @@ export function Button({
 export const buttonClass = (variant: Variant = 'secondary', className = '') =>
   `${BASE} ${VARIANT[variant]} ${className}`
 
-// A header action: an icon on its own, with the same 44px touch target.
-export function IconButton({
-  className = '',
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+// A header action: an icon on its own, with the same 44px touch target. Takes
+// a ref, for a dialog that wants the focus on its Close.
+export function IconButton({ className = '', ...rest }: React.ComponentProps<'button'>) {
   return (
     <button
       type="button"

@@ -12,6 +12,15 @@ released section and opens a fresh empty one.
 
 ### Changed
 
+- A row that is waiting on you opens its question over the list, in the same
+  modal the thread opens its messages into: the whole message, and the
+  composer for whatever the row's buttons could not carry. The whole row is
+  the target, all but its answer buttons; a submit closes the modal and the
+  row leaves the list. The row went to the thread, like every other row,
+  which was the long way round to answering; the thread is now a control at
+  the row's right, and in the head of the modal beside Close.
+- The live mode is in the header on every page, beside the bell. It was on
+  the pending page alone, as if it were a view of that page.
 - A row that is waiting on you reads as one decision: the title, the
   question in full, and the answer buttons under it when the question can be
   answered from the list. The buttons stood in a column at the right, beside

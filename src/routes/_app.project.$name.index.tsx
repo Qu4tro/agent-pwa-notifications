@@ -7,11 +7,15 @@ import { Container, useHeaderActions } from '../lib/shell'
 import { ensure, queryKeys, tasksQuery, useArchive, useClear } from '../lib/queries'
 import { TasksSkeleton } from '../lib/skeleton'
 import { PendingLine, TaskLine } from '../lib/task-line'
+import { messageSearch, useMessageModal } from '../lib/message-modal'
 import { projectLabel, fromParam } from '../lib/project'
 import { Button, ConfirmPanel, InlineError, ProjectDot, Section, iconButtonClass } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/project/$name/')({
   ssr: false,
+  // Which waiting row's question is open over the list, if one is: ?msg=, as
+  // on the thread page.
+  validateSearch: messageSearch,
   loader: ({ context, params }) =>
     context.signedIn
       ? ensure<TaskSummary[]>(context.queryClient, tasksQuery(fromParam(params.name)))
@@ -24,6 +28,8 @@ function ProjectView() {
   const { name } = Route.useParams()
   const project = fromParam(name)
   const { data, isError, refetch } = useQuery(tasksQuery(project))
+  const { msg } = Route.useSearch()
+  const modal = useMessageModal(msg, Route.useNavigate())
   const clear = useClear()
   const archive = useArchive(project)
   const [clearOpen, setClearOpen] = useState(false)
@@ -83,7 +89,14 @@ function ProjectView() {
           {waiting.length > 0 && (
             <Section title="Needs you" count={waiting.length}>
               {waiting.map((t) => (
-                <PendingLine key={t.key} t={t} queryKey={queryKeys.tasks(project)} />
+                <PendingLine
+                  key={t.key}
+                  t={t}
+                  queryKey={queryKeys.tasks(project)}
+                  open={msg != null && msg === t.pending_event_id}
+                  onOpen={modal.open}
+                  onClose={modal.close}
+                />
               ))}
             </Section>
           )}
