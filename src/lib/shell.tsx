@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { onlineManager, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell } from 'lucide-react'
+import { Bell, Focus } from 'lucide-react'
 import { APP_NAME } from './brand'
 import { pendingQuery } from './queries'
 import { badgeClass, iconButtonClass } from './ui'
@@ -13,8 +13,9 @@ import { badgeClass, iconButtonClass } from './ui'
 // used to stand aside on a sub page for a back link pointing at whatever that
 // page's parent was, which meant the one fixed landmark in the app was missing
 // from every page but one, and the way home changed name as you moved. One
-// title, one destination, always in the same place. Actions stay on the right,
-// and the bell beside them is the way to what is waiting.
+// title, one destination, always in the same place. Actions stay on the right;
+// the bell beside them is the way to what is waiting, and the live mode next
+// to it the way to answer it one question at a time, from wherever you are.
 export function Header({ right }: { right?: React.ReactNode }) {
   return (
     <header className="safe-top sticky top-0 z-10 border-b border-line bg-bg">
@@ -27,6 +28,7 @@ export function Header({ right }: { right?: React.ReactNode }) {
         </div>
         <div className="flex items-center gap-1">
           <PendingButton />
+          <LiveButton />
           {right}
         </div>
       </div>
@@ -67,6 +69,17 @@ function PendingButton() {
           {waiting}
         </span>
       ) : null}
+    </Link>
+  )
+}
+
+// The same queue as the bell's, one question at a time. It stood on the
+// pending page alone, which made it a view of that page; it is a place of its
+// own - a screen to leave open on a desk - so it is reached from every page.
+function LiveButton() {
+  return (
+    <Link to="/pending/live" title="Live mode" aria-label="Live mode" className={iconButtonClass}>
+      <Focus size={18} aria-hidden />
     </Link>
   )
 }

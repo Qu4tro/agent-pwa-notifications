@@ -1,15 +1,15 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Focus } from 'lucide-react'
 import type { TaskSummary } from '../lib/api'
-import { Container, useHeaderActions } from '../lib/shell'
+import { Container } from '../lib/shell'
 import { ensure, pendingQuery, queryKeys } from '../lib/queries'
 import { PendingSkeleton } from '../lib/skeleton'
 import { PendingLine } from '../lib/task-line'
-import { InlineError, iconButtonClass } from '../lib/ui'
+import { InlineError } from '../lib/ui'
 
 // Note 6: one page for everything waiting on the human, whatever project it is
-// in. The header's bell links here and carries the count.
+// in. The header's bell links here and carries the count; the live mode, the
+// same queue one question at a time, is the header's too.
 //
 // The rows are the same rows as the project page - micro-answers inline, and
 // the row on its own for anything larger - and they leave the same way: the
@@ -25,14 +25,6 @@ export const Route = createFileRoute('/_app/pending')({
 
 function PendingPage() {
   const { data, isError, refetch } = useQuery(pendingQuery())
-  // The same queue, one question at a time, for when the list is the part that
-  // is in the way.
-  useHeaderActions(
-    <Link to="/pending/live" title="Live mode" aria-label="Live mode" className={iconButtonClass}>
-      <Focus size={18} />
-    </Link>,
-    [],
-  )
 
   if (!data) {
     if (!isError) return <PendingSkeleton />
