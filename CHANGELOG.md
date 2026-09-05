@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-05
+
 ### Changed
 
 - A row that is waiting on you opens its question over the list, in the same
