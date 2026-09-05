@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-09-05
+
 ### Changed
 
 - The header is the same on every page: the bell, the live mode and settings,

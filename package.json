@@ -1,6 +1,6 @@
 {
   "name": "agent-pwa-notifications",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Self-hosted push + ask-and-wait inbox for AI agents. Deploy your own on Cloudflare's free plan.",
   "type": "module",
   "license": "MIT",
