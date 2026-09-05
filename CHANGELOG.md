@@ -10,6 +10,14 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Changed
+
+- The header is the same on every page: the bell, the live mode and settings,
+  in that order, and nothing a page adds or takes away. Settings stood on the
+  project list alone and a project's clear stood in its place on a project,
+  so what was at the right changed with the page. The clear is on the
+  project's title line now, at its right.
+
 ## [1.3.0] - 2026-09-05
 
 ### Changed

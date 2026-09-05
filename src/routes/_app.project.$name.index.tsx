@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import type { TaskSummary } from '../lib/api'
-import { Container, useHeaderActions } from '../lib/shell'
+import { Container } from '../lib/shell'
 import { ensure, queryKeys, tasksQuery, useArchive, useClear } from '../lib/queries'
 import { TasksSkeleton } from '../lib/skeleton'
 import { PendingLine, TaskLine } from '../lib/task-line'
@@ -34,18 +34,6 @@ function ProjectView() {
   const archive = useArchive(project)
   const [clearOpen, setClearOpen] = useState(false)
 
-  useHeaderActions(
-    <button
-      onClick={() => setClearOpen((v) => !v)}
-      title="Clear project"
-      aria-label="Clear project"
-      className={`${iconButtonClass} ${clearOpen ? 'text-kind-error' : ''}`}
-    >
-      <Trash2 size={18} />
-    </button>,
-    [clearOpen],
-  )
-
   function doClear(scope: 'read' | 'all') {
     setClearOpen(false)
     clear.mutate({ scope, project })
@@ -69,9 +57,25 @@ function ProjectView() {
 
   return (
     <Container>
+      {/* The clear is on the title's line, at its right, and not in the header:
+          the header is the same on every page, and this is what one page can
+          do. The 44px target is taller than the line; the negative margin
+          keeps the line's own height. */}
       <div className="mb-4 flex items-center gap-2 px-4">
         <ProjectDot project={project} />
-        <h1 className="truncate text-[22px] font-semibold">{projectLabel(project)}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-[22px] font-semibold">
+          {projectLabel(project)}
+        </h1>
+        <button
+          type="button"
+          onClick={() => setClearOpen((v) => !v)}
+          title="Clear project"
+          aria-label="Clear project"
+          aria-expanded={clearOpen}
+          className={`${iconButtonClass} -my-2 -mr-3 ${clearOpen ? 'text-kind-error' : ''}`}
+        >
+          <Trash2 size={18} aria-hidden />
+        </button>
       </div>
 
       {clearOpen && (

@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Settings2 } from 'lucide-react'
 import type { ProjectRow } from '../lib/api'
-import { Container, useHeaderActions } from '../lib/shell'
+import { Container } from '../lib/shell'
 import { ensure, projectsQuery } from '../lib/queries'
 import { ProjectsSkeleton } from '../lib/skeleton'
 import { projectLabel, toParam, STATE_TEXT } from '../lib/project'
@@ -14,7 +13,6 @@ import {
   Section,
   Time,
   badgeClass,
-  iconButtonClass,
   rowLinkClass,
 } from '../lib/ui'
 
@@ -29,12 +27,6 @@ export const Route = createFileRoute('/_app/')({
 
 function Projects() {
   const { data, isError, refetch } = useQuery(projectsQuery())
-  useHeaderActions(
-    <Link to="/settings" title="Settings" aria-label="Settings" className={iconButtonClass}>
-      <Settings2 size={18} />
-    </Link>,
-    [],
-  )
 
   if (!data) {
     if (!isError) return <ProjectsSkeleton />

@@ -1,22 +1,27 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { onlineManager, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, Focus } from 'lucide-react'
+import { Bell, Focus, Settings2 } from 'lucide-react'
 import { APP_NAME } from './brand'
 import { pendingQuery } from './queries'
 import { badgeClass, iconButtonClass } from './ui'
 
-// Mounted once by the app layout, so it never unmounts between pages. Pages
-// contribute the right slot through `useHeaderActions`.
+// Mounted once by the app layout, so it never unmounts between pages, and the
+// same on every page: nothing in it comes or goes with the page under it.
 //
 // The name is on every page and it is always the way to the project list. It
 // used to stand aside on a sub page for a back link pointing at whatever that
 // page's parent was, which meant the one fixed landmark in the app was missing
 // from every page but one, and the way home changed name as you moved. One
-// title, one destination, always in the same place. Actions stay on the right;
-// the bell beside them is the way to what is waiting, and the live mode next
-// to it the way to answer it one question at a time, from wherever you are.
-export function Header({ right }: { right?: React.ReactNode }) {
+// title, one destination, always in the same place.
+//
+// The right side is the same three, in the same order, wherever you are: the
+// bell is the way to what is waiting, the live mode the way to answer it one
+// question at a time, and settings at the edge. Pages used to add their own
+// control after these - settings on the project list, a clear on a project -
+// so what stood at the right changed from page to page and the eye had to
+// find it again; a page's own control now stands on the page.
+export function Header() {
   return (
     <header className="safe-top sticky top-0 z-10 border-b border-line bg-bg">
       <div className="mx-auto flex h-13 max-w-[44rem] items-center justify-between gap-3 px-4">
@@ -29,7 +34,7 @@ export function Header({ right }: { right?: React.ReactNode }) {
         <div className="flex items-center gap-1">
           <PendingButton />
           <LiveButton />
-          {right}
+          <SettingsButton />
         </div>
       </div>
     </header>
@@ -84,6 +89,14 @@ function LiveButton() {
   )
 }
 
+function SettingsButton() {
+  return (
+    <Link to="/settings" title="Settings" aria-label="Settings" className={iconButtonClass}>
+      <Settings2 size={18} aria-hidden />
+    </Link>
+  )
+}
+
 // True until a fetch fails, false again as soon as one succeeds. The lists poll
 // every 5 seconds, so a hub that comes back turns this green within one
 // interval. Losing the network is its own signal: the runtime pauses fetches
@@ -131,27 +144,6 @@ function ConnectionDot() {
       <span className="sr-only">{label}</span>
     </span>
   )
-}
-
-// The header outlives the pages, so a page hands it its actions instead of
-// rendering its own header. The layout owns the state; a page fills the slot
-// and gets out of the way when it unmounts.
-export interface HeaderSlots {
-  setRight: (node: React.ReactNode) => void
-}
-
-export const HeaderActionsContext = createContext<HeaderSlots>({
-  setRight: () => {},
-})
-
-// The right slot: what this page can do. Trash, settings, and the like.
-export function useHeaderActions(node: React.ReactNode, deps: React.DependencyList) {
-  const { setRight } = useContext(HeaderActionsContext)
-  useEffect(() => {
-    setRight(node)
-    return () => setRight(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
 }
 
 export function Container({ children }: { children: React.ReactNode }) {
