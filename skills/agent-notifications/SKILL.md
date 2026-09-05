@@ -380,12 +380,12 @@ That is the whole API:
   notification beats a form they have to open the app for.
 - Read `text` even when a control was used. It may qualify the choice, and it
   is where the human says the thing your options had no room for.
-- Do not colour the answers. The options already come out in different
-  colours, and a plain "Yes"/"No" - or "Correct"/"Wrong", "Approve"/"Reject",
-  "Go ahead"/"Not now" - comes out green/red on its own. Write the plain word
-  and let it. `colors` on a buttons block overrules that, and is for the rare
-  case where one choice should read a particular way; never use it to paint an
-  affirmative red.
+- Do not colour the answers. They come out in a neutral colour, and a plain
+  "Yes"/"No" - or "Correct"/"Wrong", "Approve"/"Reject", "Go ahead"/"Not now"
+  - is shown affirmative first and denial last whatever order you send it in.
+  Write the plain word and let it. `colors` on a buttons block is for the rare
+  case where one choice should read a particular way; a plain "No" is not a
+  danger and needs no red.
 - Do not block forever. If you stop waiting, say so in a follow-up update on
   the same thread, so the human knows the question no longer matters.
 

@@ -9,19 +9,13 @@ import { KIND_BG, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../project'
 // title. A thread page's messages stand their times in a gutter of the same
 // width, so a row and the message it opens into line up down the same column.
 //
-// The whole row is one wrapping flex line: gutter, body, answers. The answers
-// are a column of one fixed width (18rem), so every row's buttons share one
-// left edge and every body truncates at the same point down the list; a group
-// that sizes to its own labels would leave a ragged edge that the eye has
-// nowhere to rest on. The body takes every scrap of slack (grow 9999 against
-// the answers' 1), and the buttons split the column between them in equal
-// shares. When the column does not fit beside the body, it wraps to a line of
-// its own and its grow makes it span that line, which is what "full width if
-// they do not fit" means here. Nothing measures anything in JavaScript.
-//
-// The column grows for a group of labels wider than it (min-w-fit), rather
-// than stacking them inside it; and fit-content caps that at the row, so a
-// wide group on a narrow screen wraps within the row instead of overflowing.
+// A row that can be answered where it is carries its buttons under its body,
+// in the body's column, so the row reads top to bottom as one decision: the
+// title, the question, the answers. They used to stand in a column of their
+// own at the right, which put the answers a line's width away from the words
+// they answered and left the question truncated beside them. They are outside
+// the link, because a button cannot sit inside one, and they take the link's
+// left edge and its right padding.
 
 // The row's body is a link to whatever the row is about. The padding is on the
 // link, not around it, so the whole body is the target.
@@ -44,18 +38,16 @@ export function Row({
   className?: string
 }) {
   return (
-    <div className={`flex flex-wrap items-start border-b border-b-line hover:bg-surface ${className}`}>
+    <div className={`flex items-start border-b border-b-line hover:bg-surface ${className}`}>
       <div className="w-14 shrink-0 py-3 pr-1.5 pl-4 text-right text-[13px] leading-[21px] whitespace-nowrap text-faint">
         {time}
       </div>
-      <div className="flex min-w-0 grow-[9999] basis-[16rem] border-l-[3px] border-l-transparent">
+      <div className="flex min-w-0 flex-1 flex-col border-l-[3px] border-l-transparent">
         {children}
+        {answers ? (
+          <div className="flex flex-wrap items-start gap-2 pr-4 pb-3 pl-2.5">{answers}</div>
+        ) : null}
       </div>
-      {answers ? (
-        <div className="flex min-w-fit grow basis-[18rem] flex-wrap items-start gap-2 pt-3 pr-4 pb-3 pl-4">
-          {answers}
-        </div>
-      ) : null}
     </div>
   )
 }
@@ -74,13 +66,21 @@ export interface TimelineItem {
 // The middle of a row: title on top, and under it either one muted line of
 // detail or the thread's timeline. Every line truncates, so a long agent title
 // can never push the row wider or taller than its own line.
+//
+// The one line that does not truncate is a question the row is asking, on a
+// row with its answers under it: the question is what the reader decides on,
+// so it is there in full, and the row is as tall as it needs to be. Where the
+// thread has no title of its own the question is the row's head, and takes
+// the head's weight.
 export function RowBody({
   title,
+  question,
   detail,
   timeline,
   bold,
 }: {
-  title: React.ReactNode
+  title?: React.ReactNode
+  question?: React.ReactNode
   detail?: React.ReactNode
   // What happened on this thread, newest first, with however many events are
   // not shown counted at the bottom.
@@ -89,7 +89,14 @@ export function RowBody({
 }) {
   return (
     <div className="min-w-0 flex-1">
-      <div className={`truncate leading-tight ${bold ? 'font-semibold' : ''}`}>{title}</div>
+      {title != null ? (
+        <div className={`truncate leading-tight ${bold ? 'font-semibold' : ''}`}>{title}</div>
+      ) : null}
+      {question != null ? (
+        <div className={`leading-snug ${title == null ? (bold ? 'font-semibold' : '') : 'mt-1'}`}>
+          {question}
+        </div>
+      ) : null}
       {detail != null ? (
         <div className="truncate text-[15px] leading-[1.35] text-muted">{detail}</div>
       ) : null}

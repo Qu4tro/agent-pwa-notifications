@@ -59,10 +59,9 @@ const Callout = z.object({
 
 // -- Interactive blocks (questions only) --------------------------------------
 
-// One of the eight answer colours the dashboard hands out by index, for an
-// agent that wants a particular one on a particular answer. Written out here
-// rather than imported from the client, because this file is the wire
-// contract.
+// One of the eight answer colours the dashboard knows by name, for an agent
+// that wants a particular one on a particular answer. Written out here rather
+// than imported from the client, because this file is the wire contract.
 const ANSWER_COLORS = ['blue', 'violet', 'mint', 'rose', 'amber', 'cyan', 'pink', 'lime'] as const
 
 const Buttons = z.object({
@@ -70,7 +69,7 @@ const Buttons = z.object({
   id: z.string().max(80),
   options: z.array(z.string().max(200)).min(1).max(8),
   // Parallel to `options`, and allowed to be shorter: an option with no entry
-  // takes its place in the palette. A name or six hex digits and nothing else,
+  // stays neutral. A name or six hex digits and nothing else,
   // so a value that reaches a style attribute cannot carry anything a style
   // attribute could act on.
   colors: z

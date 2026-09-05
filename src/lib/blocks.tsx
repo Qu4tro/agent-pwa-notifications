@@ -9,7 +9,7 @@ import {
   SendHorizontal,
   TriangleAlert,
 } from 'lucide-react'
-import { answerStyles } from './answers'
+import { answerOrder, answerStyles } from './answers'
 import type { AnswerDoc } from './api'
 import { CodeBlock } from './highlight'
 import { Button, IconButton, fieldClass } from './ui'
@@ -549,10 +549,14 @@ export function AnswerComposer({
     <div className="flex flex-col gap-4">
       {interactive.map((b, i) => {
         if (b.type === 'buttons') {
-          const options = (b.options as string[]) ?? []
-          // Parallel to `options`, and short or absent: an option with no
-          // entry falls back to its place in the palette.
-          const styles = answerStyles(options, b.colors as string[] | undefined)
+          const sent = (b.options as string[]) ?? []
+          const colors = b.colors as (string | undefined)[] | undefined
+          // In the app's order, not the agent's: an affirmative first, a
+          // denial last. `colors` is parallel to the options as sent, and may
+          // be shorter, so it goes through the same permutation.
+          const order = answerOrder(sent)
+          const options = order.map((oi) => sent[oi])
+          const styles = answerStyles(options, order.map((oi) => colors?.[oi]))
           const id = String(b.id)
           const chosen = standing[id]
           return (

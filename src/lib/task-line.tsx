@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import type { QueryKey } from '@tanstack/react-query'
 import { type TaskSummary } from './api'
 import { useAnswerFromList } from './queries'
-import { answerStyles } from './answers'
+import { answerOrder, answerStyles } from './answers'
 import { shortAnswer } from './question'
 import { toParam } from './project'
 import { Button, KindLabel, Row, RowBody, Time, UnreadDot, rowLinkClass, type TimelineItem } from './ui'
@@ -59,13 +59,33 @@ function settled(
 export function TaskLine({
   t,
   unread,
+  question,
   answers,
 }: {
   t: TaskSummary
   unread?: boolean
+  // The question this row is asking, in full. Given on a row that is waiting
+  // on you: the row then reads as one decision - title, question, and the
+  // answers when they fit on it - and carries no timeline, because the
+  // question is what the timeline's first line would have said, and the rest
+  // of the thread is one tap away. Its history is not what the row is for.
+  question?: string
   // What can be done to this thread from the list, if anything.
   answers?: React.ReactNode
 }) {
+  // A thread with no task label is titled by its newest event. On a decision
+  // row that event is the question, which is there in full already, so the
+  // row has no title line and the question is its head. On any other row the
+  // kind word the newest event would have carried on the timeline comes up
+  // into the title instead.
+  const title =
+    t.task || question == null ? (
+      <span className="flex items-center gap-1.5">
+        {unread ? <UnreadDot kind={t.latest_kind} /> : null}
+        {t.task ? null : <KindLabel kind={t.latest_kind} />}
+        <span className="truncate">{t.task || t.latest_title}</span>
+      </span>
+    ) : undefined
   return (
     <Row time={<Time at={t.last_activity} />} answers={answers}>
       <Link
@@ -74,17 +94,9 @@ export function TaskLine({
         className={rowLinkClass}
       >
         <RowBody
-          title={
-            <span className="flex items-center gap-1.5">
-              {unread ? <UnreadDot kind={t.latest_kind} /> : null}
-              {/* A thread with no task label is titled by its newest event, and
-                  that event is left off the timeline below - so the kind word
-                  it would have carried there comes up here instead. */}
-              {t.task ? null : <KindLabel kind={t.latest_kind} />}
-              <span className="truncate">{t.task || t.latest_title}</span>
-            </span>
-          }
-          timeline={timelineOf(t)}
+          title={title}
+          question={question}
+          timeline={question == null ? timelineOf(t) : undefined}
           bold={unread || t.pending}
         />
       </Link>
@@ -93,13 +105,16 @@ export function TaskLine({
 }
 
 // A pending question keeps the same row and answers on it. Two or three short
-// options ride along the row itself; anything larger - a form, a long option,
-// an encrypted question - is the row on its own, and the row opens the thread
-// where it can be answered.
+// options stand under the question, which the row says in full, so the row
+// reads as one decision; anything larger - a form, a long option, an encrypted
+// question - is the same row with the question and no buttons, and the row
+// opens the thread where it can be answered. Neither says "needs answer": the
+// section the row is in already does.
 //
 // The buttons cannot sit inside the row's link, so they are a slot on the row
-// beside it: a column of fixed width at the right, which they split in equal
-// shares, and a full line of their own when the column does not fit.
+// under it. Each is at least 44px tall and 5rem wide whatever its label says,
+// because a control on a phone is a thumb's target, and three of them still
+// fit on one line of a 360px screen.
 //
 // `queryKey` is the list this row is part of, so the optimistic write lands on
 // the right cache entry: the project's tasks on one page, the pending list on
@@ -113,7 +128,7 @@ export function PendingLine({
 }) {
   const answer = useAnswerFromList(queryKey)
   const [error, setError] = useState<string | null>(null)
-  const options = t.pending_answers ?? []
+  const sent = t.pending_answers ?? []
   const eventId = t.pending_event_id
 
   function submit(value: Record<string, string>) {
@@ -122,8 +137,11 @@ export function PendingLine({
     answer.mutate({ eventId, answer: value }, { onError: (e) => setError((e as Error).message) })
   }
 
-  if (options.length === 0 || !eventId) return <TaskLine t={t} />
+  const question = t.pending_question ?? t.latest_title
+  if (sent.length === 0 || !eventId) return <TaskLine t={t} question={question} />
 
+  // In the app's order, not the agent's: an affirmative first, a denial last.
+  const options = answerOrder(sent.map((o) => o.label)).map((i) => sent[i])
   const styles = answerStyles(
     options.map((o) => o.label),
     options.map((o) => o.color),
@@ -132,6 +150,7 @@ export function PendingLine({
   return (
     <TaskLine
       t={t}
+      question={question}
       answers={
         <>
           {options.map((o, i) => (
@@ -139,10 +158,7 @@ export function PendingLine({
               key={o.label}
               variant="answer"
               style={styles[i]}
-              // flex-1 splits the column, or a wrapped line, into equal
-              // shares; min-w-fit stops that split from squeezing a long
-              // label into two lines, and lets the column widen for it.
-              className="flex-1 min-w-fit whitespace-nowrap"
+              className="min-w-20 whitespace-nowrap"
               disabled={answer.isPending}
               onClick={() => submit(o.answer)}
             >

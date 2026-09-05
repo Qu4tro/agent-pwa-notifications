@@ -1,11 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   ANSWER_PALETTE,
+  answerFills,
+  answerOrder,
   answerStyles,
-  answerTextColor,
   overrideColor,
-  resolveAnswerColor,
-  wordColor,
 } from '../../src/lib/answers'
 
 // WCAG relative luminance and contrast, worked out here rather than imported,
@@ -23,58 +23,55 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
+// The tokens as src/styles.css declares them. answers.ts repeats the two
+// fills to work out its tints, so this is where a drift would show.
+const css = readFileSync(new URL('../../src/styles.css', import.meta.url), 'utf8')
+const token = (name: string): string => {
+  const m = css.match(new RegExp(`--color-${name}:\\s*(#[0-9a-f]{6});`))
+  if (!m) throw new Error(`no --color-${name} in styles.css`)
+  return m[1]
+}
+const TEXT = token('text')
+const BG = token('bg')
+const SURFACE = token('surface')
+const RAISED = token('raised')
+const RAISED_HOVER = token('raised-hover')
+
 const names = Object.keys(ANSWER_PALETTE) as (keyof typeof ANSWER_PALETTE)[]
 
-// The two colours the words own. The walk must never hand them out.
-const SPOKEN_FOR = new Set<string>([ANSWER_PALETTE.mint, ANSWER_PALETTE.rose])
-
-describe('the walk', () => {
-  it('gives every option its own colour until the six run out', () => {
-    const six = Array.from({ length: 6 }, (_, i) => resolveAnswerColor(undefined, i))
-    expect(new Set(six).size).toBe(6)
+describe('the neutral fill', () => {
+  it('carries the page text on both of its steps', () => {
+    expect(contrast(TEXT, RAISED)).toBeGreaterThanOrEqual(7)
+    expect(contrast(TEXT, RAISED_HOVER)).toBeGreaterThanOrEqual(7)
   })
 
-  it('wraps by index, so a seventh option starts again', () => {
-    expect(resolveAnswerColor(undefined, 6)).toBe(resolveAnswerColor(undefined, 0))
-    expect(resolveAnswerColor(undefined, 9)).toBe(resolveAnswerColor(undefined, 3))
-  })
-
-  it('never hands out mint or rose, which the words own', () => {
-    for (let i = 0; i < 12; i++) {
-      expect(SPOKEN_FOR.has(resolveAnswerColor(undefined, i)), `index ${i}`).toBe(false)
-    }
-  })
-
-  it('reaches lime and pink last, since they neighbour mint and rose', () => {
-    const first = [0, 1, 2, 3].map((i) => resolveAnswerColor(undefined, i))
-    expect(first).not.toContain(ANSWER_PALETTE.lime)
-    expect(first).not.toContain(ANSWER_PALETTE.pink)
+  it('stands off the surface a row wears under the pointer', () => {
+    expect(luminance(RAISED)).toBeGreaterThan(luminance(SURFACE))
+    expect(luminance(RAISED_HOVER)).toBeGreaterThan(luminance(RAISED))
   })
 })
 
 describe('the eight', () => {
-  it('is readable as text on both surfaces a button sits on', () => {
-    // The page, and the row under the pointer. The same ratio covers the
-    // option that stands, which is the page colour on a fill of the colour.
-    for (const [name, hex] of Object.entries(ANSWER_PALETTE)) {
-      expect(contrast(hex, '#0f1115'), name).toBeGreaterThanOrEqual(4.5)
-      expect(contrast(hex, '#161920'), name).toBeGreaterThanOrEqual(4.5)
+  it('each carries the page text on its own tint, at rest and under the pointer', () => {
+    for (const name of names) {
+      const { fill, hover } = answerFills(ANSWER_PALETTE[name])
+      expect(contrast(TEXT, fill), name).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(TEXT, hover), name).toBeGreaterThanOrEqual(4.5)
     }
   })
 
-  it('is a register of its own, a step under the kind colour of its family', () => {
-    // Five of the eight share a hue family with a colour the kind axis owns,
-    // which the names make unavoidable. What keeps an answer from reading as
-    // an event kind is that every one of the five is the darker of the pair.
-    const family: [keyof typeof ANSWER_PALETTE, string][] = [
-      ['blue', '#5b9bff'], // --color-kind-update
-      ['violet', '#a78bfa'], // --color-kind-question
-      ['mint', '#34d399'], // --color-kind-done
-      ['rose', '#f87171'], // --color-kind-error
-      ['amber', '#fbbf24'], // --color-warn
-    ]
-    for (const [name, kind] of family) {
-      expect(luminance(ANSWER_PALETTE[name]), name).toBeLessThan(luminance(kind))
+  it('each tints its fill from the raised token, not from the page', () => {
+    // A tint is the colour over the neutral fill, so it sits between the two.
+    for (const name of names) {
+      const { fill } = answerFills(ANSWER_PALETTE[name])
+      expect(luminance(fill), name).toBeGreaterThan(luminance(RAISED) * 0.9)
+      expect(fill, name).not.toBe(RAISED)
+    }
+  })
+
+  it('is readable as the page colour on a solid fill of itself, which the option that stands wears', () => {
+    for (const name of names) {
+      expect(contrast(ANSWER_PALETTE[name], BG), name).toBeGreaterThanOrEqual(4.5)
     }
   })
 
@@ -85,132 +82,94 @@ describe('the eight', () => {
 
 describe('an agent-set colour', () => {
   it('takes a palette name, whatever case it is written in', () => {
-    expect(resolveAnswerColor('mint', 0)).toBe(ANSWER_PALETTE.mint)
-    expect(resolveAnswerColor('MINT', 0)).toBe(ANSWER_PALETTE.mint)
+    expect(overrideColor('mint')).toBe(ANSWER_PALETTE.mint)
+    expect(overrideColor('MINT')).toBe(ANSWER_PALETTE.mint)
   })
 
   it('takes six hex digits', () => {
-    expect(resolveAnswerColor('#1E3A8A', 0)).toBe('#1e3a8a')
+    expect(overrideColor('#1E3A8A')).toBe('#1e3a8a')
   })
 
-  it('falls back to the walk for anything else', () => {
-    const fallback = resolveAnswerColor(undefined, 2)
-    for (const bad of ['url(x)', 'red', '#fff', '#12345g', 'blue; color: red', '']) {
-      expect(resolveAnswerColor(bad, 2), bad).toBe(fallback)
+  it('resolves nothing else', () => {
+    for (const bad of ['url(x)', 'red', '#fff', '#12345g', 'blue; color: red', '', undefined]) {
+      expect(overrideColor(bad), String(bad)).toBe(null)
     }
   })
 })
 
-describe('the label colour', () => {
-  it('is the answer colour itself on every palette entry', () => {
-    for (const name of names) {
-      expect(answerTextColor(ANSWER_PALETTE[name]), name).toBe(ANSWER_PALETTE[name])
-    }
+describe('what an option wears', () => {
+  it('is nothing at all when the agent did not colour it', () => {
+    expect(answerStyles(['Roll it', 'Wait', 'Roll at 5%'])).toEqual([{}, {}, {}])
   })
 
-  it('falls back to the page text on a dark colour an agent chose', () => {
-    expect(answerTextColor('#1e3a8a')).toBe('var(--color-text)')
-    expect(answerTextColor('#000000')).toBe('var(--color-text)')
-  })
-
-  it('is carried, with the outline colour, on the two custom properties the button reads', () => {
+  it('is the colour and its two tints when the agent did', () => {
+    const { fill, hover } = answerFills(ANSWER_PALETTE.mint)
     expect(answerStyles(['Roll it'], ['mint'])).toEqual([
-      { '--answer-color': ANSWER_PALETTE.mint, '--answer-fg': ANSWER_PALETTE.mint },
+      { '--answer-color': ANSWER_PALETTE.mint, '--answer-fill': fill, '--answer-fill-hover': hover },
     ])
-    expect(answerStyles(['Roll it'], ['#1e3a8a'])).toEqual([
-      { '--answer-color': '#1e3a8a', '--answer-fg': 'var(--color-text)' },
-    ])
+  })
+
+  it('pairs colours to options by position, and leaves the rest alone', () => {
+    const out = answerStyles(['Deploy', 'Hold', 'Roll back'], ['mint', 'amber'])
+    expect(out[0]).toHaveProperty('--answer-color', ANSWER_PALETTE.mint)
+    expect(out[1]).toHaveProperty('--answer-color', ANSWER_PALETTE.amber)
+    expect(out[2]).toEqual({})
+  })
+
+  it('treats a value it cannot resolve as no colour', () => {
+    expect(answerStyles(['Roll it', 'Wait'], ['url(x)', undefined])).toEqual([{}, {}])
+  })
+
+  it('does not colour a word for what it says', () => {
+    // "No" is not a danger, and "Yes" is not a success: the lists order, and
+    // only the agent colours.
+    expect(answerStyles(['Yes', 'No'])).toEqual([{}, {}])
   })
 })
 
-// One question's colours are worked out together, not one option at a time,
-// which is the only way the walk can avoid what the agent has taken.
-const colors = (labels: string[], colors?: (string | undefined)[]) =>
-  answerStyles(labels, colors).map((style) => (style as Record<string, string>)['--answer-color'])
+// A reader who has answered three rows knows where the yes is on the fourth
+// before reading it. The two lists are the one thing the label says about
+// where it stands.
+describe('the order', () => {
+  const order = (labels: string[]) => answerOrder(labels).map((i) => labels[i])
 
-describe('a question with some colours set and some not', () => {
-  it('walks past anything the agent claimed', () => {
-    // "Roll it" blue by name, "Wait" amber, and the third left alone: the walk
-    // starts at blue, which would have given the row two blue buttons.
-    const out = colors(['Roll it', 'Wait', 'Roll at 5%'], ['blue', 'amber', undefined])
-    expect(out[0]).toBe(ANSWER_PALETTE.blue)
-    expect(out[1]).toBe(ANSWER_PALETTE.amber)
-    expect(out[2]).toBe(ANSWER_PALETTE.violet)
-  })
-
-  it('walks blue, violet, amber for three labels on neither list', () => {
-    expect(colors(['Roll it', 'Wait', 'Roll at 5%'])).toEqual([
-      ANSWER_PALETTE.blue,
-      ANSWER_PALETTE.violet,
-      ANSWER_PALETTE.amber,
+  it('puts an affirmative first and a denial last, whatever order they were sent', () => {
+    expect(order(['Yes', 'No'])).toEqual(['Yes', 'No'])
+    expect(order(['No', 'Yes'])).toEqual(['Yes', 'No'])
+    expect(order(['Cancel', 'Retry'])).toEqual(['Retry', 'Cancel'])
+    expect(order(['Monday', 'No', 'Staging first', 'Yes'])).toEqual([
+      'Yes',
+      'Monday',
+      'Staging first',
+      'No',
     ])
   })
 
-  it('ignores a value it cannot resolve and colours that option from the walk', () => {
-    const out = colors(['Roll it', 'Wait'], ['url(x)', undefined])
-    expect(out).toEqual([ANSWER_PALETTE.blue, ANSWER_PALETTE.violet])
-    expect(overrideColor('url(x)')).toBe(null)
+  it('keeps the agent order for labels on neither list', () => {
+    expect(order(['Roll it', 'Wait', 'Roll at 5%'])).toEqual(['Roll it', 'Wait', 'Roll at 5%'])
+    expect(order(['Rocket', 'Flag', 'Tag', 'Bolt', 'Leaf', 'Star'])).toEqual([
+      'Rocket', 'Flag', 'Tag', 'Bolt', 'Leaf', 'Star',
+    ])
   })
 
-  it('repeats rather than running out when every colour is spoken for', () => {
-    const out = colors(
-      Array.from({ length: 9 }, (_, i) => `Option ${i}`),
-      [...names, undefined],
-    )
-    expect(out).toHaveLength(9)
-    expect(out[8]).toBe(ANSWER_PALETTE.blue)
+  it('keeps the agent order within a group', () => {
+    expect(order(['Approve', 'Yes', 'Reject', 'No'])).toEqual(['Approve', 'Yes', 'Reject', 'No'])
   })
 
-  it('never reaches for mint or rose, however many options there are', () => {
-    const out = colors(Array.from({ length: 8 }, (_, i) => `Option ${i}`))
-    for (const c of out) expect(SPOKEN_FOR.has(c)).toBe(false)
-  })
-})
-
-// A "yes" and a "no" in two arbitrary colours make the eye stop and read. The
-// two lists are the one case where the colour is the answer, not a tag.
-describe('the affirm and deny lists', () => {
-  const color = (label: string) =>
-    (answerStyles([label])[0] as Record<string, string>)['--answer-color']
-
-  it('paints an affirmative green and a denial red', () => {
-    for (const yes of ['Yes', 'yes', 'OK', 'Correct', 'Go ahead', 'LGTM', 'Approve'])
-      expect(color(yes), yes).toBe(ANSWER_PALETTE.mint)
-    for (const no of ['No', 'no', 'Wrong', 'Incorrect', 'Cancel', "Don't", 'Not now'])
-      expect(color(no), no).toBe(ANSWER_PALETTE.rose)
-  })
-
-  it('ignores case and a trailing full stop', () => {
-    expect(wordColor('YES.')).toBe(ANSWER_PALETTE.mint)
-    expect(wordColor('  no!  ')).toBe(ANSWER_PALETTE.rose)
+  it('ignores case, surrounding space and a trailing full stop', () => {
+    expect(order(['  no!  ', 'YES.'])).toEqual(['YES.', '  no!  '])
   })
 
   it('matches the whole label, never a word inside it', () => {
     for (const label of ['Yes, but hold', 'Nope, not now', 'No route to host', 'Right rail'])
-      expect(wordColor(label), label).toBe(null)
+      expect(order([label, 'Yes']), label).toEqual(['Yes', label])
   })
 
-  it('says nothing about a label that says nothing', () => {
-    for (const label of ['Roll it', 'Wait', 'Tombstone', 'Roll at 5%'])
-      expect(wordColor(label), label).toBe(null)
-  })
-
-  it('gives a yes/no question green and red, in that order', () => {
-    expect(colors(['Yes', 'No'])).toEqual([ANSWER_PALETTE.mint, ANSWER_PALETTE.rose])
-  })
-
-  it('gives a third, neutral option the first colour of the walk', () => {
-    expect(colors(['Yes', 'No', 'Ask me later'])).toEqual([
-      ANSWER_PALETTE.mint,
-      ANSWER_PALETTE.rose,
-      ANSWER_PALETTE.blue,
-    ])
-  })
-
-  it('lets the agent overrule what the label says', () => {
-    expect(colors(['Yes', 'No'], ['amber', undefined])).toEqual([
-      ANSWER_PALETTE.amber,
-      ANSWER_PALETTE.rose,
-    ])
+  it('is a permutation the caller can carry anything parallel through', () => {
+    const labels = ['No', 'Maybe', 'Yes']
+    const colors = ['rose', undefined, 'mint']
+    const idx = answerOrder(labels)
+    expect(idx).toEqual([2, 1, 0])
+    expect(idx.map((i) => colors[i])).toEqual(['mint', undefined, 'rose'])
   })
 })

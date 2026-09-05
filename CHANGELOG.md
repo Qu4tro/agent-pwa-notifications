@@ -12,6 +12,19 @@ released section and opens a fresh empty one.
 
 ### Changed
 
+- A row that is waiting on you reads as one decision: the title, the
+  question in full, and the answer buttons under it when the question can be
+  answered from the list. The buttons stood in a column at the right, beside
+  a question the row truncated, and the row's timeline said "Question … needs
+  answer" under a row that was already asking. A question that has to be
+  opened is the same row without the buttons.
+- Answer buttons are a soft neutral fill with the page text on them, a step
+  lighter under the pointer, in place of an outline in a colour of their own.
+  Colour on an answer now comes only from a `colors` entry the agent set, as
+  a tint of the fill; a plain "No" is no longer red, because a denial is not
+  an error. The tool text and the skill say so.
+- A question's options stand in one order wherever they are shown: a plain
+  affirmative first, a plain denial last, the rest as the agent wrote them.
 - A thread's messages all stand shut, the newest one and a waiting question
   too, and a tap opens one over the thread: the blocks, and on a question the
   controls, the answer that stands, "Change answer" and where that answer got
