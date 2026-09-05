@@ -9,4 +9,4 @@
 // paints --color-surface under itself on hover and the pill would vanish into
 // it. Tabular digits, so a row with 9 and a row with 10 do not wobble.
 export const badgeClass =
-  'min-w-[1.1rem] rounded-full px-1 text-center text-[12px] leading-[1.1rem] font-semibold tabular-nums'
+  'ui-badge min-w-[1.1rem] rounded-full px-1 text-center text-[12px] leading-[1.1rem] font-semibold tabular-nums'

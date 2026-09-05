@@ -23,10 +23,10 @@ import { badgeClass, iconButtonClass } from './ui'
 // find it again; a page's own control now stands on the page.
 export function Header() {
   return (
-    <header className="safe-top sticky top-0 z-10 border-b border-line bg-bg">
-      <div className="mx-auto flex h-13 max-w-[44rem] items-center justify-between gap-3 px-4">
+    <header className="ui-chrome safe-top sticky top-0 z-10 border-b border-line bg-bg">
+      <div className="ui-titlebar mx-auto flex h-13 max-w-[44rem] items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Link to="/" className="truncate font-semibold text-text no-underline">
+          <Link to="/" className="ui-title truncate font-semibold text-text no-underline">
             {APP_NAME}
           </Link>
           <ConnectionDot />
@@ -138,7 +138,7 @@ function ConnectionDot() {
         aria-hidden
         title={label}
         className={`inline-block size-2 shrink-0 rounded-full ${
-          reachable ? 'bg-kind-done' : 'border-2 border-kind-error'
+          reachable ? 'ui-conn-on bg-kind-done' : 'ui-conn-off border-2 border-kind-error'
         }`}
       />
       <span className="sr-only">{label}</span>
@@ -147,5 +147,5 @@ function ConnectionDot() {
 }
 
 export function Container({ children }: { children: React.ReactNode }) {
-  return <main className="safe-bottom mx-auto max-w-[44rem] pt-5">{children}</main>
+  return <main className="ui-window safe-bottom mx-auto max-w-[44rem] pt-5">{children}</main>
 }

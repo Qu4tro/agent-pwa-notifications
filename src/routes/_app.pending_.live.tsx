@@ -551,7 +551,7 @@ function LiveCard({
   // a card whose body came late would arrive with no rise at all.
   return (
     <div className={motionClass(phase, motion)}>
-      <div className="rounded-ui border border-edge bg-surface p-5">
+      <div className="ui-card rounded-ui border border-edge bg-surface p-5">
         <div className="flex items-center gap-2 text-[15px] text-muted">
           <ProjectDot project={e.project ?? ''} size={6} />
           <span className="truncate">{projectLabel(e.project ?? '')}</span>

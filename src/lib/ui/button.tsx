@@ -5,11 +5,15 @@
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'answer'
 
+// The `ui-` classes are markers and carry no rules of their own here: they are
+// what a theme selects on for what a variable cannot say. A bevel and a
+// pressed-in toggle are shapes rather than colours, so a theme in src/themes
+// reaches them through these. Nothing else may style them.
 const VARIANT: Record<Variant, string> = {
   // Dark label on the accent: 6.9:1. A light label on it would be 2.2:1.
-  primary: 'bg-kind-question text-bg font-semibold hover:opacity-90',
+  primary: 'ui-btn-primary bg-kind-question text-bg font-semibold hover:opacity-90',
   secondary: 'border border-edge text-text hover:bg-surface',
-  danger: 'border border-kind-error text-kind-error hover:bg-surface',
+  danger: 'ui-btn-danger border border-kind-error text-kind-error hover:bg-surface',
   // A soft fill and not an outline, in no colour of its own: the neutral fill
   // a step above the surface, the page's text on it, and a step lighter again
   // under the pointer - a row hovers to the surface, so the fill has to sit
@@ -20,11 +24,11 @@ const VARIANT: Record<Variant, string> = {
   // page text where it has none - and the label goes to the page colour, so
   // the choice reads off the row.
   answer:
-    'bg-[var(--answer-fill,var(--color-raised))] font-medium text-text hover:bg-[var(--answer-fill-hover,var(--color-raised-hover))] aria-pressed:bg-[var(--answer-color,var(--color-text))] aria-pressed:text-bg',
+    'ui-answer bg-[var(--answer-fill,var(--color-raised))] font-medium text-text hover:bg-[var(--answer-fill-hover,var(--color-raised-hover))] aria-pressed:bg-[var(--answer-color,var(--color-text))] aria-pressed:text-bg',
 }
 
 const BASE =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-ui px-4 text-[16px] leading-none disabled:cursor-not-allowed disabled:opacity-50'
+  'ui-btn inline-flex min-h-11 items-center justify-center gap-2 rounded-ui px-4 text-[16px] leading-none disabled:cursor-not-allowed disabled:opacity-50'
 
 export function Button({
   variant = 'secondary',
@@ -45,11 +49,11 @@ export function IconButton({ className = '', ...rest }: React.ComponentProps<'bu
   return (
     <button
       type="button"
-      className={`inline-flex size-11 items-center justify-center rounded-ui text-muted hover:bg-surface hover:text-text ${className}`}
+      className={`ui-icon-btn inline-flex size-11 items-center justify-center rounded-ui text-muted hover:bg-surface hover:text-text ${className}`}
       {...rest}
     />
   )
 }
 
 export const iconButtonClass =
-  'inline-flex size-11 items-center justify-center rounded-ui text-muted hover:bg-surface hover:text-text'
+  'ui-icon-btn inline-flex size-11 items-center justify-center rounded-ui text-muted hover:bg-surface hover:text-text'

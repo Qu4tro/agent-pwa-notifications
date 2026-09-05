@@ -1,6 +1,7 @@
 import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
 import { APP_NAME, APP_SHORT_NAME, APP_TAGLINE } from '../lib/brand'
+import { THEME_BOOT } from '../lib/theme'
 import appCss from '../styles.css?url'
 
 // The router hands every route the one QueryClient, so a loader can warm a
@@ -17,6 +18,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: APP_NAME },
       { name: 'description', content: APP_TAGLINE },
       // Matches --color-bg, so the browser chrome and the app share one surface.
+      // A theme rewrites this one, in THEME_BOOT and again whenever it is
+      // changed, so the chrome follows the app it frames.
       { name: 'theme-color', content: '#0f1115' },
       { name: 'mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
@@ -35,11 +38,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The theme is an attribute on <html> that no render put there, so both
+    // ends of the document are told not to expect what they find.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body suppressHydrationWarning>
+        {/* The theme this device chose, on the document before anything is
+            painted. First in the body and blocking, so it runs after <head>
+            has been parsed - it rewrites the theme-color meta - and before a
+            single row is drawn. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         {children}
         <Scripts />
         {/* Register the service worker for push + install. Inline so it runs

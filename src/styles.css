@@ -1,9 +1,18 @@
 @import 'tailwindcss';
 
+/* A second set of values for the tokens below, under a `data-theme` on <html>.
+   The default theme is this file with no attribute set at all; src/lib/theme.ts
+   is what puts the attribute there. */
+@import './themes/win95.css';
+
 /* Every colour, radius and size the app uses. Declared once here; Tailwind
    turns each one into a utility (bg-surface, text-muted, rounded-ui) and into
    a plain CSS variable for the few values that can only be set inline, like a
    project colour or a progress width.
+
+   A theme re-declares these and nothing else, which works because a utility
+   compiles to `var(--color-surface)` rather than to the value: change the
+   variable on <html> and every rule that reads it changes with it.
 
    Colour carries meaning and nothing else: the kind of an event, the project
    it belongs to, the state of a question. Nothing is coloured for decoration. */

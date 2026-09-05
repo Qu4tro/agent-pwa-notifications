@@ -18,6 +18,7 @@ import {
 } from '../lib/queries'
 import { clearPersistedCache } from '../lib/query'
 import { getEncKey, setEncKey, clearEncKey, generateEncKey } from '../lib/e2e'
+import { DEFAULT_THEME, THEMES, getTheme, setTheme, type Theme } from '../lib/theme'
 import { Button, ConfirmPanel, InlineError, Snippet, fieldClass, sectionHeadingClass } from '../lib/ui'
 
 export const Route = createFileRoute('/_app/settings')({
@@ -41,7 +42,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 
 // One column, one heading per topic, no cards. The order is the order a new
 // hub is set up in: turn on notifications, quieten them, get the key, connect
-// an agent, then the housekeeping.
+// an agent, then what is only taste, then the housekeeping.
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8 px-4">
@@ -221,6 +222,10 @@ function SettingsPage() {
         <EncryptionSection />
       </Group>
 
+      <Group title="Appearance">
+        <ThemeSection />
+      </Group>
+
       <Group title="Clear inbox">
         <Note>
           Tidy up or start fresh. Agents can also clear things themselves when it gets cluttered.
@@ -362,6 +367,67 @@ function EncryptionSection() {
       )}
       {msg ? <p className="mt-2 text-[15px] text-muted">{msg}</p> : null}
     </div>
+  )
+}
+
+// Which theme this device is drawn in. A device thing, like the encryption
+// key: it is stored in this browser and nothing about it reaches the hub, so
+// a phone can be grey and a laptop dark on the same account. Read after mount
+// rather than on the first render, because the server has no localStorage to
+// read it from - the document has already applied it by then, from the inline
+// script in __root.tsx, so nothing about the page changes when this lands.
+//
+// The choice takes effect on the tap. There is nothing to save: it is one
+// attribute on <html>, and every colour in the app follows it.
+function ThemeSection() {
+  const [chosen, setChosen] = useState(DEFAULT_THEME)
+  useEffect(() => setChosen(getTheme()), [])
+
+  return (
+    <div>
+      <Note>How the app is drawn. The choice is this device's and stays on it.</Note>
+      <fieldset className="flex flex-col gap-1">
+        <legend className="sr-only">Theme</legend>
+        {THEMES.map((t) => (
+          <label key={t.id} className="flex min-h-11 cursor-pointer items-center gap-3 py-1">
+            <input
+              type="radio"
+              name="theme"
+              value={t.id}
+              checked={chosen === t.id}
+              onChange={() => {
+                setTheme(t.id)
+                setChosen(t.id)
+              }}
+            />
+            <ThemeSwatch theme={t} />
+            <span className="min-w-0">
+              <span className="block text-[16px]">{t.name}</span>
+              <span className="block text-[15px] text-muted">{t.note}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+    </div>
+  )
+}
+
+// What a theme looks like, in that theme's own four colours: the page, the
+// strip along the top of it, a line of text on it and the accent under that.
+// Painted rather than described, so the choice can be made without making it,
+// and small enough that it is a mark beside a name and not a screenshot.
+function ThemeSwatch({ theme }: { theme: Theme }) {
+  const s = theme.swatch
+  return (
+    <span
+      aria-hidden
+      className="flex size-11 shrink-0 flex-col overflow-hidden rounded-ui border"
+      style={{ borderColor: s.text, background: s.page }}
+    >
+      <span className="block h-3 w-full" style={{ background: s.bar }} />
+      <span className="mt-2 ml-1.5 block h-1 w-6" style={{ background: s.text }} />
+      <span className="mt-1 ml-1.5 block h-1 w-3.5" style={{ background: s.accent }} />
+    </span>
   )
 }
 

@@ -95,9 +95,32 @@ delivering to a browser. Real delivery is checked by hand; see
 Tailwind 4 utilities plus the design tokens declared once in `src/styles.css`
 inside `@theme`, so each token is both a utility and a CSS variable. Colour
 carries meaning: the kind of an event, the project it belongs to, the state of
-a question. There are no inline style objects; do not reintroduce them.
+a question. There are no inline style objects; do not reintroduce them, except
+where the value is data rather than a styling decision - a project's colour, an
+agent's answer colour, a theme's swatch.
 
 Text is plain ASCII everywhere, including UI strings.
+
+### Themes
+
+A theme is a second set of values for those same tokens, under a `data-theme`
+attribute on `<html>`, in `src/themes/<id>.css`. Every utility compiles to
+`var(--color-...)`, so re-declaring the tokens re-paints the whole app and no
+component knows a theme exists. Three rules:
+
+1. A theme re-declares **every** token `@theme` declares. One left out falls
+   back to the default's value, which on a light theme is a colour drawn to be
+   read on near-black. `test/unit/theme.test.ts` fails when one is missing, and
+   checks the new palette's contrast while it is there.
+2. What a variable cannot say - a bevel is a shape, not a colour - goes on the
+   `ui-` marker classes the shared components carry (`ui-btn`, `ui-field`,
+   `ui-window`, `ui-dialog`, and the rest). They carry no rules of their own;
+   nothing but a theme may style them, and no theme may select on a layout
+   class. Theme rules are unlayered, which is how they beat a utility and its
+   `hover:` variant without `!important`.
+3. `src/lib/theme.ts` is the list, the storage key and the inline boot script,
+   and adding a theme there and a file under `src/themes/` is the whole of it.
+   The choice lives in this browser's localStorage, never on the hub.
 
 ## Sync with upstream
 

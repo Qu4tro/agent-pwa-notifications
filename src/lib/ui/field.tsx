@@ -5,4 +5,4 @@
 // 16px is not a taste call: iOS zooms the page into any input smaller than
 // that, and the zoom does not come back out on its own.
 export const fieldClass =
-  'w-full rounded-ui border border-edge bg-transparent px-3 py-2.5 text-[16px] text-text'
+  'ui-field w-full rounded-ui border border-edge bg-transparent px-3 py-2.5 text-[16px] text-text'
