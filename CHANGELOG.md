@@ -25,6 +25,9 @@ released section and opens a fresh empty one.
   boundary between one person's inbox and another's. The account scoping they
   sit on is unchanged; the comments now say what the code does, which is filter
   every query by `account_id`.
+- The D1 table `settings`, in `migrations/0011_drop_settings.sql`. It is the
+  global key/value bag from `0001_init.sql`; `0007_accounts.sql` replaced it
+  with `account_settings` and left it standing. No query has named it since.
 
 ## [1.4.0] - 2026-09-05
 
