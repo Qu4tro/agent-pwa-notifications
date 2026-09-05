@@ -147,7 +147,7 @@ everything" removes both.
 Opening a thread marks its events read on every load, not only the first, so an
 update that arrives while you are looking at the thread does not linger as
 unread afterwards. A question stays unread until it is answered, which is what
-keeps it in "Waiting on you".
+keeps it in "Needs you".
 
 ## Why a notification did not arrive
 

@@ -15,8 +15,17 @@ to: `GET <hub>/api/v1/schema.json`.
 
 ### markdown
 
-GitHub-flavored markdown, up to 20000 characters. The first markdown block in
-an event also supplies the notification preview line.
+A small markdown subset, up to 20000 characters:
+
+- `#`, `##` and `###` headings.
+- Bullet lists on `-` or `*`.
+- Fenced code blocks, with an optional language on the fence.
+- `**bold**`, `` `code` ``, `[label](url)`, and bare `http(s)` links.
+
+Every other line is a paragraph, and a blank line ends one. Anything outside
+that list - italics, ordered lists, quotes, tables, raw HTML - renders as the
+plain text it is written as. The first markdown block in an event also supplies
+the notification preview line.
 
 ```json
 { "type": "markdown", "text": "## Deploy finished\nAll **14** checks passed." }

@@ -43,6 +43,17 @@ released section and opens a fresh empty one.
   `idx_events_project` and `idx_accounts_key`. The account-scoped indexes from
   0007 supersede them, and `accounts.agent_key_hash` is UNIQUE.
 
+### Fixed
+
+- `GET /api/v1/openapi.json` lists `project`, `task`, `model` and the encrypted
+  `enc` form on events, questions and in-place updates, and `ack` on questions.
+- `GET /api/v1/openapi.json` no longer advertises the answer operation. That
+  route is behind the session cookie and rejects an agent key.
+- `agent-notify-pwa <command> --help` prints the help instead of running the
+  command.
+- One definition of the event `Kind` union: `src/lib/api.ts` imports it instead
+  of writing it out three more times.
+
 ## [1.5.0] - 2026-09-05
 
 ### Removed

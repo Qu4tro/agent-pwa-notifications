@@ -614,9 +614,9 @@ export async function getTasks(project: string, env: Env, accountId: string): Pr
 }
 
 // Note 6: everything waiting on the human, across every project, in one list.
-// getStats has the count and getProjects has it per project, but neither can
-// say what is being asked; getFeed stops at the 100 most recent events, so a
-// question older than that would simply not be there.
+// getProjects has the count per project but cannot say what is being asked,
+// and getTasks only covers one project at a time, so a question waiting in a
+// project the human is not looking at has nowhere else to surface.
 //
 // Same shape as getTasks, so the pending page renders the same rows as the
 // project page. Oldest question first: the one that has been waiting longest

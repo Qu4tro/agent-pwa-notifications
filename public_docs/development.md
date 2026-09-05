@@ -25,7 +25,7 @@ src/server/blocks.ts   the zod schema for the block types agents may send
 src/server/quick-answers.ts  when a question may answer from a notification
 src/server/push.ts     VAPID signing and RFC 8291 payload encryption
 src/server/mcp.ts      the five MCP tools, wrapped around the same handlers
-src/server/cron.ts     the hourly job: expire questions, prune old events
+src/server/cron.ts     the hourly job: expire questions, archive old events
 src/server/hub.ts      the opt-in Durable Object behind INSTANT=1
 src/lib/queries.ts     every query key and fetcher the app uses
 src/lib/blocks.tsx     the renderer for each block type
@@ -51,8 +51,9 @@ pnpm exec vitest run --project api
 
 Two projects, because they need different runtimes:
 
-- `test/unit/**` runs on node. Pure functions only: the quick-answer rule, the
-  service-worker action rule, the query keys.
+- `test/unit/**` runs on node. Pure functions only - the rules that need no
+  Worker runtime, such as the quick-answer rule and the markdown parser - one
+  file per rule, named after it.
 - `test/api/**` runs on real workerd through `@cloudflare/vitest-pool-workers`,
   with an isolated D1 and KV per test file. `test/setup.ts` applies the
   migrations in `migrations/` to that D1, so a schema change is picked up by

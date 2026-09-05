@@ -86,9 +86,16 @@ pnpm exec wrangler deployments list        # what is live
 pnpm exec wrangler rollback <deployment>   # back to the previous one
 ```
 
-A migration is not rolled back by that. Migrations are additive by convention:
-add a column or a table, do not drop or rewrite one, so an older Worker keeps
-running against a newer schema.
+A migration is not rolled back by that. Migrations are forward-only: write a
+new one, never edit or revert an applied one.
+
+The workflow migrates first and deploys second, so between the two steps the
+previous Worker runs against the new schema. A migration that drops or rewrites
+an object is allowed only when that Worker never touches it. Adding a column or
+a table always passes the test. Dropping one passes only when the deployed code
+has already stopped reading and writing it. `0011_drop_settings` met that test:
+`account_settings` had replaced the `settings` table back in `0007`, and no
+deployed Worker read or wrote it any more.
 
 To retry a tag that failed before it deployed, delete it locally and remotely
 (`git tag -d v1.2.0 && git push origin :refs/tags/v1.2.0`), fix the cause, and

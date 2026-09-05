@@ -11,8 +11,8 @@ interface QuickAnswerAction {
   title: string
   answer: Record<string, string>
   // What the agent asked for on this option, if it asked. Absent means the
-  // dashboard hands the option its place in the palette. A notification action
-  // has nowhere to put a colour; a list row does.
+  // option stays neutral. A notification action has nowhere to put a colour;
+  // a list row does.
   color?: string
 }
 

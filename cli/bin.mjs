@@ -107,8 +107,8 @@ async function open() {
   if (status !== 200 || !json.ok) die(`Failed (${status}): ${json.error || 'unknown error'}`)
 
   const minutes = Math.max(1, Math.round((json.expires_at - Date.now()) / 60_000))
-  // QR by default; --no-qr prints the URL alone (parseArgs in loose mode does
-  // not fold --no-x into x, so read both).
+  // QR by default; --no-qr prints the URL alone. parseArgs in loose mode keeps
+  // `no-qr` as its own flag, so the check is on that name.
   if (!flags['no-qr']) {
     console.log('\nScan this on the device you want to sign in:\n')
     qr(json.url)
@@ -165,7 +165,7 @@ async function ask() {
   const options = flags.button || []
   if (options.length < 1) die('Provide at least one --button option.')
   // Paired with --button by position, and allowed to run short: an option with
-  // no --color of its own takes its place in the dashboard's palette.
+  // no --color of its own stays neutral.
   const colors = flags.color || []
 
   const blocks = [
@@ -269,9 +269,10 @@ ${BIN} ${VERSION} - talk to your Agent PWA Notifications hub
       stdout. The human can tap an option, write words, or both, so either
       field can be null: \`jq -r .choice\` for the option, \`jq -r .text\` for
       the words.
-      Every option is already a different colour. --color pairs with --button
-      by position when a particular choice should read a particular way:
-      blue, violet, mint, rose, amber, cyan, pink, lime, or #rrggbb.
+      Options come out neutral, a plain affirmative first and a plain denial
+      last, whatever order you pass them in. --color pairs with --button by
+      position when a particular choice should read a particular way: blue,
+      violet, mint, rose, amber, cyan, pink, lime, or #rrggbb.
 
   ${BIN} status [--json]
       Show the saved hub URL, the key prefix and whether E2E is on.
@@ -286,6 +287,10 @@ Environment overrides the saved config:
 
 if (flags.version && !cmd) {
   console.log(VERSION)
+} else if (flags.help) {
+  // --help beats the command, so `notify --help` reads the help instead of
+  // sending a notification.
+  help()
 } else {
   const run = { login, connect, open, notify, ask, status, help, version: () => console.log(VERSION) }[cmd] || help
   await run()

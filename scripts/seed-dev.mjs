@@ -194,8 +194,8 @@ for (const { t, e, at } of posts) {
       id,
       createdAt: at,
       // A "live" event was edited in place after it was posted, so its
-      // updated_at runs ahead of created_at - that is what the feed cursor and
-      // the connection dot are for.
+      // updated_at runs ahead of created_at - and updated_at is what drives
+      // the live refresh and the connection dot.
       updatedAt: e.live ? NOW - 90_000 : at,
       readAt: e.read ? at + 4 * 60_000 : null,
       question: null,

@@ -150,13 +150,14 @@ agents  --POST /api/v1/events------>  Cloudflare Worker
         <-GET  /api/v1/questions/:id    |- /mcp       stateless MCP
                                         |- /          the app, cookie session
 you     <-- Web Push (VAPID) ---------  |- D1 (events, questions, subscriptions)
-        --- poll the feed while open->  |- KV (sessions)
-                                        |- cron, hourly: expire and prune
+        --- refetch while open ------>  |- KV (sessions)
+                                        |- cron, hourly: expire and archive
 ```
 
 - **Delivery is Web Push plus polling.** An agent polls its own question every
-  few seconds; the app polls a cursor feed only while a tab is open. One person
-  stays well inside the free limits.
+  few seconds; the app refetches its lists - projects, tasks, thread, pending -
+  every five seconds, and only while a tab is visible. One person stays well
+  inside the free limits.
 - **The front end reads from a cache first.** Queries are persisted, so a
   navigation paints from what is already there and refetches behind it. A
   reload with the network down still shows the last inbox.

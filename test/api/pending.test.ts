@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { call, createAccount, sessionFor, type TestAccount } from '../helpers'
 
 // Note 6: one list of everything waiting on the human, across every project.
-// getStats had the count and getProjects had it per project, but neither could
-// say what was being asked, and getFeed stops at the 100 most recent events -
-// so a question older than that would simply not be in it.
+// getProjects has the count per project but cannot say what is being asked,
+// and getTasks covers one project at a time - so a question waiting in a
+// project the human is not looking at has nowhere else to surface.
 
 async function ask(
   account: TestAccount,

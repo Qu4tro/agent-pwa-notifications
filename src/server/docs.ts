@@ -10,7 +10,10 @@ export function blockSchemaDoc(): Response {
       description:
         'A JSON array of typed UI blocks. Display blocks work in any event. Interactive blocks (buttons, form) are only valid on a question.',
       blocks: {
-        markdown: { type: 'markdown', text: 'string (GitHub-flavored markdown)' },
+        markdown: {
+          type: 'markdown',
+          text: 'string (a markdown subset: # ## ### headings, - or * bullet lists, ``` fenced code, **bold**, `code`, [label](url) and bare http(s) links. Every other line is a paragraph; anything outside the list renders as plain text.)',
+        },
         progress: { type: 'progress', label: 'string?', value: 'number', max: 'number (default 100)' },
         keyvalue: { type: 'keyvalue', items: '[{ k: string, v: string }]' },
         table: { type: 'table', columns: 'string[]', rows: 'string[][]' },
@@ -23,7 +26,7 @@ export function blockSchemaDoc(): Response {
           id: 'string',
           options: 'string[] (the choices)',
           colors:
-            'string[]? (one per option, in the same order: blue|violet|mint|rose|amber|cyan|pink|lime, or #rrggbb. Leave it out: every option already gets its own colour, and a plain "Yes"/"No", "Correct"/"Wrong", "Approve"/"Reject" comes out green/red on its own. An entry here overrules both.)',
+            'string[]? (one per option, in the same order: blue|violet|mint|rose|amber|cyan|pink|lime, or #rrggbb. Leave it out: options are shown in a neutral colour, a plain affirmative ("Yes", "Approve", "Go ahead") first and a plain denial ("No", "Reject", "Not now") last, whatever order you send. Add it only when a particular choice should read a particular way; a plain "No" is not a danger and needs no red.)',
         },
         form: {
           type: 'form',
@@ -82,6 +85,18 @@ export function blockSchemaDoc(): Response {
 const CHANGED_ANSWERS =
   ' Carries `changed_answers` when the human replaced an answer on this thread and no poll has collected it since: read each item, then poll its id to acknowledge it.'
 
+// Blocks arrive one of two ways: a plain JSON array the server validates, or,
+// with `enc: true`, one ciphertext string the server stores and never reads.
+const BLOCKS_PROPERTY = {
+  description: 'Display blocks. A JSON array, or the ciphertext string when `enc` is true. See /api/v1/schema.json.',
+  oneOf: [{ type: 'array', items: { type: 'object' } }, { type: 'string' }],
+}
+
+const ENC_PROPERTY = {
+  type: 'boolean',
+  description: 'Send `blocks` as one ciphertext string. The server stores it as it is; the app decrypts it.',
+}
+
 export function openApiDoc(origin: string): Response {
   const spec = {
     openapi: '3.1.0',
@@ -110,11 +125,15 @@ export function openApiDoc(origin: string): Response {
                   required: ['title'],
                   properties: {
                     title: { type: 'string' },
-                    agent: { type: 'string' },
-                    task_id: { type: 'string' },
+                    agent: { type: 'string', description: 'The tool you run in, e.g. "cursor".' },
+                    task_id: { type: 'string', description: 'Stable key that threads every call of one task together.' },
+                    project: { type: 'string', description: 'Project name. Groups and filters the dashboard.' },
+                    task: { type: 'string', description: 'Current task, e.g. "Adding children mode".' },
+                    model: { type: 'string', description: 'Which model you are, e.g. "opus-4.8".' },
                     kind: { type: 'string', enum: ['update', 'done', 'error'] },
                     priority: { type: 'integer', enum: [0, 1, 2] },
-                    blocks: { type: 'array', items: { type: 'object' } },
+                    blocks: BLOCKS_PROPERTY,
+                    enc: ENC_PROPERTY,
                     idle_minutes: {
                       type: 'integer',
                       description:
@@ -146,11 +165,20 @@ export function openApiDoc(origin: string): Response {
                   required: ['title', 'blocks'],
                   properties: {
                     title: { type: 'string' },
-                    blocks: { type: 'array', items: { type: 'object' } },
+                    blocks: BLOCKS_PROPERTY,
+                    enc: ENC_PROPERTY,
+                    ack: {
+                      type: 'string',
+                      description:
+                        'Shown to the human the instant they answer, e.g. "Got it - proceeding with {answer}." {answer} stands for their choice.',
+                    },
                     timeout_minutes: { type: 'integer' },
                     idle_minutes: { type: 'integer' },
                     task_id: { type: 'string' },
                     agent: { type: 'string' },
+                    project: { type: 'string' },
+                    task: { type: 'string' },
+                    model: { type: 'string' },
                   },
                 },
               },
@@ -172,39 +200,9 @@ export function openApiDoc(origin: string): Response {
           },
         },
       },
-      '/api/v1/questions/{id}/answer': {
-        post: {
-          operationId: 'answer',
-          summary: 'Write the answer. The latest one is the answer.',
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-          requestBody: {
-            required: true,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    answer: {
-                      type: 'object',
-                      description: 'The values of the question own controls, keyed by block id.',
-                    },
-                    text: {
-                      type: 'string',
-                      nullable: true,
-                      description: 'The human own words, 20000 characters at most.',
-                    },
-                    if_pending: {
-                      type: 'boolean',
-                      description: 'Write only while the question is still waiting.',
-                    },
-                  },
-                },
-              },
-            },
-          },
-          responses: { '200': { description: 'ok, status, changes' } },
-        },
-      },
+      // POST /api/v1/questions/{id}/answer is the human's route, behind the
+      // session cookie. An agent key is rejected there, so it stays out of this
+      // spec.
       '/api/v1/inbox': {
         get: {
           operationId: 'inbox',
@@ -229,11 +227,15 @@ export function openApiDoc(origin: string): Response {
                   type: 'object',
                   properties: {
                     title: { type: 'string' },
-                    blocks: { type: 'array', items: { type: 'object' } },
+                    blocks: BLOCKS_PROPERTY,
+                    enc: ENC_PROPERTY,
                     kind: { type: 'string', enum: ['update', 'done', 'error'] },
                     idle_minutes: { type: 'integer' },
                     priority: { type: 'integer', enum: [0, 1, 2] },
-                    notify: { type: 'boolean' },
+                    project: { type: 'string' },
+                    task: { type: 'string' },
+                    model: { type: 'string' },
+                    notify: { type: 'boolean', description: 'Push this update. Default false - silent progress ticks.' },
                   },
                 },
               },

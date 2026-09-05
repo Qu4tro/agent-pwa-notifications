@@ -168,7 +168,7 @@ CLI, which posts the question and blocks until the answer arrives:
 ```bash
 agent-notify-pwa ask "Ready to deploy?" --button Deploy --button Hold \
   --project "Weather app" --task-id deploy-check
-# prints the answer JSON on stdout: {"choice":"Deploy"}
+# prints the answer JSON on stdout: {"choice":"Deploy","text":null}
 ```
 
 Raw HTTP:

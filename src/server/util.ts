@@ -53,7 +53,8 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
-// -- HMAC-SHA256 sign/verify, used for magic-login tokens and session cookies.
+// -- HMAC-SHA256 sign/verify, used for the session cookie and nothing else. A
+// login link is a random token; KV holds only its sha256.
 async function hmacKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',

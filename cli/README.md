@@ -70,8 +70,8 @@ agent-notify-pwa notify "Tests failing" --kind error --priority 2 \
 messages thread together.
 
 The human can change an answer after giving it. A change rides on the next
-`notify`, `ask` or `update` you make on the same `--task-id`, and prints on
-stderr, one line each, until you poll the question again:
+`notify` or `ask` you make on the same `--task-id`, and prints on stderr, one
+line each, until you poll the question again:
 
 ```
 changed answer 01J9... "Ready to deploy?": {"answer":{"choice":"Hold"},"text":"wait for QA"}
@@ -121,16 +121,16 @@ characters, make the question answerable straight from the notification. A
 question with more options, or a form, still takes words there: the
 notification carries a Reply action on a browser that types into one.
 
-Answers colour themselves. A plain affirmative or denial comes out green or
-red, and anything else takes its own colour from a palette, so two choices are
-told apart before they are read:
+Options come out in a neutral colour, with a plain affirmative ("Yes",
+"Approve", "Go ahead") first and a plain denial ("No", "Reject", "Not now")
+last, whatever order you pass them in:
 
 ```bash
 agent-notify-pwa ask "Promote build 4821?" --button Yes --button No
 ```
 
-`--color` overrides that, always, and pairs with `--button` by position from
-the left. Use it when a particular choice should read a particular way:
+`--color` paints one, and pairs with `--button` by position from the left. Use
+it when a particular choice should read a particular way:
 
 ```bash
 agent-notify-pwa ask "Roll the flag?" --button "Roll it" --button Wait \
@@ -139,12 +139,11 @@ agent-notify-pwa ask "Roll the flag?" --button "Roll it" --button Wait \
 
 The values are `blue`, `violet`, `mint`, `rose`, `amber`, `cyan`, `pink`,
 `lime`, or `#rrggbb`. Pass fewer `--color`s than `--button`s and the options
-past the end colour themselves; because the pairing is positional, colouring
-only the second button means giving the first one a value too.
+past the end stay neutral; because the pairing is positional, colouring only
+the second button means giving the first one a value too.
 
-Because `--color` wins over the affirmative/denial rule, it is also the only
-way to paint a "Yes" red. Do not: red is the error colour everywhere else in
-the app.
+A plain "No" is not a danger and needs no red. Red is the error colour
+everywhere else in the app.
 
 ### status
 

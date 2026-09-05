@@ -1,5 +1,7 @@
 // Thin client-side fetch helpers. Same-origin, cookie-authed.
 
+import type { Kind } from './project'
+
 // An answer is one document in two parts: the values of the controls the agent
 // sent, keyed by block id, and the human's own words. Either part may be
 // empty, and at least one is filled.
@@ -24,7 +26,7 @@ export interface EventItem {
   id: string
   agent: string
   task_id: string | null
-  kind: 'update' | 'question' | 'done' | 'error'
+  kind: Kind
   title: string
   blocks: unknown[] | string // string = ciphertext when enc
   enc: boolean
@@ -66,13 +68,13 @@ export interface TaskSummary {
   pending_question: string | null
   // Non-empty only for a micro-question: the 2 or 3 options that can be
   // answered straight from the project list. `color` is what the agent asked
-  // for, if it asked; absent means the option takes its place in the palette.
+  // for, if it asked; absent means the option stays neutral.
   pending_answers: { label: string; answer: Record<string, string>; color?: string }[]
   // When the question was asked. Null unless `pending`; the pending page
   // orders on it, so the longest wait is at the top.
   pending_since: number | null
   latest_title: string
-  latest_kind: 'update' | 'question' | 'done' | 'error'
+  latest_kind: Kind
   last_activity: number
   state: ThreadState
   // What the agent set, if it set anything. null means the hub's default.
@@ -81,7 +83,7 @@ export interface TaskSummary {
   // there are in total, so `count - recent.length` is what is not shown.
   recent: {
     id: string
-    kind: 'update' | 'question' | 'done' | 'error'
+    kind: Kind
     title: string
     created_at: number
     read_at: number | null

@@ -1,11 +1,14 @@
-// The fake inbox. One export: `threads`, a list of task threads, each with the
-// events an agent would have sent while it worked. `scripts/seed-dev.mjs` posts
-// them through the real API and then backdates the rows.
+// The fake inbox. Three exports: `threads`, the task threads that carry the
+// interesting shapes; `encryptedThread`, one thread whose blocks are
+// ciphertext; and `nightlyThreads()`, filler that makes a project list long
+// enough to scroll. Each thread holds the events an agent would have sent
+// while it worked. `scripts/seed-dev.mjs` posts all three through the real API
+// and then backdates the rows.
 //
 // Times are minutes ago. Every block type, every event kind, every question
-// state and a few deliberately awkward shapes (a 300-character title, twelve
-// tags, a wide table, a long code block) are in here, because the point of the
-// set is to show the UI what it will actually have to render.
+// state and a few deliberately awkward shapes (a 300-character title, a wide
+// table, a long code block) are in here, because the point of the set is to
+// show the UI what it will actually have to render.
 
 const H = 60
 const D = 24 * 60
@@ -50,7 +53,7 @@ const longCode = code(
   const sinceTs = Number(url.searchParams.get('since_ts') ?? '0') || 0
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? '100') | 0))
 
-  // The cursor is a timestamp, not an offset: an in-place progress update has to
+  // since_ts is a timestamp, not an offset: an in-place progress update has to
   // come back through the same window as a brand-new event, and an offset would
   // silently skip it once the row moved.
   const rows = await env.DB.prepare(
@@ -66,8 +69,9 @@ const longCode = code(
 }
 
 // Every handler takes the resolved accountId and scopes its queries to it.
-// Miss it on one query and one person's inbox leaks into another's. The tests
-// in test/tenancy.spec.ts walk every route with two accounts for that reason.
+// Miss it on one query and one person's inbox leaks into another's. The
+// cross-account cases in test/api/auth.test.ts, test/api/pending.test.ts and
+// test/api/clear.test.ts run two accounts against each other for that reason.
 function hydrate(row: Record<string, unknown>): Record<string, unknown> {
   const enc = Number(row.enc ?? 0) === 1
   const blocks = enc ? (row.blocks as string) : JSON.parse((row.blocks as string) || '[]')

@@ -1,7 +1,7 @@
 # Worktrunk project config. See https://worktrunk.dev/config/
 #
-# Worktrees live at .worktrees/<branch>, per the user config. Each phase of
-# the fork plan gets one worktree and one herdr tab.
+# Worktrees live at .worktrees/<branch>, per the user config. One worktree per
+# branch in flight, so a long change and a quick fix never share a checkout.
 
 [post-start]
 # Git ignores all of docs/, so a fresh worktree has no planning material.
