@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-05
+
 ### Added
 
 - Themes, under Appearance in Settings, and a second one to choose: Windows 95.
