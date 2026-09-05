@@ -10,6 +10,8 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-05
+
 ### Removed
 
 - The `AGENT_KEY` Worker binding, from `src/server/env.ts` and from
