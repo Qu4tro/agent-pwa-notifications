@@ -16,6 +16,9 @@ import { KIND_BG, KIND_LABEL, KIND_TEXT, STATE_TEXT } from '../project'
 // they answered and left the question truncated beside them. They are outside
 // the link, because a button cannot sit inside one, and they take the link's
 // left edge and its right padding.
+//
+// A row may also carry one control at its right, in a column of its own after
+// the body: the way to the thread, on a row whose body opens something else.
 
 // The row's body is a link to whatever the row is about. The padding is on the
 // link, not around it, so the whole body is the target.
@@ -26,6 +29,8 @@ export function Row({
   children,
   time,
   answers,
+  trailing,
+  onClick,
   className = '',
 }: {
   children: React.ReactNode
@@ -35,10 +40,24 @@ export function Row({
   // Controls that belong to this row and cannot live inside its link, because
   // a button cannot sit inside one.
   answers?: React.ReactNode
+  // One control at the row's right, top-aligned with the title: a 44px target
+  // there is centred on the title's line, which sits 12px down and 19px tall.
+  trailing?: React.ReactNode
+  // A row that opens something opens from anywhere on it that is not already
+  // a control: the gutter, the padding, the space beside the answers. What
+  // hovers is what clicks. The body is a button as well, for the keyboard and
+  // for whatever reads the page; this is for the pointer, which does not know
+  // where the body ends.
+  onClick?: () => void
   className?: string
 }) {
   return (
-    <div className={`flex items-start border-b border-b-line hover:bg-surface ${className}`}>
+    <div
+      className={`flex items-start border-b border-b-line hover:bg-surface ${
+        onClick ? 'cursor-pointer' : ''
+      } ${className}`}
+      onClick={onClick ? (ev) => fromTheRowItself(ev) && onClick() : undefined}
+    >
       <div className="w-14 shrink-0 py-3 pr-1.5 pl-4 text-right text-[13px] leading-[21px] whitespace-nowrap text-faint">
         {time}
       </div>
@@ -48,8 +67,18 @@ export function Row({
           <div className="flex flex-wrap items-start gap-2 pr-4 pb-3 pl-2.5">{answers}</div>
         ) : null}
       </div>
+      {trailing ? <div className="shrink-0 pr-1.5">{trailing}</div> : null}
     </div>
   )
+}
+
+// Whether a click landed on the row and not on a control in it, whose own
+// handler has it - the body button, an answer, the link at the right - or at
+// the end of selecting words on it, which is not a tap.
+function fromTheRowItself(ev: React.MouseEvent): boolean {
+  const el = ev.target as Element
+  if (el.closest('a, button')) return false
+  return !window.getSelection()?.toString()
 }
 
 export interface TimelineItem {
@@ -78,6 +107,7 @@ export function RowBody({
   detail,
   timeline,
   bold,
+  phrasing,
 }: {
   title?: React.ReactNode
   question?: React.ReactNode
@@ -86,22 +116,31 @@ export function RowBody({
   // not shown counted at the bottom.
   timeline?: { items: TimelineItem[]; earlier: number }
   bold?: boolean
+  // True where the body sits in a <button>, which may hold only phrasing
+  // content: the lines are then spans set block, and read the same. A
+  // timeline is a list, and cannot be given with this.
+  phrasing?: boolean
 }) {
+  const Line = phrasing ? 'span' : 'div'
   return (
-    <div className="min-w-0 flex-1">
+    <Line className="block min-w-0 flex-1">
       {title != null ? (
-        <div className={`truncate leading-tight ${bold ? 'font-semibold' : ''}`}>{title}</div>
+        <Line className={`block truncate leading-tight ${bold ? 'font-semibold' : ''}`}>
+          {title}
+        </Line>
       ) : null}
       {question != null ? (
-        <div className={`leading-snug ${title == null ? (bold ? 'font-semibold' : '') : 'mt-1'}`}>
+        <Line
+          className={`block leading-snug ${title == null ? (bold ? 'font-semibold' : '') : 'mt-1'}`}
+        >
           {question}
-        </div>
+        </Line>
       ) : null}
       {detail != null ? (
-        <div className="truncate text-[15px] leading-[1.35] text-muted">{detail}</div>
+        <Line className="block truncate text-[15px] leading-[1.35] text-muted">{detail}</Line>
       ) : null}
       {timeline ? <Timeline {...timeline} /> : null}
-    </div>
+    </Line>
   )
 }
 

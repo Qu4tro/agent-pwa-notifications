@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { useRouter } from '@tanstack/react-router'
-import { Lock, X } from 'lucide-react'
+import { Link, useRouter } from '@tanstack/react-router'
+import { History, Lock, X } from 'lucide-react'
 import type { AnswerDoc, EventItem } from './api'
 import { BlockRenderer } from './blocks'
 import {
@@ -12,7 +12,7 @@ import {
   shortAnswer,
   useQuestionContent,
 } from './question'
-import { KIND_BORDER, KIND_LABEL, STATE_TEXT } from './project'
+import { KIND_BORDER, KIND_LABEL, STATE_TEXT, toParam } from './project'
 import { IconButton, KindLabel, Time } from './ui'
 
 // One message, over the page it was opened from. The thread opens each of its
@@ -56,6 +56,25 @@ export function useMessageModal(
   return { open, close }
 }
 
+// The way to a thread from somewhere that is not on it: a row whose body
+// opens its question instead, and the head of the modal that opens. An icon
+// on the header's 44px target; its hover is a step above the surface, because
+// what it sits on - a row under the pointer, the modal's panel - is already
+// the surface, and the target would otherwise not show.
+export function ThreadLink({ thread }: { thread: { project: string; key: string } }) {
+  return (
+    <Link
+      to="/project/$name/task/$key"
+      params={{ name: toParam(thread.project), key: thread.key }}
+      aria-label="Open the thread"
+      title="Thread"
+      className="inline-flex size-11 items-center justify-center rounded-ui text-muted hover:bg-raised hover:text-text"
+    >
+      <History size={18} aria-hidden />
+    </Link>
+  )
+}
+
 // The whole of one message, over the thread it belongs to: what its row says,
 // and under that the blocks and - on a question - the controls, the answer
 // that stands and where that answer got to.
@@ -74,6 +93,7 @@ export function MessageModal({
   onCorrecting,
   onClose,
   onSubmit,
+  thread,
 }: {
   e: EventItem
   content: ReturnType<typeof useQuestionContent>
@@ -84,16 +104,27 @@ export function MessageModal({
   onCorrecting: (v: boolean) => void
   onClose: () => void
   onSubmit: (doc: AnswerDoc) => void
+  // Given when the modal is not over its own thread: the way there goes in
+  // the head, beside the way out. Over the thread it would go nowhere.
+  thread?: { project: string; key: string }
 }) {
   const { blocks, answer, text, locked } = content
   const q = e.question
   const dialog = useRef<HTMLDialogElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const d = dialog.current
     // Not while it is already up: showModal() on an open dialog throws, and in
     // development React mounts an effect, tears it down and mounts it again.
-    if (d && !d.open) d.showModal()
+    if (d && !d.open) {
+      d.showModal()
+      // On the way out, not on the way to the thread: the browser would give
+      // the first control in the head the focus, and where the modal is over
+      // a list that is the thread link, so an Enter straight after opening
+      // would leave the page.
+      closeButton.current?.focus()
+    }
     // Nothing closes the dialog on the way out. React takes the element away
     // and a modal that leaves the document leaves the top layer with it;
     // calling close() here would fire `close` on a dialog that is already
@@ -152,7 +183,8 @@ export function MessageModal({
                 <Time at={e.created_at} long />
               </span>
             </span>
-            <IconButton aria-label="Close" onClick={onClose}>
+            {thread ? <ThreadLink thread={thread} /> : null}
+            <IconButton ref={closeButton} aria-label="Close" onClick={onClose}>
               <X size={20} aria-hidden />
             </IconButton>
           </div>

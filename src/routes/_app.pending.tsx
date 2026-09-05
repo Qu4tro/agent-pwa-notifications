@@ -5,6 +5,7 @@ import { Container } from '../lib/shell'
 import { ensure, pendingQuery, queryKeys } from '../lib/queries'
 import { PendingSkeleton } from '../lib/skeleton'
 import { PendingLine } from '../lib/task-line'
+import { messageSearch, useMessageModal } from '../lib/message-modal'
 import { InlineError } from '../lib/ui'
 
 // Note 6: one page for everything waiting on the human, whatever project it is
@@ -17,6 +18,9 @@ import { InlineError } from '../lib/ui'
 // brings new ones in. Nothing is dismissed by hand.
 export const Route = createFileRoute('/_app/pending')({
   ssr: false,
+  // Which row's question is open over the list, if one is: ?msg=, as on the
+  // thread page.
+  validateSearch: messageSearch,
   loader: ({ context }) =>
     context.signedIn ? ensure<TaskSummary[]>(context.queryClient, pendingQuery()) : undefined,
   pendingComponent: PendingSkeleton,
@@ -25,6 +29,8 @@ export const Route = createFileRoute('/_app/pending')({
 
 function PendingPage() {
   const { data, isError, refetch } = useQuery(pendingQuery())
+  const { msg } = Route.useSearch()
+  const modal = useMessageModal(msg, Route.useNavigate())
 
   if (!data) {
     if (!isError) return <PendingSkeleton />
@@ -47,6 +53,9 @@ function PendingPage() {
               key={`${t.project}/${t.key}`}
               t={t}
               queryKey={queryKeys.pending()}
+              open={msg != null && msg === t.pending_event_id}
+              onOpen={modal.open}
+              onClose={modal.close}
             />
           ))}
         </div>
