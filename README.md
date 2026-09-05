@@ -184,9 +184,8 @@ pnpm build
 ```
 
 [public_docs/development.md](public_docs/development.md) covers the layout, the
-test harness, adding an endpoint or a block type, and pulling changes from
-upstream. [public_docs/release.md](public_docs/release.md) covers cutting a
-release.
+test harness, and adding an endpoint or a block type.
+[public_docs/release.md](public_docs/release.md) covers cutting a release.
 
 Built with TanStack Start (React 19) on Cloudflare Workers, D1 and KV, Tailwind
 4, and a hand-rolled VAPID and RFC 8291 push implementation on WebCrypto with

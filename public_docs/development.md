@@ -122,22 +122,6 @@ component knows a theme exists. Three rules:
    and adding a theme there and a file under `src/themes/` is the whole of it.
    The choice lives in this browser's localStorage, never on the hub.
 
-## Sync with upstream
-
-This repository is not a GitHub fork, so there is no upstream button. The
-remote is wired by hand:
-
-```bash
-git remote add upstream https://github.com/Prajeevan/agent-dash.git   # once
-git fetch upstream
-git log --oneline main..upstream/master
-git cherry-pick <sha>
-```
-
-Upstream is inactive and the two trees have diverged: the skill, the MCP tool
-set, the auth flow and the whole interface differ. Expect to port a change by
-hand rather than to merge it.
-
 ## Conventions
 
 - Conventional Commits.
