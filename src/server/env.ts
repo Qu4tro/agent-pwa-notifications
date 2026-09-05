@@ -15,7 +15,6 @@ export interface Env {
 
   // Vars (set in wrangler.jsonc [vars] or left unset for defaults)
   EMAIL_FROM?: string // "Agent PWA Notifications <login@yourdomain>", sender for OTP mail
-  APP_URL?: string // canonical hosted URL, e.g. "https://notifications.example"
   SESSION_TTL_DAYS?: string // default 365
   EVENT_RETENTION_DAYS?: string // default 90
   INSTANT?: string // "1" enables the Durable Object live feed (opt-in, off by default)

@@ -74,15 +74,11 @@ async function maybePush(env: Env, accountId: string, event: EventRow): Promise<
 
 interface EventRow {
   id: string
-  agent: string
   task_id: string | null
   kind: string
   title: string
   blocks: string
   priority: number
-  created_at: number
-  read_at: number | null
-  expires_at: number
   project: string | null
   enc: number
 }
@@ -121,25 +117,18 @@ interface Meta {
   project: string | null
   task: string | null
   model: string | null
-  tags: string // JSON array string
   idleMinutes: number | null
 }
 
 // How long a thread stays "in progress" with nothing new on it. An agent that
 // crashes, or that simply stops, would otherwise leave its thread Active for
 // ever, so silence past this counts as finished. Four hours, decided 2026-09-04.
-export const DEFAULT_IDLE_MINUTES = 240
+const DEFAULT_IDLE_MINUTES = 240
 
 // Pull the attribution fields out of a request body, sanitized.
 function extractMeta(body: Record<string, unknown>): Meta {
   const str = (v: unknown, max: number) =>
     typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null
-  const tags = Array.isArray(body.tags)
-    ? (body.tags as unknown[])
-        .filter((t) => typeof t === 'string' && t.trim())
-        .slice(0, 12)
-        .map((t) => (t as string).trim().slice(0, 40))
-    : []
   // Same bounds as a question timeout: a minute to seven days. Anything the
   // agent does not send stays null, which reads as the default.
   const rawIdle = Number(body.idle_minutes)
@@ -151,7 +140,6 @@ function extractMeta(body: Record<string, unknown>): Meta {
     project: str(body.project, 120),
     task: str(body.task, 200),
     model: str(body.model, 80),
-    tags: JSON.stringify(tags),
     idleMinutes,
   }
 }
@@ -182,16 +170,15 @@ export async function createEvent(request: Request, env: Env, accountId: string)
   const id = ulid()
   const t = now()
   await env.DB.prepare(
-    `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc, idle_minutes)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
+    `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, enc, idle_minutes)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
   )
-    .bind(id, accountId, agent, taskId, kind, title, norm.blocks, priority, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc, meta.idleMinutes)
+    .bind(id, accountId, agent, taskId, kind, title, norm.blocks, priority, t, t + retentionMs(env), meta.project, meta.task, meta.model, norm.enc, meta.idleMinutes)
     .run()
 
   const event: EventRow = {
-    id, agent, task_id: taskId, kind, title,
-    blocks: norm.blocks, priority, created_at: t, read_at: null,
-    expires_at: t + retentionMs(env), project: meta.project, enc: norm.enc,
+    id, task_id: taskId, kind, title,
+    blocks: norm.blocks, priority, project: meta.project, enc: norm.enc,
   }
   await maybePush(env, accountId, event)
   await pokeHub(env, accountId)
@@ -245,7 +232,6 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
   const project = 'project' in body ? extractMeta(body).project : null
   const task = 'task' in body ? extractMeta(body).task : null
   const model = 'model' in body ? extractMeta(body).model : null
-  const tags = 'tags' in body ? extractMeta(body).tags : null
   const idleMinutes = 'idle_minutes' in body ? extractMeta(body).idleMinutes : null
 
   // COALESCE keeps the old value when we pass null. read_at resets so a fresh
@@ -259,14 +245,13 @@ export async function updateEvent(id: string, request: Request, env: Env, accoun
        project = COALESCE(?5, project),
        task = COALESCE(?6, task),
        model = COALESCE(?7, model),
-       tags = COALESCE(?8, tags),
-       enc = COALESCE(?9, enc),
-       idle_minutes = COALESCE(?10, idle_minutes),
-       updated_at = ?11,
+       enc = COALESCE(?8, enc),
+       idle_minutes = COALESCE(?9, idle_minutes),
+       updated_at = ?10,
        read_at = NULL
-     WHERE id = ?12 AND account_id = ?13`,
+     WHERE id = ?11 AND account_id = ?12`,
   )
-    .bind(title, kind, priority, blocksJson, project, task, model, tags, encVal, idleMinutes, now(), id, accountId)
+    .bind(title, kind, priority, blocksJson, project, task, model, encVal, idleMinutes, now(), id, accountId)
     .run()
 
   if (body.notify === true) {
@@ -312,9 +297,9 @@ export async function createQuestion(request: Request, env: Env, accountId: stri
   const ack = typeof body.ack === 'string' && body.ack.trim() ? body.ack.trim().slice(0, 500) : null
   const batch = [
     env.DB.prepare(
-      `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, tags, enc, ack, idle_minutes)
-       VALUES (?1, ?2, ?3, ?4, 'question', ?5, ?6, 2, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
-    ).bind(id, accountId, agent, taskId, title, norm.blocks, t, t + retentionMs(env), meta.project, meta.task, meta.model, meta.tags, norm.enc, ack, meta.idleMinutes),
+      `INSERT INTO events (id, account_id, agent, task_id, kind, title, blocks, priority, created_at, updated_at, expires_at, project, task, model, enc, ack, idle_minutes)
+       VALUES (?1, ?2, ?3, ?4, 'question', ?5, ?6, 2, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
+    ).bind(id, accountId, agent, taskId, title, norm.blocks, t, t + retentionMs(env), meta.project, meta.task, meta.model, norm.enc, ack, meta.idleMinutes),
     env.DB.prepare(
       `INSERT INTO questions (event_id, status, timeout_at) VALUES (?1, 'pending', ?2)`,
     ).bind(id, timeoutAt),
@@ -322,9 +307,8 @@ export async function createQuestion(request: Request, env: Env, accountId: stri
   await env.DB.batch(batch)
 
   const event: EventRow = {
-    id, agent, task_id: taskId, kind: 'question', title,
-    blocks: norm.blocks, priority: 2, created_at: t, read_at: null,
-    expires_at: t + retentionMs(env), project: meta.project, enc: norm.enc,
+    id, task_id: taskId, kind: 'question', title,
+    blocks: norm.blocks, priority: 2, project: meta.project, enc: norm.enc,
   }
   await maybePush(env, accountId, event)
   await pokeHub(env, accountId)
@@ -492,7 +476,7 @@ async function changedAnswers(
 // An `error` does not finish a thread. An update that went wrong is still an
 // update, and the agent may well retry, so the thread stays Active until it
 // says done or the silence runs out. Decided 2026-09-04.
-export type ThreadState = 'pending' | 'active' | 'done'
+type ThreadState = 'pending' | 'active' | 'done'
 
 // How many of a thread's own event titles the project row shows. The count on
 // the row used to be the only trace of everything but the latest one, which
@@ -504,9 +488,7 @@ const RECENT_ON_A_ROW = 3
 // the map is keyed by both. Shared by the project list and the pending page,
 // which is why it is a function and not a loop inside getTasks.
 const SELECT_THREAD_ROWS = `SELECT e.*, ${THREAD_KEY_SQL} AS thread_key,
-       q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
-       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
-       q.changes AS q_changes
+       q.status AS q_status, q.answer AS q_answer, q.text AS q_text
      FROM events e LEFT JOIN questions q ON q.event_id = e.id`
 
 function summarizeThreads(rows: Record<string, unknown>[]): any[] {
@@ -688,27 +670,6 @@ export async function getThread(project: string, key: string, env: Env, accountI
 
 // -- Dashboard endpoints (session cookie -> accountId) -------------------------
 
-// Timestamp-cursor feed for open dashboard tabs. `since_ts` is the newest
-// updated_at the tab already has; we return anything created OR updated after
-// it - so in-place progress updates flow through, not just brand-new events.
-// Ordered by created_at so a card stays put while its progress bar moves.
-export async function getFeed(url: URL, env: Env, accountId: string): Promise<Response> {
-  const sinceTs = Number(url.searchParams.get('since_ts') ?? '0') || 0
-  const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? '100') | 0))
-  const rows = await env.DB.prepare(
-    `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
-       q.answered_at AS q_answered, q.timeout_at AS q_timeout, q.picked_up_at AS q_picked,
-       q.changes AS q_changes
-     FROM events e LEFT JOIN questions q ON q.event_id = e.id
-     WHERE e.account_id = ?1 AND e.archived_at IS NULL
-       AND COALESCE(e.updated_at, e.created_at) > ?2
-     ORDER BY e.created_at DESC LIMIT ?3`,
-  )
-    .bind(accountId, sinceTs, limit)
-    .all()
-  return json({ ok: true, events: (rows.results ?? []).map(hydrate) })
-}
-
 export async function getEvent(id: string, env: Env, accountId: string): Promise<Response> {
   const row = await env.DB.prepare(
     `SELECT e.*, q.status AS q_status, q.answer AS q_answer, q.text AS q_text,
@@ -745,7 +706,6 @@ function hydrate(row: Record<string, unknown>): Record<string, unknown> {
     project: row.project ?? null,
     task: row.task ?? null,
     model: row.model ?? null,
-    tags: JSON.parse((row.tags as string) || '[]'),
     ack: row.ack ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at ?? row.created_at,
@@ -768,21 +728,6 @@ function hydrate(row: Record<string, unknown>): Record<string, unknown> {
 export async function markRead(id: string, env: Env, accountId: string): Promise<Response> {
   await env.DB.prepare('UPDATE events SET read_at = ?1 WHERE id = ?2 AND account_id = ?3 AND read_at IS NULL')
     .bind(now(), id, accountId)
-    .run()
-  return json({ ok: true })
-}
-
-export async function markAllRead(env: Env, accountId: string): Promise<Response> {
-  await env.DB.prepare('UPDATE events SET read_at = ?1 WHERE account_id = ?2 AND read_at IS NULL')
-    .bind(now(), accountId)
-    .run()
-  return json({ ok: true })
-}
-
-// Bring an item back to the top by marking it unread again.
-export async function markUnread(id: string, env: Env, accountId: string): Promise<Response> {
-  await env.DB.prepare('UPDATE events SET read_at = NULL WHERE id = ?1 AND account_id = ?2')
-    .bind(id, accountId)
     .run()
   return json({ ok: true })
 }
@@ -1092,17 +1037,4 @@ export async function putSettings(request: Request, env: Env, accountId: string)
     await setSetting(env, accountId, 'quiet_hours', JSON.stringify(body.quiet_hours ?? null))
   }
   return getSettings(env, accountId)
-}
-
-export async function getStats(env: Env, accountId: string): Promise<Response> {
-  const unread = await env.DB.prepare('SELECT COUNT(*) AS n FROM events WHERE account_id = ?1 AND read_at IS NULL AND archived_at IS NULL')
-    .bind(accountId)
-    .first<{ n: number }>()
-  const pending = await env.DB.prepare(
-    `SELECT COUNT(*) AS n FROM questions q JOIN events e ON e.id = q.event_id
-     WHERE e.account_id = ?1 AND e.archived_at IS NULL AND q.status = 'pending'`,
-  )
-    .bind(accountId)
-    .first<{ n: number }>()
-  return json({ ok: true, unread: unread?.n ?? 0, pending_questions: pending?.n ?? 0 })
 }

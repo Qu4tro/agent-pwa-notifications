@@ -21,7 +21,6 @@ const { values: flags, positionals } = parseArgs({
     model: { type: 'string' },
     kind: { type: 'string' },
     idle: { type: 'string' },
-    tag: { type: 'string', multiple: true },
     markdown: { type: 'string' },
     button: { type: 'string', multiple: true },
     color: { type: 'string', multiple: true },
@@ -29,7 +28,6 @@ const { values: flags, positionals } = parseArgs({
     e2e: { type: 'boolean' },
     agent: { type: 'string' },
     json: { type: 'boolean' },
-    qr: { type: 'boolean' },
     'no-qr': { type: 'boolean' },
     next: { type: 'string' },
     ttl: { type: 'string' },
@@ -111,7 +109,7 @@ async function open() {
   const minutes = Math.max(1, Math.round((json.expires_at - Date.now()) / 60_000))
   // QR by default; --no-qr prints the URL alone (parseArgs in loose mode does
   // not fold --no-x into x, so read both).
-  if (!flags['no-qr'] && flags.qr !== false) {
+  if (!flags['no-qr']) {
     console.log('\nScan this on the device you want to sign in:\n')
     qr(json.url)
   }
@@ -137,7 +135,6 @@ async function notify() {
     task: flags.task,
     task_id: flags['task-id'],
     model: flags.model,
-    tags: flags.tag,
   }
   await attachBlocks(body, blocks, conf)
   const { status, json } = await hub('POST', '/api/v1/events', conf, body)
@@ -182,7 +179,6 @@ async function ask() {
     task: flags.task,
     task_id: flags['task-id'],
     model: flags.model,
-    tags: flags.tag,
     ack: flags.ack,
     idle_minutes: flags.idle ? Number(flags.idle) : undefined,
   }
@@ -260,7 +256,7 @@ ${BIN} ${VERSION} - talk to your Agent PWA Notifications hub
 
   ${BIN} notify "msg" [--priority 0|1|2] [--kind update|done|error]
                           [--project P] [--task T] [--task-id ID] [--model M]
-                          [--markdown "..."] [--tag x] [--agent NAME]
+                          [--markdown "..."] [--agent NAME]
                           [--idle MINUTES]
       --kind done is what ends a thread on the dashboard. --idle says how long
       silence still counts as working (default 240). An answer the human

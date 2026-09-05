@@ -1,7 +1,7 @@
 export { Row, RowBody, rowLinkClass, type TimelineItem } from './row'
 export { Time } from './time'
 export { KindLabel, ProjectDot, UnreadDot } from './kind'
-export { Button, IconButton, buttonClass, iconButtonClass } from './button'
+export { Button, IconButton, iconButtonClass } from './button'
 export { Section, sectionHeadingClass } from './section'
 export { badgeClass } from './badge'
 export { ConfirmPanel } from './confirm'

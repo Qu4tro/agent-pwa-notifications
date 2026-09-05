@@ -94,7 +94,7 @@ const Form = z.object({
   fields: z.array(Field).min(1).max(20),
 })
 
-export const BlockSchema = z.discriminatedUnion('type', [
+const BlockSchema = z.discriminatedUnion('type', [
   Markdown,
   Progress,
   KeyValue,

@@ -63,7 +63,7 @@ export function getTheme(): string {
 // Paint the theme on the document. The attribute is dropped rather than set to
 // `default`, so the unthemed document and the document that chose the default
 // are the same document.
-export function applyTheme(id: string) {
+function applyTheme(id: string) {
   const theme = THEMES.find((t) => t.id === themeId(id)) as Theme
   const root = document.documentElement
   if (theme.id === DEFAULT_THEME) root.removeAttribute('data-theme')

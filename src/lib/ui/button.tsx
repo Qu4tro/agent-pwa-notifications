@@ -39,10 +39,6 @@ export function Button({
   return <button type={type} className={`${BASE} ${VARIANT[variant]} ${className}`} {...rest} />
 }
 
-// Same shape as Button, for the places where the control is really a link.
-export const buttonClass = (variant: Variant = 'secondary', className = '') =>
-  `${BASE} ${VARIANT[variant]} ${className}`
-
 // A header action: an icon on its own, with the same 44px touch target. Takes
 // a ref, for a dialog that wants the focus on its Close.
 export function IconButton({ className = '', ...rest }: React.ComponentProps<'button'>) {

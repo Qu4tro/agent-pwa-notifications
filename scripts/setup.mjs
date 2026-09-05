@@ -21,7 +21,6 @@ if (existing && !rotate) {
     VAPID_PUBLIC_KEY: vapid.publicKey,
     VAPID_PRIVATE_KEY: vapid.privateKey,
     VAPID_SUBJECT: existing?.VAPID_SUBJECT || 'mailto:admin@example.invalid',
-    WORKER_URL: existing?.WORKER_URL,
   }
   saveSecrets(secrets)
   console.log(`Generated credentials into ${SECRETS_FILE} (gitignored).\n`)
@@ -39,7 +38,7 @@ console.log('\nDeploying...')
 wrangler(['deploy'])
 
 const name = readWorkerName()
-const url = secrets.WORKER_URL || `https://${name}.<your-subdomain>.workers.dev`
+const url = `https://${name}.<your-subdomain>.workers.dev`
 
 console.log('\n--------------------------------------------------------')
 console.log('The hub is live at ' + url)

@@ -46,7 +46,7 @@ export function b64urlDecode(s: string): Uint8Array<ArrayBuffer> {
 }
 
 // -- Constant-time string compare, for token checks.
-export function timingSafeEqual(a: string, b: string): boolean {
+function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let diff = 0
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)

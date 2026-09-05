@@ -10,6 +10,39 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Removed
+
+- The unread `APP_URL` field from the `Env` interface.
+- `newEncKey()` from the CLI's utility module.
+- `buttonClass` from `src/lib/ui/button.tsx` and from the UI barrel.
+- The unused `M` minute constant in `scripts/seed-data.mjs`.
+- The flat-dashboard API chain: `GET /api/v1/feed`, `GET /api/v1/stats`,
+  `POST /api/v1/read-all` and `POST /api/v1/event/:id/unread`, with their
+  handlers, their client methods and `useMarkAllRead`. No route or component
+  called them.
+- Event tags. Nothing has rendered them since the tag row left the UI, so the
+  `tags` input is gone from the agent API, the MCP tools, the CLI's `--tag`
+  flag and the seed data. The `events.tags` column stays; it defaults to `[]`.
+- Two root dependencies nothing imports: `@tanstack/react-router-ssr-query`
+  and `@tanstack/router-plugin`.
+- The unread `_ctx` parameter of `handleApi`, and the argument its two callers
+  passed.
+- The `kind` and `encrypted` copies inside the notification's `options.data`.
+  The click handler reads only `url`, `eventId` and `quickAnswers`.
+- The CLI's `--qr` flag. `--no-qr` alone decides whether the QR prints.
+- `EventRow.agent`, `created_at`, `read_at` and `expires_at`. Neither
+  `maybePush` nor `quickAnswerActions` read them.
+- The `q_answered`, `q_timeout`, `q_picked` and `q_changes` columns from the
+  thread-summary query. `summarizeThreads` reads none of them.
+- The setup script's `WORKER_URL` carry-forward. Nothing wrote it.
+- The `export` keyword on 29 symbols no other file imports, across
+  `src/lib/`, `src/routes/`, `src/server/`, `cli/lib/util.mjs` and
+  `scripts/lib.mjs`. Each symbol stays; only its module boundary changed.
+- Five D1 indexes, in `migrations/0012_drop_unused_indexes.sql`:
+  `idx_events_created`, `idx_events_task`, `idx_events_updated`,
+  `idx_events_project` and `idx_accounts_key`. The account-scoped indexes from
+  0007 supersede them, and `accounts.agent_key_hash` is UNIQUE.
+
 ## [1.5.0] - 2026-09-05
 
 ### Removed

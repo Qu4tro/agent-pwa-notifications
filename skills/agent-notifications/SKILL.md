@@ -68,7 +68,6 @@ that, send on every call:
   every call for that task. This is what threads a sequence of updates and
   questions into ONE conversation. Without a shared `task_id`, three questions
   become three separate cards, which is exactly the clutter to avoid.
-- `tags`: optional, e.g. `["ui", "backend"]`.
 
 Rule of thumb:
 

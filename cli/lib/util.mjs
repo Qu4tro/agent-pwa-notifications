@@ -9,8 +9,8 @@ import qrcode from 'qrcode-terminal'
 // asks for one and saves it.
 
 const XDG = process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
-export const CONFIG_DIR = join(XDG, 'agent-notify-pwa')
-export const CONFIG_PATH = join(CONFIG_DIR, 'config.json')
+const CONFIG_DIR = join(XDG, 'agent-notify-pwa')
+const CONFIG_PATH = join(CONFIG_DIR, 'config.json')
 
 export function loadConfig() {
   if (!existsSync(CONFIG_PATH)) return {}
@@ -66,10 +66,6 @@ export async function verify({ url, key }) {
 
 // -- E2E crypto (AES-256-GCM with a shared key the hub never sees) ------------
 // Envelope: base64( iv(12) || ciphertext+tag ). Same scheme in the browser.
-export function newEncKey() {
-  return b64url(randomBytes(32))
-}
-
 function b64url(buf) {
   return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }

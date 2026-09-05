@@ -6,7 +6,7 @@
 
 import type { Block } from './blocks'
 
-export interface QuickAnswerAction {
+interface QuickAnswerAction {
   action: string
   title: string
   answer: Record<string, string>

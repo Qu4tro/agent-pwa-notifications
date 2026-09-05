@@ -26,7 +26,7 @@ export const ANSWER_PALETTE = {
   lime: '#84cc16',
 } as const
 
-export type AnswerColorName = keyof typeof ANSWER_PALETTE
+type AnswerColorName = keyof typeof ANSWER_PALETTE
 
 const HEX = /^#[0-9a-f]{6}$/i
 
@@ -39,14 +39,14 @@ const HEX = /^#[0-9a-f]{6}$/i
 // substring rule would place "Nope, not now" from "no" and "Yes, but hold"
 // from "yes", which is the opposite of what either list is for. Multi-word
 // entries are allowed, and are why the match is on the whole label.
-export const AFFIRM = new Set([
+const AFFIRM = new Set([
   'yes', 'y', 'yep', 'yeah', 'yup', 'ok', 'okay', 'sure', 'correct', 'right',
   'true', 'confirm', 'confirmed', 'approve', 'approved', 'accept', 'accepted',
   'agree', 'i agree', 'allow', 'enable', 'go', 'go ahead', 'do it', 'proceed',
   'continue', 'looks good', 'lgtm', 'all good', 'sounds good', 'yes please',
 ])
 
-export const DENY = new Set([
+const DENY = new Set([
   'no', 'n', 'nope', 'nah', 'wrong', 'incorrect', 'false', 'deny', 'denied',
   'reject', 'rejected', 'decline', 'declined', 'disagree', 'cancel', 'stop',
   'abort', 'never', 'do not', "don't", 'not now', 'disable', 'block', 'skip it',

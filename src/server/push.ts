@@ -124,7 +124,7 @@ async function encryptPayload(
 }
 
 // Send one push. Returns the HTTP status (410/404 => subscription is dead).
-export async function sendPush(
+async function sendPush(
   env: Env,
   sub: PushSubscription,
   notification: unknown,

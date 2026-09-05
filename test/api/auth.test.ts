@@ -62,14 +62,14 @@ describe('agent bearer auth on /api/v1/events', () => {
 })
 
 describe('session auth on the dashboard API', () => {
-  it('rejects /api/v1/feed without a session cookie', async () => {
-    const res = await call('GET', '/api/v1/feed')
+  it('rejects /api/v1/projects without a session cookie', async () => {
+    const res = await call('GET', '/api/v1/projects')
     expect(res.status).toBe(401)
   })
 
-  it('accepts /api/v1/feed with a session cookie', async () => {
+  it('accepts /api/v1/projects with a session cookie', async () => {
     const account = await createAccount('reader@example.invalid')
-    const res = await call('GET', '/api/v1/feed', {
+    const res = await call('GET', '/api/v1/projects', {
       auth: { cookie: await sessionFor(account.id) },
     })
     expect(res.status).toBe(200)
@@ -77,7 +77,7 @@ describe('session auth on the dashboard API', () => {
   })
 
   it('rejects a forged session cookie', async () => {
-    const res = await call('GET', '/api/v1/feed', {
+    const res = await call('GET', '/api/v1/projects', {
       auth: { cookie: 'ad_session=made.up' },
     })
     expect(res.status).toBe(401)

@@ -10,7 +10,7 @@ export { Hub } from './server/hub'
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const handled = await handleApi(request, env, ctx)
+    const handled = await handleApi(request, env)
     if (handled) return handled
 
     // Everything else -> TanStack Start SSR (the dashboard/PWA).

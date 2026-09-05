@@ -33,11 +33,8 @@ import {
   createQuestion,
   getQuestion,
   getInbox,
-  getFeed,
   getEvent,
   markRead,
-  markAllRead,
-  markUnread,
   clearEvents,
   archiveThreads,
   answerQuestion,
@@ -45,7 +42,6 @@ import {
   unsubscribePush,
   getSettings,
   putSettings,
-  getStats,
   getProjects,
   getTasks,
   getThread,
@@ -55,7 +51,7 @@ import { EmailCapError } from './email'
 import { handleMcp } from './mcp'
 import { blockSchemaDoc, openApiDoc } from './docs'
 
-export const CORS = {
+const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET,POST,OPTIONS',
   'access-control-allow-headers': 'authorization,content-type',
@@ -72,11 +68,7 @@ function withCors(res: Response): Response {
   return new Response(res.body, { status: res.status, headers })
 }
 
-export async function handleApi(
-  request: Request,
-  env: Env,
-  _ctx?: ExecutionContext,
-): Promise<Response | null> {
+export async function handleApi(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url)
   const path = url.pathname
   const method = request.method
@@ -244,17 +236,14 @@ export async function handleApi(
     const acct = await sessionAccount(request, env)
     if (!acct) return unauthorized()
 
-    if (path === '/api/v1/feed' && method === 'GET') return getFeed(url, env, acct)
     if (path === '/api/v1/projects' && method === 'GET') return getProjects(env, acct)
     if (path === '/api/v1/tasks' && method === 'GET')
       return getTasks(url.searchParams.get('project') ?? '', env, acct)
     if (path === '/api/v1/thread' && method === 'GET')
       return getThread(url.searchParams.get('project') ?? '', url.searchParams.get('key') ?? '', env, acct)
     if (path === '/api/v1/pending' && method === 'GET') return getPending(env, acct)
-    if (path === '/api/v1/stats' && method === 'GET') return getStats(env, acct)
     if (path === '/api/v1/settings' && method === 'GET') return getSettings(env, acct)
     if (path === '/api/v1/settings' && method === 'POST') return putSettings(request, env, acct)
-    if (path === '/api/v1/read-all' && method === 'POST') return markAllRead(env, acct)
     // Session only. Archiving is a human action - no agent-facing equivalent.
     if (path === '/api/v1/archive' && method === 'POST') return archiveThreads(request, env, acct)
     if (path === '/api/v1/push/subscribe' && method === 'POST') return subscribePush(request, env, acct)
@@ -265,9 +254,6 @@ export async function handleApi(
 
     const readMatch = path.match(/^\/api\/v1\/event\/([^/]+)\/read$/)
     if (readMatch && method === 'POST') return markRead(readMatch[1], env, acct)
-
-    const unreadMatch = path.match(/^\/api\/v1\/event\/([^/]+)\/unread$/)
-    if (unreadMatch && method === 'POST') return markUnread(unreadMatch[1], env, acct)
 
     const answerMatch = path.match(/^\/api\/v1\/questions\/([^/]+)\/answer$/)
     if (answerMatch && method === 'POST') return answerQuestion(answerMatch[1], request, env, acct)

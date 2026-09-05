@@ -42,7 +42,6 @@ async function progress() {
     model: 'opus-4.8',
     project: 'News Digest',
     task: 'Scanning sources',
-    tags: ['research'],
     task_id: 'ai-news-scan',
     title: 'Scanning AI news',
     blocks: [
@@ -90,7 +89,6 @@ async function weather() {
     model: 'gpt-5',
     project: 'Weather app',
     task: 'Fetching conditions',
-    tags: ['weather'],
     title: 'Which city do you want the weather for?',
     timeout_minutes: 30,
     blocks: [
@@ -132,7 +130,6 @@ async function weather() {
     model: 'gpt-5',
     project: 'Weather app',
     task: 'Fetching conditions',
-    tags: ['weather'],
     priority: 1,
     task_id: 'weather',
     title: `Weather in ${place.name}, ${place.country_code}`,
@@ -158,7 +155,6 @@ async function colors() {
     model: 'opus-4.8',
     project: 'Weather app',
     task: 'Adding children mode',
-    tags: ['ui', 'design'],
     title: 'Please choose which color scheme for children mode',
     timeout_minutes: 60,
     blocks: [

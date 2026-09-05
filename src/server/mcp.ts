@@ -22,7 +22,6 @@ const TOOLS = [
         project: { type: 'string', description: 'Project name, e.g. "Weather app". Used to group and filter.' },
         task: { type: 'string', description: 'Current task, e.g. "Adding children mode".' },
         model: { type: 'string', description: 'Which model you are, e.g. "opus-4.8", "gpt-5".' },
-        tags: { type: 'array', description: 'Optional freeform tags, e.g. ["backend","urgent"].' },
         blocks: { type: 'array', description: 'Optional display blocks. See /api/v1/schema.json.' },
         priority: { type: 'number', description: '0 info, 1 notify, 2 urgent. Default 0.' },
         task_id: { type: 'string', description: 'Stable key to group updates into one thread / update in place.' },
@@ -62,7 +61,6 @@ const TOOLS = [
         project: { type: 'string', description: 'Project name, e.g. "Weather app".' },
         task: { type: 'string', description: 'Current task, e.g. "Adding children mode".' },
         model: { type: 'string', description: 'Which model you are.' },
-        tags: { type: 'array', description: 'Optional freeform tags.' },
         ack: {
           type: 'string',
           description:

@@ -147,7 +147,6 @@ for (const { t, e, at } of posts) {
     project: t.project ?? undefined,
     task: t.task ?? undefined,
     model: t.model ?? undefined,
-    tags: t.tags ?? [],
     task_id: t.taskId ?? undefined,
     enc: enc || undefined,
     blocks: enc ? await encryptValue(e.blocks) : e.blocks,

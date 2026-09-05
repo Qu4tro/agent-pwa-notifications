@@ -8,8 +8,8 @@ import { handleApi } from '../src/server/router'
 export { Hub } from '../src/server/hub'
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const handled = await handleApi(request, env, ctx)
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+    const handled = await handleApi(request, env)
     return handled ?? new Response('Not found.', { status: 404 })
   },
 }

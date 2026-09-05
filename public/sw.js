@@ -43,7 +43,7 @@ self.addEventListener('push', (event) => {
   let data = {}
   try {
     data = event.data ? event.data.json() : {}
-  } catch (e) {
+  } catch {
     data = { title: 'Agent PWA Notifications', body: event.data ? event.data.text() : '' }
   }
 
@@ -56,8 +56,6 @@ self.addEventListener('push', (event) => {
     data: {
       url: data.eventId ? `/event/${data.eventId}` : '/',
       eventId: data.eventId,
-      kind: data.kind,
-      encrypted: data.encrypted === true,
       quickAnswers: data.quickAnswers,
     },
     icon: '/icon-192.png',

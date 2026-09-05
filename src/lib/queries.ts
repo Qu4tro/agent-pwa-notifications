@@ -118,7 +118,7 @@ function invalidateLists(client: QueryClient) {
 // `display` is the plaintext document for the optimistic cache write; `payload`
 // is the envelope that goes on the wire, which for an E2E question carries
 // each part as ciphertext.
-export type AnswerInput = {
+type AnswerInput = {
   eventId: string
   payload: Record<string, unknown>
   display: AnswerDoc
@@ -252,11 +252,6 @@ export function useMarkRead() {
         client.invalidateQueries({ queryKey: ['tasks'] }),
       ]),
   })
-}
-
-export function useMarkAllRead() {
-  const client = useQueryClient()
-  return useMutation({ mutationFn: () => api.markAllRead(), onSuccess: () => invalidateLists(client) })
 }
 
 export function useClear() {

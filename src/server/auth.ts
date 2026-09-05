@@ -17,7 +17,7 @@ function sessionTtlSeconds(env: Env): number {
 
 // -- Accounts -----------------------------------------------------------------
 
-export interface Account {
+interface Account {
   id: string
   email: string
   agent_key_prefix: string
@@ -126,7 +126,7 @@ export function normalizeEmail(raw: unknown): string | null {
 // ALLOWED_EMAILS is an optional Worker secret: a comma-separated allow list. It
 // closes sign-up on a hub that has a Resend key, where anyone who knows the URL
 // could otherwise create an account. Unset (or blank) leaves the hub open.
-export function emailAllowed(env: Env, email: string): boolean {
+function emailAllowed(env: Env, email: string): boolean {
   const raw = env.ALLOWED_EMAILS?.trim()
   if (!raw) return true
   return raw
@@ -163,7 +163,7 @@ export async function requestLoginCode(env: Env, email: string, ip: string): Pro
   return true
 }
 
-export type VerifyResult =
+type VerifyResult =
   | { ok: true; account: Account; agentKey: string | null }
   | { ok: false; error: string }
 
@@ -222,7 +222,7 @@ export async function verifyLoginCode(env: Env, email: string, code: unknown): P
 const LINK_PREFIX = 'link:'
 const LINK_RATE_MAX = 10 // links per account per hour
 const LINK_RATE_WINDOW = 60 * 60
-export const LINK_TTL_DEFAULT_MINUTES = 15
+const LINK_TTL_DEFAULT_MINUTES = 15
 const LINK_TTL_MIN_MINUTES = 1
 const LINK_TTL_MAX_MINUTES = 60
 
@@ -249,7 +249,7 @@ export function safeNext(raw: unknown): string {
   return next.slice(0, 512)
 }
 
-export type MintResult =
+type MintResult =
   | { ok: true; token: string; expiresAt: number }
   | { ok: false; error: string }
 

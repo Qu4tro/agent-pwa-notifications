@@ -48,8 +48,8 @@ describe('POST /api/v1/archive', () => {
     const thread = await call('GET', '/api/v1/thread?project=p&key=thread', { auth: { cookie } })
     expect(thread.status).toBe(404)
 
-    const feed = await call('GET', '/api/v1/feed', { auth: { cookie } })
-    expect(feed.body.events).toEqual([])
+    const pending = await call('GET', '/api/v1/pending', { auth: { cookie } })
+    expect(pending.body.pending).toEqual([])
 
     const one = await call('GET', `/api/v1/event/${id}`, { auth: { cookie } })
     expect(one.status).toBe(404)
@@ -69,12 +69,12 @@ describe('POST /api/v1/archive', () => {
     const cookie = await sessionFor(account.id)
     await notify(account, { title: 'Unread' })
 
-    const before = await call('GET', '/api/v1/stats', { auth: { cookie } })
-    expect(before.body.unread).toBe(1)
+    const before = await call('GET', '/api/v1/projects', { auth: { cookie } })
+    expect(before.body.projects).toMatchObject([{ project: 'p', unread: 1, pending: 0 }])
 
     await archive(cookie, ['thread'])
-    const after = await call('GET', '/api/v1/stats', { auth: { cookie } })
-    expect(after.body).toMatchObject({ unread: 0, pending_questions: 0 })
+    const after = await call('GET', '/api/v1/projects', { auth: { cookie } })
+    expect(after.body.projects).toEqual([])
   })
 
   it('refuses a whole thread that still has a question waiting', async () => {

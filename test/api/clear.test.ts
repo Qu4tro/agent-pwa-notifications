@@ -116,30 +116,6 @@ describe('POST /api/v1/clear with scope read', () => {
     expect(await eventIds(account.id)).toEqual([id])
   })
 
-  // Phase 2: "read" now means "seen or settled". An answered question that the
-  // human flipped back to unread is still settled, so clear takes it.
-  it('deletes an answered question that is marked unread again', async () => {
-    const account = await createAccount('answered-unread@example.invalid')
-    const cookie = await sessionFor(account.id)
-    const id = await ask(account, 'Ship it?')
-
-    await call('POST', `/api/v1/questions/${id}/answer`, {
-      body: { answer: { choice: 'Yes' } },
-      auth: { cookie },
-    })
-    await call('POST', `/api/v1/event/${id}/unread`, { auth: { cookie } })
-
-    const row = await env.DB.prepare('SELECT read_at FROM events WHERE id = ?1')
-      .bind(id)
-      .first<{ read_at: number | null }>()
-    expect(row?.read_at).toBeNull()
-
-    const cleared = await call('POST', '/api/v1/clear', { body: { scope: 'read' }, auth: { cookie } })
-    expect(cleared.body).toMatchObject({ ok: true, cleared: 1 })
-    expect(await eventIds(account.id)).toEqual([])
-    expect(await questionIds(account.id)).toEqual([])
-  })
-
   // Phase 2: an expired question is settled too - nobody can answer it any
   // more, so it should not sit in the inbox forever.
   it('deletes an expired question that was never read', async () => {

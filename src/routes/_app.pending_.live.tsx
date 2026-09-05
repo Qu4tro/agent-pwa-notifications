@@ -51,11 +51,11 @@ export const Route = createFileRoute('/_app/pending_/live')({
 // `empty` is the breath: nothing on screen, a timer running. `calm` is the
 // "all caught up" line, which waits for a question the way `showing` waits for
 // an answer. `leaving` with no current card is that line on its way out.
-export type LivePhase = 'empty' | 'calm' | 'entering' | 'showing' | 'acked' | 'leaving'
+type LivePhase = 'empty' | 'calm' | 'entering' | 'showing' | 'acked' | 'leaving'
 
 // How the card on screen arrived, or how it goes: up from the queue, or
 // sideways along the strip.
-export type LiveMotion = 'rise' | 'back' | 'forward'
+type LiveMotion = 'rise' | 'back' | 'forward'
 
 export interface LiveState {
   // The question on screen, or null when nothing is.
@@ -72,7 +72,7 @@ export interface LiveState {
   destination: string | 'edge' | null
 }
 
-export type LiveInput =
+type LiveInput =
   | { type: 'data'; ids: string[] }
   | { type: 'answered'; answer: string }
   | { type: 'failed' }
@@ -93,7 +93,7 @@ export const LIVE_START: LiveState = {
 
 // The cursor is at the edge when the card on screen is not one of the ones
 // already settled - so also when there is no card at all.
-export function atEdge(s: LiveState): boolean {
+function atEdge(s: LiveState): boolean {
   return s.current === null || !s.behind.includes(s.current)
 }
 

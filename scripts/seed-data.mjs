@@ -7,7 +7,6 @@
 // tags, a wide table, a long code block) are in here, because the point of the
 // set is to show the UI what it will actually have to render.
 
-const M = 1
 const H = 60
 const D = 24 * 60
 
@@ -123,7 +122,6 @@ export const threads = [
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'apn-connection-dot',
-    tags: ['ui', 'polish'],
     events: [
       {
         min: 5 * D + 2 * H,
@@ -201,7 +199,6 @@ export function ConnectionDot({ state }: { state: keyof typeof TONE }) {
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'apn-ios-push',
-    tags: ['bug', 'push', 'ios'],
     events: [
       {
         min: 3 * H + 20,
@@ -256,7 +253,6 @@ The spec is explicit: a 404 or 410 means delete the subscription.`),
     agent: 'codex',
     model: 'gpt-5.2',
     taskId: 'apn-release-notes',
-    tags: ['docs', 'release'],
     events: [
       {
         min: 26 * H,
@@ -303,7 +299,6 @@ The spec is explicit: a 404 or 410 means delete the subscription.`),
     agent: 'codex',
     model: 'gpt-5.2',
     taskId: 'oc-stripe-confirm',
-    tags: ['payments', 'migration', 'stripe', 'backend'],
     events: [
       {
         min: 9 * D,
@@ -402,7 +397,6 @@ reconciliation job, which nobody has read in a year.`),
     agent: 'orchard-ci',
     model: null,
     taskId: 'oc-flaky-refund',
-    tags: ['ci', 'flaky'],
     events: [
       {
         min: 4 * D,
@@ -453,7 +447,6 @@ AssertionError: expected 'pending' to be 'settled'
     agent: 'cursor',
     model: 'claude-sonnet-5',
     taskId: 'oc-apple-pay',
-    tags: ['frontend', 'payments'],
     events: [
       {
         min: 12,
@@ -475,7 +468,6 @@ AssertionError: expected 'pending' to be 'settled'
     agent: 'claude-code',
     model: 'claude-sonnet-5',
     taskId: 'sc-serde',
-    tags: ['rust', 'refactor'],
     events: [
       {
         min: 6 * D,
@@ -517,7 +509,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-sonnet-5',
     taskId: 'sc-release-090',
-    tags: ['release'],
     events: [
       {
         min: 4 * D,
@@ -549,7 +540,6 @@ pub struct Config {
     agent: 'research-bot',
     model: 'claude-opus-5',
     taskId: 'rp-sweep-1',
-    tags: ['research', 'pricing', 'q3'],
     events: [
       {
         min: 11 * D,
@@ -608,7 +598,6 @@ pub struct Config {
     agent: 'deploy-cron',
     model: null,
     taskId: 'hl-certs',
-    tags: ['infra', 'tls'],
     events: [
       {
         min: 5 * H,
@@ -645,7 +634,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'itm-decom',
-    tags: ['migration', 'infra', 'dns', 'cleanup', 'q3', 'phase-two', 'tracked', 'blocked', 'has-owner', 'reviewed', 'scheduled', 'noisy'],
     events: [
       {
         min: 2 * D,
@@ -687,7 +675,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-sonnet-5',
     taskId: 'cm-i18n',
-    tags: ['i18n', '🍵'],
     events: [
       {
         min: 30 * H,
@@ -736,7 +723,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-sonnet-5',
     taskId: null,
-    tags: ['perf'],
     events: [
       {
         min: 13 * D,
@@ -758,7 +744,6 @@ pub struct Config {
     agent: 'shell',
     model: null,
     taskId: null,
-    tags: [],
     events: [
       {
         min: 90,
@@ -801,7 +786,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'claude-opus-5',
     taskId: 'gk-release',
-    tags: ['release', 'gate'],
     events: [
       {
         min: 6 * H,
@@ -830,7 +814,6 @@ pub struct Config {
     agent: 'migrator',
     model: 'gpt-5.2',
     taskId: 'gk-schema',
-    tags: ['db'],
     events: [
       {
         min: 3 * H,
@@ -851,7 +834,6 @@ pub struct Config {
     agent: 'dependabot-ish',
     model: null,
     taskId: 'gk-zod',
-    tags: ['deps'],
     events: [
       {
         min: 90,
@@ -872,7 +854,6 @@ pub struct Config {
     agent: 'janitor',
     model: null,
     taskId: 'gk-branches',
-    tags: ['cleanup'],
     events: [
       {
         min: 40,
@@ -893,7 +874,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'claude-sonnet-5',
     taskId: 'gk-quiet',
-    tags: ['ops'],
     events: [
       {
         min: 5 * H,
@@ -924,7 +904,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'claude-opus-5',
     taskId: 'gk-ranker',
-    tags: ['release'],
     events: [
       {
         min: 55,
@@ -945,7 +924,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'claude-opus-5',
     taskId: 'gk-hotfix',
-    tags: ['release', 'hotfix'],
     events: [
       {
         min: 12,
@@ -967,7 +945,6 @@ pub struct Config {
     agent: 'janitor',
     model: 'claude-sonnet-5',
     taskId: 'gk-keys',
-    tags: ['security'],
     events: [
       {
         min: 70,
@@ -988,7 +965,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'claude-opus-5',
     taskId: 'gk-eu',
-    tags: ['release'],
     events: [
       {
         min: 2 * H + 10,
@@ -1009,7 +985,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'gk-brand',
-    tags: ['ui'],
     events: [
       {
         min: 2 * H + 40,
@@ -1030,7 +1005,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'gpt-5.2',
     taskId: 'gk-region',
-    tags: ['release'],
     events: [
       {
         min: 4 * H + 30,
@@ -1051,7 +1025,6 @@ pub struct Config {
     agent: 'janitor',
     model: null,
     taskId: 'gk-flaky',
-    tags: ['ci'],
     events: [
       {
         min: 9 * H,
@@ -1071,7 +1044,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'gk-review',
-    tags: ['review'],
     events: [
       {
         min: 3 * H,
@@ -1106,7 +1078,6 @@ pub struct Config {
     agent: 'janitor',
     model: null,
     taskId: 'gk-backup',
-    tags: ['ops'],
     events: [
       {
         min: 8,
@@ -1128,7 +1099,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'claude-sonnet-5',
     taskId: 'gk-flag',
-    tags: ['release'],
     events: [
       {
         min: 33,
@@ -1149,7 +1119,6 @@ pub struct Config {
     agent: 'janitor',
     model: null,
     taskId: 'gk-logs',
-    tags: ['ops'],
     events: [
       {
         min: 95,
@@ -1170,7 +1139,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'gk-icon',
-    tags: ['ui'],
     events: [
       {
         min: 2 * H + 55,
@@ -1191,7 +1159,6 @@ pub struct Config {
     agent: 'migrator',
     model: 'gpt-5.2',
     taskId: 'gk-deprec',
-    tags: ['db'],
     events: [
       {
         min: 3 * H + 20,
@@ -1212,7 +1179,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'claude-opus-5',
     taskId: 'gk-rollback',
-    tags: ['release'],
     events: [
       {
         min: 4 * H + 5,
@@ -1236,7 +1202,6 @@ pub struct Config {
     agent: 'release-bot',
     model: 'claude-opus-5',
     taskId: 'gk-timing',
-    tags: ['release'],
     events: [
       {
         min: 5 * H + 15,
@@ -1261,7 +1226,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'rn-write',
-    tags: ['docs', 'release'],
     events: [
       {
         min: 2 * D + 4 * H,
@@ -1302,7 +1266,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'rn-post',
-    tags: ['docs', 'release'],
     events: [
       {
         min: 6 * H,
@@ -1347,7 +1310,6 @@ pub struct Config {
     agent: 'claude-code',
     model: 'claude-opus-5',
     taskId: 'rn-changelog',
-    tags: ['docs', 'release'],
     events: [
       {
         min: 3 * H,
@@ -1379,7 +1341,6 @@ export const encryptedThread = {
   agent: 'claude-code',
   model: 'claude-opus-5',
   taskId: 'oc-key-rotation',
-  tags: ['secrets', 'e2e'],
   events: [
     {
       min: 3 * H,
@@ -1454,7 +1415,6 @@ export function nightlyThreads() {
       agent: 'deploy-cron',
       model: null,
       taskId: `hl-backup-${String(night).padStart(2, '0')}`,
-      tags: ['backup', 'cron'],
       events,
     })
   }

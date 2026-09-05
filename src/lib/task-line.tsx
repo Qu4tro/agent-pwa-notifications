@@ -28,7 +28,7 @@ function taskParams(t: TaskSummary) {
 // The title of the row is the task label when the agent set one, and the
 // newest event's own title when it did not, so in that second case the newest
 // line is already the title and is left off rather than said twice.
-export function timelineOf(t: TaskSummary): { items: TimelineItem[]; earlier: number } {
+function timelineOf(t: TaskSummary): { items: TimelineItem[]; earlier: number } {
   const shown = t.task ? t.recent : t.recent.slice(0, -1)
   const items = shown
     .map((r) => ({

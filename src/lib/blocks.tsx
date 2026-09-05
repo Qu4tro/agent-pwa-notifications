@@ -18,7 +18,7 @@ import { Button, IconButton, fieldClass } from './ui'
 // We never dangerouslySetInnerHTML agent content. Text is escaped by React by
 // default; here we only turn a small, known set of markdown into real elements.
 
-export type InlineToken =
+type InlineToken =
   | { kind: 'text'; text: string }
   | { kind: 'bold'; text: string }
   | { kind: 'code'; text: string }
@@ -119,7 +119,7 @@ function inline(text: string, key: string): React.ReactNode[] {
 // paragraph of literal backticks and the code as prose. A fence is the same
 // thing a `code` block is, so it renders as one - same highlighting, same copy
 // button - and the prose around it stays markdown.
-export type MdSegment =
+type MdSegment =
   | { kind: 'text'; text: string }
   | { kind: 'code'; lang?: string; text: string }
 
@@ -267,7 +267,7 @@ const TONE = {
   },
 } as const
 
-export type Tone = keyof typeof TONE
+type Tone = keyof typeof TONE
 
 // The tone colours the chip and the icon; the words stay --color-text, so the
 // contrast of the message itself never depends on which tone it is.

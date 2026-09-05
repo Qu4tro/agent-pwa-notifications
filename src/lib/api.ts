@@ -32,7 +32,6 @@ export interface EventItem {
   project: string | null
   task: string | null
   model: string | null
-  tags: string[]
   ack: string | null
   created_at: number
   updated_at: number
@@ -52,7 +51,7 @@ export interface ProjectRow {
 // Which section of the project page a thread belongs in. The server decides
 // it, from what the agent said and how long it has been quiet - not from what
 // the human has read. See ThreadState in src/server/api.ts.
-export type ThreadState = 'pending' | 'active' | 'done'
+type ThreadState = 'pending' | 'active' | 'done'
 
 export interface TaskSummary {
   key: string
@@ -122,10 +121,6 @@ export class AuthError extends Error {
 
 export const api = {
   config: () => req<{ ok: boolean; instant: boolean; version: string }>('/api/v1/config'),
-  feed: (sinceTs?: number) =>
-    req<{ ok: boolean; events: EventItem[] }>(
-      `/api/v1/feed${sinceTs ? `?since_ts=${sinceTs}` : ''}`,
-    ),
   event: (id: string) => req<{ ok: boolean; event: EventItem }>(`/api/v1/event/${id}`),
   projects: () => req<{ ok: boolean; projects: ProjectRow[] }>('/api/v1/projects'),
   tasks: (project: string) =>
@@ -136,10 +131,7 @@ export const api = {
     ),
   // Every question waiting on you, across every project, oldest first.
   pending: () => req<{ ok: boolean; pending: TaskSummary[] }>('/api/v1/pending'),
-  stats: () => req<{ ok: boolean; unread: number; pending_questions: number }>('/api/v1/stats'),
   markRead: (id: string) => req(`/api/v1/event/${id}/read`, { method: 'POST' }),
-  markUnread: (id: string) => req(`/api/v1/event/${id}/unread`, { method: 'POST' }),
-  markAllRead: () => req('/api/v1/read-all', { method: 'POST' }),
   // project null/undefined = all projects; '' = the "No project" bucket.
   clear: (scope: 'read' | 'all', project?: string | null) =>
     req<{ ok: boolean; cleared: number }>('/api/v1/clear', {
