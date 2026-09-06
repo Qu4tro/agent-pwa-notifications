@@ -10,6 +10,10 @@ released section and opens a fresh empty one.
 
 ## [Unreleased]
 
+### Changed
+
+- The development annotation bar now loads uxnote-fork 3.0.1.
+
 ### Removed
 
 - The unread `APP_URL` field from the `Env` interface.
