@@ -59,7 +59,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}`,
           }}
         />
-        {/* Dev only: the uxnote-fork 3.0.1 annotation bar, so the UI can be
+        {/* Dev only: the uxnote-fork 3.1.0 annotation bar, so the UI can be
             marked up in place. It loads from the reference server, run from a
             uxnote-fork checkout, which serves the widget beside the API:
 
@@ -71,8 +71,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             of marking and the two controls that place it; export, import and
             the mail handoff sit in the head of the panel, and the two JSON ones
             are switched off here. There is no mail button without a
-            `data-mailto` address, and none is named. With the server down the
-            widget just does not appear. Never in a production build:
+            `data-mailto` address, and none is named. The bar follows the
+            reader into the thread modal, because that dialog carries
+            `data-uxnote-allow`. With the server down the widget just does not
+            appear. Never in a production build:
             `import.meta.env.DEV` is replaced with `false` and the whole element
             is dropped. */}
         {import.meta.env.DEV ? (

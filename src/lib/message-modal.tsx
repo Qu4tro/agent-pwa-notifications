@@ -83,6 +83,11 @@ export function ThreadLink({ thread }: { thread: { project: string; key: string 
 // focus trap, the rest of the page going inert and Escape are all the
 // browser's; the tap on the backdrop and the way back are what is written
 // here.
+//
+// `data-uxnote-allow` is the development annotation bar's way in: it refuses a
+// native dialog that has not said it may, and the rest of the page is inert
+// while this one is open. Nothing else reads the attribute, in this app or in
+// the browser.
 export function MessageModal({
   e,
   content,
@@ -146,6 +151,7 @@ export function MessageModal({
       ref={dialog}
       aria-label={e.title || KIND_LABEL[e.kind] || 'Message'}
       onClose={onClose}
+      data-uxnote-allow=""
       className="m-0 h-full max-h-none w-full max-w-none border-0 bg-transparent p-0 backdrop:bg-black/70"
     >
       {/* The panel is the modal and everything around it is the way out, so a
